@@ -1,10 +1,12 @@
-hash: 098e3f5eeb8737d71a32459d0daca83725ba35f7a74a1b1452d6b6e4c78fb933
-updated: 2017-06-16T10:44:30.652658611-07:00
+hash: a47ee58f1ab090894d2d46b7803a6842f041d72017655d36223590022156bff1
+updated: 2017-06-21T09:54:16.471840229-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: 1bdb71328511a5225d6300c3c08a79172f667996
   subpackages:
   - btcec
+- name: github.com/cosmos/basecoin-delegationgame
+  version: f708523e290f889dd2773d3bf826caec541fc8cc
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
@@ -54,7 +56,7 @@ imports:
 - name: github.com/pelletier/go-toml
   version: fe7536c3dee2596cdd23ee9976a17c22bdaae286
 - name: github.com/pkg/errors
-  version: c605e284fe17294bda444b34710735b29d1a9d90
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -62,7 +64,7 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: b4dbd37a01839e0653eec12aa4bbb2a2ce7b2a37
+  version: 99b5d838ca16c25cc4944e323684f8415e8b10ba
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -161,7 +163,6 @@ imports:
   - events
   - flowrate
   - log
-  - logger
   - merkle
 - name: golang.org/x/crypto
   version: 850760c427c516be930bc91280636328f1a62286

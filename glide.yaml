@@ -18,4 +18,5 @@ import:
   version: develop
 - package: github.com/tendermint/basecoin-stake
   version: develop
-
+- package: github.com/cosmos/basecoin-delegationgame
+  version: develop
