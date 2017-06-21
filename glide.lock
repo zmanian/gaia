@@ -1,18 +1,18 @@
-hash: a47ee58f1ab090894d2d46b7803a6842f041d72017655d36223590022156bff1
-updated: 2017-06-21T11:56:53.956012112-07:00
+hash: 917c0b8eddffe54ef0a5d3430fbbdee0ce51d6f5f346976290834f864cb62dba
+updated: 2017-06-21T15:42:22.695193742-07:00
 imports:
 - name: github.com/btcsuite/btcd
-  version: 1bdb71328511a5225d6300c3c08a79172f667996
+  version: a6965d493fdfb833b6b3a83c3958ab18968fe24e
   subpackages:
   - btcec
 - name: github.com/cosmos/basecoin-delegationgame
-  version: c2124b11a4278745b38986fdcc37404c68addcae
+  version: 49cfdc2158bab6156d4be46402a8b7040aa12c08
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/go-kit/kit
-  version: a9ca6725cbbea455e61c6bc8a1ed28e81eb3493b
+  version: 0c52d4024a04395dabac42b65e5825d08d3335df
   subpackages:
   - log
   - log/level
@@ -22,14 +22,14 @@ imports:
 - name: github.com/go-stack/stack
   version: 7a2f19628aabfe68f0766b59e74d6315f8347d22
 - name: github.com/golang/protobuf
-  version: e325f446bebc2998605911c0a2650d9920361d4a
+  version: 1fb8fd32a09087bcd727225167edd31e1b9ceb24
   subpackages:
   - proto
   - ptypes/any
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
 - name: github.com/gorilla/websocket
-  version: a91eba7f97777409bc2c443f5534d41dd20c5720
+  version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/hashicorp/hcl
   version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
   subpackages:
@@ -64,13 +64,13 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 99b5d838ca16c25cc4944e323684f8415e8b10ba
+  version: 31694f19adeeaeb0a0e5fe95441b390d757753d2
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
-  version: a1ecfa6a20bd4ef9e9caded262ee1b1b26847675
+  version: c1de95864d73a5465492829d7cb2dd422b19ac96
 - name: github.com/syndtr/goleveldb
   version: 8c81ea47d4c41a385645e133e15510fc6a2a74b4
   subpackages:
@@ -94,42 +94,37 @@ imports:
   - server
   - types
 - name: github.com/tendermint/basecoin
-  version: 5981d85ca72459b28462dc78e97b259348293a32
+  version: da384487bb35fc8c23fd637719ce9c60b87913c0
   subpackages:
   - app
-  - cmd/commands
+  - cmd/basecoin/commands
   - plugins/ibc
   - state
   - types
   - version
-- name: github.com/tendermint/basecoin-stake
-  version: f4b812d923b096f3ca9afc650e410943cc064015
-  subpackages:
-  - cmd/stakecoin/commands
 - name: github.com/tendermint/ed25519
   version: 1f52c6f8b8a5c7908aff4497c186af344b428925
   subpackages:
   - edwards25519
   - extra25519
 - name: github.com/tendermint/go-crypto
-  version: 7dff40942a64cdeefefa9446b2d104750b349f8a
+  version: ad70b2222698a2018c4bf18bab86f3727621f492
 - name: github.com/tendermint/go-wire
   version: 5f88da3dbc1a72844e6dfaf274ce87f851d488eb
   subpackages:
   - data
   - data/base58
 - name: github.com/tendermint/merkleeyes
-  version: 6acc3a2663d9a3ec85cd654e01eaa7d7d7c6e99b
+  version: ce7de05896f560ddcc9207f65fea9901835dd238
   subpackages:
   - app
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: ca632c9e90cf06a67bacedd43d76407ce7b3614e
+  version: 4f0f50c62d41d39ad64e07ad642f705cc13c8229
   subpackages:
   - blockchain
   - cmd/tendermint/commands
-  - cmd/tendermint/commands/flags
   - config
   - consensus
   - mempool
@@ -165,7 +160,7 @@ imports:
   - log
   - merkle
 - name: golang.org/x/crypto
-  version: 850760c427c516be930bc91280636328f1a62286
+  version: adbae1b6b6fb4b02448a0fc0dbbc9ba2b95b294d
   subpackages:
   - curve25519
   - nacl/box
@@ -176,7 +171,7 @@ imports:
   - ripemd160
   - salsa20/salsa
 - name: golang.org/x/net
-  version: ddf80d0970594e2e4cccf5a98861cad3d9eaa4cd
+  version: 057a25b06247e0c51ba15d8ae475feb2fcb72164
   subpackages:
   - context
   - http2
@@ -190,7 +185,7 @@ imports:
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 9e2f80a6ba7ed4ba13e0cd4b1f094bf916875735
+  version: 4e9ab9ee170f2a39bd66c92b3e0a47ff47a4bc77
   subpackages:
   - secure/bidirule
   - transform
@@ -201,7 +196,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: c5c761dbca07f4d0efafd3f430a40dcdf1c1163f
+  version: 306d7d084b0c626e49d3a60ac008e52ad961edee
   subpackages:
   - codes
   - credentials

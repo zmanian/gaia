@@ -6,8 +6,8 @@ import (
 	dg "github.com/cosmos/basecoin-delegationgame"
 	"github.com/spf13/cobra"
 	// _ "github.com/tendermint/basecoin-delegationgame/commands"
-	_ "github.com/tendermint/basecoin-stake/cmd/stakecoin/commands"
-	"github.com/tendermint/basecoin/cmd/commands"
+	// _ "github.com/tendermint/basecoin-stake/cmd/stakecoin/commands"
+	"github.com/tendermint/basecoin/cmd/basecoin/commands"
 	"github.com/tendermint/basecoin/types"
 	"github.com/tendermint/tmlibs/cli"
 )
@@ -15,7 +15,7 @@ import (
 func init() {
 	commands.RegisterStartPlugin("delegationGame",
 		func() types.Plugin {
-			return &dg.Plugin{}
+			return &dg.Plugin{BondDenom: "atom"}
 		},
 	)
 }
@@ -28,12 +28,6 @@ func main() {
 	RootCmd.AddCommand(
 		commands.InitCmd,
 		commands.StartCmd,
-		commands.TxCmd,
-		commands.QueryCmd,
-		commands.KeyCmd,
-		commands.VerifyCmd,
-		commands.BlockCmd,
-		commands.AccountCmd,
 		commands.UnsafeResetAllCmd,
 		commands.QuickVersionCmd("0.1.0"),
 	)
