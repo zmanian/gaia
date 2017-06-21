@@ -1,12 +1,12 @@
 hash: a47ee58f1ab090894d2d46b7803a6842f041d72017655d36223590022156bff1
-updated: 2017-06-21T09:54:16.471840229-07:00
+updated: 2017-06-21T11:56:53.956012112-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: 1bdb71328511a5225d6300c3c08a79172f667996
   subpackages:
   - btcec
 - name: github.com/cosmos/basecoin-delegationgame
-  version: f708523e290f889dd2773d3bf826caec541fc8cc
+  version: c2124b11a4278745b38986fdcc37404c68addcae
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
@@ -119,7 +119,7 @@ imports:
   - data
   - data/base58
 - name: github.com/tendermint/merkleeyes
-  version: b653442978ee84c7df583417e86e82dd9fe3d674
+  version: 6acc3a2663d9a3ec85cd654e01eaa7d7d7c6e99b
   subpackages:
   - app
   - client
