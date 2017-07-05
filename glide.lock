@@ -1,5 +1,5 @@
-hash: 917c0b8eddffe54ef0a5d3430fbbdee0ce51d6f5f346976290834f864cb62dba
-updated: 2017-06-21T15:42:22.695193742-07:00
+hash: 782f23816be6729feaabf128e3d6f5abf374d9858c16edfe97467511c40399c2
+updated: 2017-06-30T13:54:14.000048604-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: a6965d493fdfb833b6b3a83c3958ab18968fe24e
@@ -102,6 +102,8 @@ imports:
   - state
   - types
   - version
+- name: github.com/tendermint/basecoin-stake
+  version: a7921cd9fc32d27432f6375591cc40e892c063d9
 - name: github.com/tendermint/ed25519
   version: 1f52c6f8b8a5c7908aff4497c186af344b428925
   subpackages:
@@ -115,7 +117,7 @@ imports:
   - data
   - data/base58
 - name: github.com/tendermint/merkleeyes
-  version: ce7de05896f560ddcc9207f65fea9901835dd238
+  version: 102aaf5a8ffda1846413fb22805a94def2045b9f
   subpackages:
   - app
   - client

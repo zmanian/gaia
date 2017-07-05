@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	// _ "github.com/tendermint/basecoin-delegationgame/commands"
 	// _ "github.com/tendermint/basecoin-stake/cmd/stakecoin/commands"
+	stake "github.com/tendermint/basecoin-stake"
 	"github.com/tendermint/basecoin/cmd/basecoin/commands"
 	"github.com/tendermint/basecoin/types"
 	"github.com/tendermint/tmlibs/cli"
@@ -16,6 +17,11 @@ func init() {
 	commands.RegisterStartPlugin("delegationGame",
 		func() types.Plugin {
 			return &dg.Plugin{BondDenom: "atom"}
+		},
+	)
+	commands.RegisterStartPlugin("stake",
+		func() types.Plugin {
+			return &stake.Plugin{UnbondingPeriod: 0, CoinDenom: "atom"}
 		},
 	)
 }

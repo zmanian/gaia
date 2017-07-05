@@ -18,3 +18,7 @@ import:
   version: develop
 - package: github.com/cosmos/basecoin-delegationgame
   version: basecoin_migration
+- package: github.com/tendermint/merkleeyes
+  version: ^0.2.4
+  subpackages:
+  - iavl
