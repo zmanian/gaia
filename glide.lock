@@ -1,12 +1,12 @@
-hash: 782f23816be6729feaabf128e3d6f5abf374d9858c16edfe97467511c40399c2
-updated: 2017-06-30T13:54:14.000048604-07:00
+hash: 9e8598b5021d530ca358e9c3666079c7f4edae36ab0daf72186e0a4d1a7840c8
+updated: 2017-07-10T11:22:35.501200968-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: a6965d493fdfb833b6b3a83c3958ab18968fe24e
   subpackages:
   - btcec
 - name: github.com/cosmos/basecoin-delegationgame
-  version: 49cfdc2158bab6156d4be46402a8b7040aa12c08
+  version: 36f30929dc0447d54453a0236108b2e80cdcff05
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
@@ -64,7 +64,7 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 31694f19adeeaeb0a0e5fe95441b390d757753d2
+  version: 8c6fa02d2225de0f9bdcb7ca912556f68d172d8c
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -94,7 +94,7 @@ imports:
   - server
   - types
 - name: github.com/tendermint/basecoin
-  version: da384487bb35fc8c23fd637719ce9c60b87913c0
+  version: 51a435315eb6263979d71e08ba1683da6080fa17
   subpackages:
   - app
   - cmd/basecoin/commands
@@ -103,14 +103,14 @@ imports:
   - types
   - version
 - name: github.com/tendermint/basecoin-stake
-  version: a7921cd9fc32d27432f6375591cc40e892c063d9
+  version: a3ea61c20ac5d2b6204ae1c8393289f564c0dc96
 - name: github.com/tendermint/ed25519
   version: 1f52c6f8b8a5c7908aff4497c186af344b428925
   subpackages:
   - edwards25519
   - extra25519
 - name: github.com/tendermint/go-crypto
-  version: ad70b2222698a2018c4bf18bab86f3727621f492
+  version: d31cfbaeaa4d930798ec327b52917975f3203c11
 - name: github.com/tendermint/go-wire
   version: 5f88da3dbc1a72844e6dfaf274ce87f851d488eb
   subpackages:
@@ -123,7 +123,7 @@ imports:
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: 4f0f50c62d41d39ad64e07ad642f705cc13c8229
+  version: 7f3c697b6e4c624aa0f8d29ff97e9bfe20deb8f9
   subpackages:
   - blockchain
   - cmd/tendermint/commands
