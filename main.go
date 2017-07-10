@@ -17,7 +17,10 @@ import (
 func init() {
 	commands.RegisterStartPlugin("delegationGame",
 		func() types.Plugin {
-			return &dg.Plugin{BondDenom: "atom"}
+			return &dg.Plugin{
+				BondDenom:             "atom",
+				MinimumOwnCoinsBonded: 1000,
+			}
 		},
 	)
 	commands.RegisterStartPlugin("stake",

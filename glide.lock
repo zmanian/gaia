@@ -1,12 +1,12 @@
 hash: 9e8598b5021d530ca358e9c3666079c7f4edae36ab0daf72186e0a4d1a7840c8
-updated: 2017-07-10T11:22:35.501200968-07:00
+updated: 2017-07-10T16:19:27.67930516-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: a6965d493fdfb833b6b3a83c3958ab18968fe24e
   subpackages:
   - btcec
 - name: github.com/cosmos/basecoin-delegationgame
-  version: 36f30929dc0447d54453a0236108b2e80cdcff05
+  version: a162fab408dc7514ecc1fd9fa6081436f4732011
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
@@ -123,7 +123,7 @@ imports:
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: 7f3c697b6e4c624aa0f8d29ff97e9bfe20deb8f9
+  version: b467515719e686e4678e6da4e102f32a491b85a0
   subpackages:
   - blockchain
   - cmd/tendermint/commands
