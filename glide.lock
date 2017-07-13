@@ -1,12 +1,12 @@
 hash: 9e8598b5021d530ca358e9c3666079c7f4edae36ab0daf72186e0a4d1a7840c8
-updated: 2017-07-10T16:19:27.67930516-07:00
+updated: 2017-07-13T08:28:51.31856985-07:00
 imports:
 - name: github.com/btcsuite/btcd
   version: a6965d493fdfb833b6b3a83c3958ab18968fe24e
   subpackages:
   - btcec
 - name: github.com/cosmos/basecoin-delegationgame
-  version: a162fab408dc7514ecc1fd9fa6081436f4732011
+  version: ae3f61b3ef75cda39b61d131f67029ef83716857
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/fsnotify/fsnotify
@@ -64,7 +64,7 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 8c6fa02d2225de0f9bdcb7ca912556f68d172d8c
+  version: c46add8a652801b61513ad36c56759f302fbb028
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -103,7 +103,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/basecoin-stake
-  version: a3ea61c20ac5d2b6204ae1c8393289f564c0dc96
+  version: 678d2ee42bc44d51288072406dacd2b9b70170e6
 - name: github.com/tendermint/ed25519
   version: 1f52c6f8b8a5c7908aff4497c186af344b428925
   subpackages:
