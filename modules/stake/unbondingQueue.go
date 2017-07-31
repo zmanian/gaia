@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/tendermint/basecoin/types"
+	"github.com/tendermint/basecoin/state"
 	"github.com/tendermint/go-wire"
 )
 
@@ -21,7 +21,7 @@ func queueKey(n uint64) []byte {
 type UnbondQueue struct {
 	head  uint64
 	tail  uint64
-	store types.KVStore
+	store state.KVStore
 }
 
 func (uq *UnbondQueue) incrementHead() {
@@ -68,7 +68,7 @@ func (uq UnbondQueue) Peek() (unbond *Unbond) {
 	return
 }
 
-func loadUnbondQueue(store types.KVStore) UnbondQueue {
+func loadUnbondQueue(store state.KVStore) UnbondQueue {
 	uq := UnbondQueue{}
 	uq.store = store
 	headBytes := store.Get(headKey)

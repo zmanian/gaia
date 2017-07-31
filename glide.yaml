@@ -1,0 +1,41 @@
+package: github.com/cosmos/gaia
+import:
+- package: github.com/pkg/errors
+- package: github.com/spf13/cobra
+- package: github.com/spf13/viper
+- package: github.com/tendermint/abci
+  subpackages:
+  - types
+- package: github.com/tendermint/basecoin
+  subpackages:
+  - client/commands
+  - client/commands/proofs
+  - client/commands/proxy
+  - client/commands/seeds
+  - client/commands/txs
+  - cmd/basecoin/commands
+  - docs/guide/counter/cmd/countercli/commands
+  - docs/guide/counter/plugins/counter
+  - errors
+  - modules/auth
+  - modules/auth/commands
+  - modules/base
+  - modules/base/commands
+  - modules/coin
+  - modules/coin/commands
+  - modules/fee
+  - modules/fee/commands
+  - modules/ibc
+  - modules/nonce
+  - modules/nonce/commands
+  - modules/roles
+  - stack
+  - state
+  - types
+- package: github.com/tendermint/go-crypto
+  subpackages:
+  - cmd
+- package: github.com/tendermint/go-wire
+- package: github.com/tendermint/tmlibs
+  subpackages:
+  - cli
