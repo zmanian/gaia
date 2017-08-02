@@ -3,13 +3,14 @@ package commands
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	wire "github.com/tendermint/go-wire"
+	"github.com/tendermint/basecoin"
+	txcmd "github.com/tendermint/basecoin/client/commands/txs"
+	"github.com/tendermint/basecoin/modules/coin"
 
 	"github.com/cosmos/gaia/modules/stake"
 )
@@ -72,30 +73,25 @@ func init() {
 }
 
 func cmdBond(cmd *cobra.Command, args []string) error {
-	// convert validator pubkey to bytes
-	validator, err := hex.DecodeString(bcmd.StripHex(viper.GetString(FlagValidator)))
-	if err != nil {
-		return errors.Errorf("Validator is invalid hex: %v\n", err)
-	}
-
-	bondTx := stake.BondTx{
-		ValidatorPubKey: validator,
-		Sequence:        0,
-	}
-	fmt.Println("BondTx:", string(wire.JSONBytes(bondTx)))
-	bytes := wire.BinaryBytes(bondTx)
-	return bcmd.AppTx("stake", bytes)
+	return cmdDelegation(stake.NewTxBond)
 }
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
+	return cmdDelegation(stake.NewTxUnbond)
+}
+
+func cmdDelegation(NewTx func(validator basecoin.Actor, amount coin.Coin) basecoin.TxInner) error {
 	// convert validator pubkey to bytes
 	validator, err := hex.DecodeString(bcmd.StripHex(validatorFlag))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
 
-	bondTx := stake.BondTx{ValidatorPubKey: validator}
-	fmt.Println("BondTx:", string(wire.JSONBytes(bondTx)))
-	bytes := wire.BinaryBytes(bondTx)
-	return bcmd.AppTx("stake", bytes)
+	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
+	if err != nil {
+		return err
+	}
+
+	tx := stake.NewTx(validator, amount)
+	return txcmd.DoTx(tx)
 }

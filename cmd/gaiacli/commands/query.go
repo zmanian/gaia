@@ -9,11 +9,58 @@ import (
 	"github.com/tendermint/basecoin/stack"
 )
 
-//CounterQueryCmd - CLI command to query the counter state
-var CounterQueryCmd = &cobra.Command{
-	Use:   "counter",
-	Short: "Query counter state, with proof",
-	RunE:  counterQueryCmd,
+var (
+	//CmdQueryValidator - CLI command to query the counter state
+	CmdQueryValidator = &cobra.Command{
+		Use:   "validator",
+		Short: "Query a validator",
+	}
+
+	//CmdQueryValidatorSummary - CLI command to query the counter state
+	CmdQueryValidatorSummary = &cobra.Command{
+		Use:   "summary",
+		Short: "Query a validator summary",
+		RunE:  counterQueryCmd,
+	}
+
+	//CmdQueryValidatorDeligates - CLI command to query the counter state
+	CmdQueryValidatorDeligates = &cobra.Command{
+		Use:   "deligates",
+		Short: "Query a validator's deligates",
+		RunE:  counterQueryCmd,
+	}
+
+	//CmdQueryDeligator - CLI command to query the counter state
+	CmdQueryDeligator = &cobra.Command{
+		Use:   "deligator",
+		Short: "Query a the validators of a delagator",
+	}
+
+	//CmdQueryDeligatorSummary - CLI command to query the counter state
+	CmdQueryDeligatorSummary = &cobra.Command{
+		Use:   "summary",
+		Short: "Query a deligator summary",
+		RunE:  counterQueryCmd,
+	}
+
+	//CmdQueryDeligatorValidators - CLI command to query the counter state
+	CmdQueryDeligatorValidators = &cobra.Command{
+		Use:   "validators",
+		Short: "Query a the validators of a delagator",
+		RunE:  counterQueryCmd,
+	}
+)
+
+func init() {
+	//combine the subcommands
+	CmdQueryValidator.AddCommand(
+		CmdQueryValidatorSummary,
+		CmdQueryValidatorDeligates,
+	)
+	CmdQueryDeligator.AddCommand(
+		CmdQueryDeligatorSummary,
+		CmdQueryDeligatorValidatos,
+	)
 }
 
 func counterQueryCmd(cmd *cobra.Command, args []string) error {

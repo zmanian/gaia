@@ -25,46 +25,8 @@ import (
 // so it gets routed properly
 const (
 	Name      = "stake"
-	ByteTx    = 0x55
-	TypeTx    = NameCounter + "/count"
-	PRECISION = 10e8
+	Precision = 10e8
 )
-
-func init() {
-	basecoin.TxMapper.RegisterImplementation(Tx{}, TypeTx, ByteTx)
-}
-
-// Tx - struct for all counter transactions
-type Tx struct {
-	Valid bool       `json:"valid"`
-	Fee   coin.Coins `json:"fee"`
-}
-
-// NewTx - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTx(valid bool, fee coin.Coins) basecoin.Tx {
-	return Tx{
-		Valid: valid,
-		Fee:   fee,
-	}.Wrap()
-}
-
-// Wrap - Wrap a Tx as a Basecoin Tx, used to satisfy the XXX interface
-func (c Tx) Wrap() basecoin.Tx {
-	return basecoin.Tx{TxInner: c}
-}
-
-// ValidateBasic just makes sure the Fee is a valid, non-negative value
-func (c Tx) ValidateBasic() error {
-	if !c.Fee.IsValid() {
-		return coin.ErrInvalidCoins()
-	}
-	if !c.Fee.IsNonnegative() {
-		return coin.ErrInvalidCoins()
-	}
-	return nil
-}
-
-///////////////////////////////////////////////////////////////////////////
 
 // NewHandler returns a new counter transaction processing handler
 func NewHandler(feeDenom string) basecoin.Handler {
@@ -89,7 +51,7 @@ func NewHandler(feeDenom string) basecoin.Handler {
 		)
 }
 
-// Handler the counter transaction processing handler
+// Handler the transaction processing handler
 type Handler struct {
 	stack.NopOption
 }
@@ -101,7 +63,7 @@ func (Handler) Name() string {
 	return Name
 }
 
-// AssertDispatcher - placeholder to satisfy XXX
+// AssertDispatcher - placeholder for stack.Dispatchable
 func (Handler) AssertDispatcher() {}
 
 // CheckTx checks if the tx is properly structured
@@ -118,51 +80,6 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	if err != nil {
 		return res, err
 	}
-	// note that we don't assert this on CheckTx (ValidateBasic),
-	// as we allow them to be writen to the chain
-	if !ctr.Valid {
-		return res, ErrInvalidCounter()
-	}
-
-	// handle coin movement.... like, actually decrement the other account
-	if !ctr.Fee.IsZero() {
-		// take the coins and put them in out account!
-		senders := ctx.GetPermissions("", auth.NameSigs)
-		if len(senders) == 0 {
-			return res, errors.ErrMissingSignature()
-		}
-		in := []coin.TxInput{{Address: senders[0], Coins: ctr.Fee}}
-		out := []coin.TxOutput{{Address: StoreActor(), Coins: ctr.Fee}}
-		send := coin.NewSendTx(in, out)
-		// if the deduction fails (too high), abort the command
-		_, err = dispatch.DeliverTx(ctx, store, send)
-		if err != nil {
-			return res, err
-		}
-	}
-
-	// update the counter
-	state, err := LoadState(store)
-	if err != nil {
-		return res, err
-	}
-	state.Counter++
-	state.TotalFees = state.TotalFees.Plus(ctr.Fee)
-	err = SaveState(store, state)
-
-	return res, err
-}
-
-func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr Tx, err error) {
-	//ctr, ok := tx.Unwrap().(Tx)
-	//if !ok {
-	//return ctr, errors.ErrInvalidFormat(TypeTx, tx)
-	//}
-	//err = ctr.ValidateBasic()
-	//if err != nil {
-	//return ctr, err
-	//}
-	//return ctr, nil
 
 	var tx Tx
 	err := wire.ReadBinaryBytes(txBytes, &tx)
@@ -176,6 +93,20 @@ func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr Tx, err error) {
 	case UnbondTx:
 		return sp.runUnbondTx(txType, store, ctx)
 	}
+
+	return res, err
+}
+
+func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr Tx, err error) {
+	ctr, ok := tx.Unwrap().(Tx)
+	if !ok {
+		return ctr, errors.ErrInvalidFormat(TypeTx, tx)
+	}
+	err = ctr.ValidateBasic()
+	if err != nil {
+		return ctr, err
+	}
+	return ctr, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,12 +154,12 @@ func (sp Plugin) runBondTx(tx BondTx, store types.KVStore, ctx types.CallContext
 		bondValue = &BondValue{
 			ValidatorPubKey: tx.ValidatorPubKey,
 			Total:           0,
-			ExchangeRate:    1 * PRECISION, // starts at one atom per bond token
+			ExchangeRate:    1 * Precision, // starts at one atom per bond token
 		}
 		bondValues = append(bondValues, *bondValue)
 	}
 	// calulcate amount of bond tokens to create, based on exchange rate
-	bondAmount := uint64(coinAmount) * PRECISION / bondValue.ExchangeRate
+	bondAmount := uint64(coinAmount) * Precision / bondValue.ExchangeRate
 	bondValue.Total += bondAmount
 	bondAccount.Amount += bondAmount
 	bondAccount.Sequence++
@@ -309,7 +240,7 @@ func (sp Plugin) runUnbondTx(tx UnbondTx, store types.KVStore, ctx types.CallCon
 //// create bond value object
 //bondValue := BondValue{
 //Total:           val.Power,
-//ExchangeRate:    1 * PRECISION,
+//ExchangeRate:    1 * Precision,
 //ValidatorPubKey: val.PubKey,
 //}
 //bondValues = append(bondValues, bondValue)
@@ -330,7 +261,7 @@ func (sp Plugin) runUnbondTx(tx UnbondTx, store types.KVStore, ctx types.CallCon
 
 //// add unbonded coins to basecoin account, based on current exchange rate
 //_, bondValue := loadBondValues(store).Get(unbond.ValidatorPubKey)
-//coinAmount := unbond.BondAmount * bondValue.ExchangeRate / PRECISION
+//coinAmount := unbond.BondAmount * bondValue.ExchangeRate / Precision
 //account := bcs.GetAccount(store, unbond.Address)
 //payout := makeCoin(coinAmount, sp.CoinDenom)
 //account.Balance = account.Balance.Plus(payout)
