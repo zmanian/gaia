@@ -14,14 +14,15 @@ const (
 	tailKey        = []byte(queueKeyPrefix + "tail")
 )
 
-func queueKey(n uint64) []byte {
+// getQueueKey - get the key for the queue'd record at position 'n'
+func getQueueKey(n uint64) []byte {
 	return []byte(queueKeyPrefix + fmt.Sprintf("%x", n))
 }
 
 // UnbondQueue - the Queue of the bonded tokens waiting to be unbonded
 type UnbondQueue struct {
-	head  uint64
 	tail  uint64
+	head  uint64
 	store state.KVStore
 }
 
@@ -43,30 +44,30 @@ func (uq UnbondQueue) length() uint64 {
 	return uq.tail - uq.head
 }
 
-// Push - TODO fill in
+// Push - Add to the back of the Queue
 func (uq *UnbondQueue) Push(unbond Unbond) {
-	pushKey := queueKey(uq.tail)
+	pushKey := getQueueKey(uq.tail)
 	unbondBytes := wire.BinaryBytes(unbond)
 	uq.store.Set(pushKey, unbondBytes)
 	uq.incrementTail()
 }
 
-// Pop - TODO fill in
+// Pop - Remove from the top of Queue
 func (uq *UnbondQueue) Pop() {
 	if uq.length() == 0 {
 		return
 	}
-	popKey := queueKey(uq.head)
+	popKey := getQueueKey(uq.head)
 	uq.store.Set(popKey, nil) // TODO: remove
 	uq.incrementHead()
 }
 
-// Peek - TODO fill in
+// Peek - Get the top record on the stack
 func (uq UnbondQueue) Peek() (unbond *Unbond) {
 	if uq.length() == 0 {
 		return nil
 	}
-	peekKey := queueKey(uq.head)
+	peekKey := getQueueKey(uq.head)
 	unbondBytes := uq.store.Get(peekKey)
 	wire.ReadBinaryBytes(unbondBytes, unbond)
 	return

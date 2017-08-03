@@ -17,12 +17,7 @@ import (
 	"github.com/tendermint/go-wire"
 )
 
-// Tx
-//--------------------------------------------------------------------------------
-
-// register the tx type with it's validation logic
-// make sure to use the name of the handler as the prefix in the tx type,
-// so it gets routed properly
+//nolint
 const (
 	Name      = "stake"
 	Precision = 10e8
@@ -56,7 +51,7 @@ type Handler struct {
 	stack.NopOption
 }
 
-var _ stack.Dispatchable = Handler{}
+var _ stack.Dispatchable = Handler{} //enforce interface at compile time
 
 // Name - return stake namespace
 func (Handler) Name() string {
@@ -67,37 +62,12 @@ func (Handler) Name() string {
 func (Handler) AssertDispatcher() {}
 
 // CheckTx checks if the tx is properly structured
-func (h Handler) CheckTx(ctx basecoin.Context, store state.SimpleDB,
-	tx basecoin.Tx, _ basecoin.Checker) (res basecoin.Result, err error) {
+func (h Handler) CheckTx(ctx basecoin.Context, db state.SimpleDB,
+	tx basecoin.Tx, _ basecoin.Checker) (res basecoin.CheckResult, err error) {
 	_, err = checkTx(ctx, tx)
 	return
 }
-
-// DeliverTx executes the tx if valid
-func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
-	tx basecoin.Tx, dispatch basecoin.Deliver) (res basecoin.Result, err error) {
-	ctr, err := checkTx(ctx, tx)
-	if err != nil {
-		return res, err
-	}
-
-	var tx Tx
-	err := wire.ReadBinaryBytes(txBytes, &tx)
-	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error decoding tx: " + err.Error())
-	}
-
-	switch txType := tx.(type) {
-	case BondTx:
-		return sp.runBondTx(txType, store, ctx)
-	case UnbondTx:
-		return sp.runUnbondTx(txType, store, ctx)
-	}
-
-	return res, err
-}
-
-func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr Tx, err error) {
+func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr basecoin.Tx, err error) {
 	ctr, ok := tx.Unwrap().(Tx)
 	if !ok {
 		return ctr, errors.ErrInvalidFormat(TypeTx, tx)
@@ -109,16 +79,58 @@ func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr Tx, err error) {
 	return ctr, nil
 }
 
+// DeliverTx executes the tx if valid
+func (h Handler) DeliverTx(ctx basecoin.Context, db state.SimpleDB,
+	tx basecoin.Tx, dispatch basecoin.Deliver) (res basecoin.DeliverResult, err error) {
+	ctr, err := checkTx(ctx, tx)
+	if err != nil {
+		return res, err
+	}
+
+	//start by processing the unbonding queue
+	height := ctx.BlockHeight()
+	processUnbondingQueue(db, height)
+
+	//now actually run the transaction
+	var tx Tx
+	err := wire.ReadBinaryBytes(txBytes, &tx)
+	if err != nil {
+		return abci.ErrBaseEncodingError.AppendLog("Error decoding tx: " + err.Error())
+	}
+
+	var abciRes abci.Result
+	switch txType := tx.(type) {
+	case TxBond:
+		abciRes, err = sp.runTxBond(txType, db, ctx)
+	case TxUnbond:
+		abciRes, err = sp.runTxUnbond(txType, db, ctx, height)
+	case TxNominate:
+		abciRes, err = sp.runTxNominate(txType, db, ctx)
+	case TxModComm:
+		abciRes, err = sp.runTxModComm(txType, db, ctx)
+	}
+
+	//determine the validator set changes
+	bondValues := getBondValues(db)
+	res = basecoin.DeliverResult{
+		Data:    abciRes.Data,
+		Log:     abciRes.Log,
+		Diff:    bondValues.Validators(), //FIXME this is the full set, need to just use the diff
+		GasUsed: 0,                       //TODO add gas accounting
+	}
+
+	return res, err
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Plugin is a proof-of-stake plugin for Basecoin
 type Plugin struct {
 	UnbondingPeriod uint64 // how long unbonding takes (measured in blocks)
 	CoinDenom       string // bondable coin denomination
-	height          uint64 // current block height
 }
 
-func (sp Plugin) runBondTx(tx BondTx, store types.KVStore, ctx types.CallContext) (res abci.Result) {
+func (sp Plugin) runTxBond(tx TxBond, db state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 	if len(ctx.Coins) != 1 {
 		return abci.ErrInternalError.AppendLog("Invalid coins")
 	}
@@ -132,7 +144,7 @@ func (sp Plugin) runBondTx(tx BondTx, store types.KVStore, ctx types.CallContext
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
 	}
 
-	bondAccount := loadBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	bondAccount := loadBondAccount(db, ctx.CallerAddress, tx.ValidatorPubKey)
 	if bondAccount == nil {
 		if tx.Sequence != 0 {
 			return abci.ErrInternalError.AppendLog("Invalid sequence number")
@@ -147,7 +159,7 @@ func (sp Plugin) runBondTx(tx BondTx, store types.KVStore, ctx types.CallContext
 	}
 
 	// add tokens to validator's bond supply
-	bondValues := loadBondValues(store)
+	bondValues := loadBondValues(db)
 	_, bondValue := bondValues.Get(tx.ValidatorPubKey)
 	if bondValue == nil {
 		// first bond for this validator, initialize a new BondValue
@@ -166,18 +178,19 @@ func (sp Plugin) runBondTx(tx BondTx, store types.KVStore, ctx types.CallContext
 
 	// TODO: special rules for entering validator set
 
-	storeBondValues(store, bondValues)
-	storeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
+	storeBondValues(db, bondValues)
+	storeBondAccount(db, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
 
 	return abci.OK
 }
 
-func (sp Plugin) runUnbondTx(tx UnbondTx, store types.KVStore, ctx types.CallContext) (res abci.Result) {
+func (sp Plugin) runTxUnbond(tx TxUnbond, db state.SimpleDB,
+	ctx types.CallContext, height uint64) (res abci.Result) {
 	if tx.BondAmount <= 0 {
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
-	bondAccount := loadBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	bondAccount := loadBondAccount(db, ctx.CallerAddress, tx.ValidatorPubKey)
 	if bondAccount == nil {
 		return abci.ErrBaseUnknownAddress.AppendLog("No bond account for this (address, validator) pair")
 	}
@@ -188,93 +201,87 @@ func (sp Plugin) runUnbondTx(tx UnbondTx, store types.KVStore, ctx types.CallCon
 	// subtract tokens from bond account
 	bondAccount.Amount -= tx.BondAmount
 	if bondAccount.Amount == 0 {
-		removeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
+		removeBondAccount(db, ctx.CallerAddress, tx.ValidatorPubKey)
 	} else {
-		storeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
+		storeBondAccount(db, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
 	}
 
 	// subtract tokens from bond value
-	bondValues := loadBondValues(store)
+	bondValues := loadBondValues(db)
 	bvIndex, bondValue := bondValues.Get(tx.ValidatorPubKey)
 	bondValue.Total -= tx.BondAmount
 	if bondValue.Total == 0 {
 		bondValues.Remove(bvIndex)
 	}
 	// will get sorted in EndBlock
-	storeBondValues(store, bondValues)
+	storeBondValues(db, bondValues)
 
 	// add unbond record to queue
 	unbond := Unbond{
 		ValidatorPubKey: tx.ValidatorPubKey,
 		BondAmount:      tx.BondAmount,
 		Address:         ctx.CallerAddress,
-		Height:          sp.height, // unbonds at `height + UnbondingPeriod`
+		HeightAtInit:    height, // will unbond at `height + UnbondingPeriod`
 	}
-	unbondQueue := loadUnbondQueue(store)
+	unbondQueue := loadUnbondQueue(db)
 	unbondQueue.Push(unbond)
 
 	return abci.OK
 }
 
-//// SetOption from ABCI
-//func (sp Plugin) SetOption(store types.KVStore, key string, value string) (log string) {
-//if key == "unbondingPeriod" {
-//var err error
-//sp.UnbondingPeriod, err = strconv.ParseUint(value, 10, 64)
-//if err != nil {
-//panic(fmt.Errorf("Could not parse int: '%s'", value))
-//}
-//return
-//}
-//if key == "coinDenom" {
-//sp.CoinDenom = value
-//return
-//}
-//panic(fmt.Errorf("Unknown option key '%s'", key))
-//}
+func (sp Plugin) runNominate(tx TxNominate, db state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
-//// InitChain from ABCI
-//func (sp Plugin) InitChain(store types.KVStore, vals []*abci.Validator) {
-//bondValues := loadBondValues(store)
-//for _, val := range vals {
-//// create bond value object
-//bondValue := BondValue{
-//Total:           val.Power,
-//ExchangeRate:    1 * Precision,
-//ValidatorPubKey: val.PubKey,
-//}
-//bondValues = append(bondValues, bondValue)
+	// create bond value object
+	bondValue := BondValue{
+		ValidatorPubKey: tx.PubKey,
+		Commission:      tx.Commission,
+		Total:           tx.Amount.Amount,
+		ExchangeRate:    1 * Precision,
+	}
 
-//// TODO: create bond account so initial bonds are unbondable
-//}
-//storeBondValues(store, bondValues)
-//}
+	//append and store
+	bondValues := getBondValues(db)
+	bondValues = append(bondValues, bondValue)
+	setBondValues(db, bondValues)
 
-//// BeginBlock from ABCI
-//func (sp Plugin) BeginBlock(store types.KVStore, hash []byte, header *abci.Header) {V
-//// process unbonds which have finished
-//sp.height = header.GetHeight()
-//queue := loadUnbondQueue(store)
-//unbond := queue.Peek()
-//for unbond != nil && sp.height-unbond.Height > sp.UnbondingPeriod {
-//queue.Pop()
+	return abci.OK
+}
 
-//// add unbonded coins to basecoin account, based on current exchange rate
-//_, bondValue := loadBondValues(store).Get(unbond.ValidatorPubKey)
-//coinAmount := unbond.BondAmount * bondValue.ExchangeRate / Precision
-//account := bcs.GetAccount(store, unbond.Address)
-//payout := makeCoin(coinAmount, sp.CoinDenom)
-//account.Balance = account.Balance.Plus(payout)
-//bcs.SetAccount(store, unbond.Address, account)
+//TODO Update logic
+func (sp Plugin) runModComm(tx TxModComm, db state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
-//// get next unbond record
-//unbond = queue.Peek()
-//}
-//}
+	// create bond value object
+	bondValue := BondValue{
+		ValidatorPubKey: tx.PubKey,
+		Commission:      tx.Commission,
+		Total:           tx.Amount.Amount,
+		ExchangeRate:    1 * Precision,
+	}
 
-//// EndBlock from ABCI
-//func (sp Plugin) EndBlock(store types.KVStore, height uint64) abci.ResponseEndBlock {
-//sp.height = height + 1
-//bondValues := loadBondValues(store)
-//return abci.ResponseEndBlock{bondValues.Validators()}
-//}
+	//append and store
+	bondValues := loadBondValues(db)
+	bondValues = append(bondValues, bondValue)
+	setBondValues(db, bondValues)
+
+	return abci.OK
+}
+
+// process unbonds which have finished
+func (sp Plugin) processUnbondingQueue(db state.SimpleDB, height uint64) {
+	queue := loadUnbondQueue(db)
+	unbond := queue.Peek()
+	for unbond != nil && height-unbond.HeightAtInit > sp.UnbondingPeriod {
+		queue.Pop()
+
+		// add unbonded coins to basecoin account, based on current exchange rate
+		_, bondValue := loadBondValues(db).Get(unbond.ValidatorPubKey)
+		coinAmount := unbond.BondAmount * bondValue.ExchangeRate / Precision
+		account := bcs.GetAccount(db, unbond.Address)
+		payout := makeCoin(coinAmount, sp.CoinDenom)
+		account.Balance = account.Balance.Plus(payout)
+		bcs.SetAccount(db, unbond.Address, account)
+
+		// get next unbond record
+		unbond = queue.Peek()
+	}
+}
