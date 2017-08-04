@@ -13,17 +13,19 @@ const (
 	bondValueKey         = []byte("bv")
 )
 
-func getBondAccountKey(delegatorAddr, validatorPubKey []byte) []byte {
+func getDelegateeBondsKey(delegatorAddr, validatorPubKey []byte) []byte {
 	return []byte(bondAccountKeyPrefix + fmt.Sprintf("%x/%x", delegatorAddr, validatorPubKey))
 }
 
-func setBondAccount(db state.SimpleDB, delegatorAddr, validatorPubKey []byte, account *BondAccount) {
+func setDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey []byte, account *DelegateeBonds) {
 	accountBytes := wire.BinaryBytes(account)
-	db.Set(getBondAccountKey(delegatorAddr, validatorPubKey), accountBytes)
+	store.Set(getDelegateeBondsKey(delegatorAddr, validatorPubKey), accountBytes)
 }
 
-func getBondAccount(db state.SimpleDB, delegatorAddr, validatorPubKey []byte) (account *BondAccount, err error) {
-	accountBytes := db.Get(getBondAccountKey(delegatorAddr, validatorPubKey))
+func getDelegateeBonds(store state.SimpleDB, delegatorAddr,
+	validatorPubKey []byte) (account *DelegateeBonds, err error) {
+
+	accountBytes := store.Get(getDelegateeBondsKey(delegatorAddr, validatorPubKey))
 	if accountBytes == nil {
 		return nil
 	}
@@ -34,19 +36,21 @@ func getBondAccount(db state.SimpleDB, delegatorAddr, validatorPubKey []byte) (a
 	return
 }
 
-func removeBondAccount(db state.SimpleDB, delegatorAddr, validatorPubKey []byte) {
-	db.Remove(getBondAccountKey(delegatorAddr, validatorPubKey))
+func removeDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey []byte) {
+	store.Remove(getDelegateeBondsKey(delegatorAddr, validatorPubKey))
 }
 
-func setBondValues(db state.SimpleDB, bondValues BondValues) {
+//////////////////////////////////////////////////////////////////////////////////////////
+
+func setDelegatorBonds(store state.SimpleDB, bondValues AllDelegatorBonds) {
 	bvBytes := wire.BinaryBytes(bondValues)
-	db.Set(bondValueKey, bvBytes)
+	store.Set(bondValueKey, bvBytes)
 }
 
-func getBondValues(db state.SimpleDB) (bondValues BondValues, err error) {
-	bvBytes := db.Get(bondValueKey)
+func getDelegatorBonds(store state.SimpleDB) (bondValues AllDelegatorBonds, err error) {
+	bvBytes := store.Get(bondValueKey)
 	if bvBytes == nil {
-		return make(BondValues, 0)
+		return make(AllDelegatorBonds, 0)
 	}
 	err = wire.ReadBinaryBytes(bvBytes, bondValues)
 	if err != nil {
