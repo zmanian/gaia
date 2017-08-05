@@ -111,12 +111,12 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	}
 
 	//determine the validator set changes
-	bondValues := getBondValues(store)
+	delegatorBonds := getDelegatorBonds(store)
 	res = basecoin.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
-		Diff:    bondValues.Validators(), //FIXME this is the full set, need to just use the diff
-		GasUsed: 0,                       //TODO add gas accounting
+		Diff:    delegatorBonds.Validators(), //FIXME this is the full set, need to just use the diff
+		GasUsed: 0,                           //TODO add gas accounting
 	}
 
 	return res, err
@@ -159,26 +159,26 @@ func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContex
 	}
 
 	// add tokens to validator's bond supply
-	bondValues := loadBondValues(store)
-	_, bondValue := bondValues.Get(tx.ValidatorPubKey)
-	if bondValue == nil {
-		// first bond for this validator, initialize a new BondValue
-		bondValue = &BondValue{
+	delegatorBonds := getDelegatorBonds(store)
+	_, delegatorBond := delegatorBonds.Get(tx.ValidatorPubKey)
+	if delegatorBond == nil {
+		// first bond for this validator, initialize a new DelegatorBond
+		delegatorBond = &DelegatorBond{
 			ValidatorPubKey: tx.ValidatorPubKey,
 			Total:           0,
 			ExchangeRate:    1 * Precision, // starts at one atom per bond token
 		}
-		bondValues = append(bondValues, *bondValue)
+		delegatorBonds = append(delegatorBonds, *delegatorBond)
 	}
 	// calulcate amount of bond tokens to create, based on exchange rate
-	bondAmount := uint64(coinAmount) * Precision / bondValue.ExchangeRate
-	bondValue.Total += bondAmount
+	bondAmount := uint64(coinAmount) * Precision / delegatorBond.ExchangeRate
+	delegatorBond.Total += bondAmount
 	bondAccount.Amount += bondAmount
 	bondAccount.Sequence++
 
 	// TODO: special rules for entering validator set
 
-	storeBondValues(store, bondValues)
+	setDelegatorBonds(store, delegatorBonds)
 	storeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
 
 	return abci.OK
@@ -207,14 +207,14 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 	}
 
 	// subtract tokens from bond value
-	bondValues := loadBondValues(store)
-	bvIndex, bondValue := bondValues.Get(tx.ValidatorPubKey)
-	bondValue.Total -= tx.BondAmount
-	if bondValue.Total == 0 {
-		bondValues.Remove(bvIndex)
+	delegatorBonds := getDelegatorBonds(store)
+	bvIndex, delegatorBond := delegatorBonds.Get(tx.ValidatorPubKey)
+	delegatorBond.Total -= tx.BondAmount
+	if delegatorBond.Total == 0 {
+		delegatorBonds.Remove(bvIndex)
 	}
 	// will get sorted in EndBlock
-	storeBondValues(store, bondValues)
+	setDelegatorBonds(store, delegatorBonds)
 
 	// add unbond record to queue
 	unbond := Unbond{
@@ -233,7 +233,7 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
 	// create bond value object
-	bondValue := BondValue{
+	delegatorBond := DelegatorBond{
 		ValidatorPubKey: tx.PubKey,
 		Commission:      tx.Commission,
 		Total:           tx.Amount.Amount,
@@ -241,9 +241,9 @@ func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.Call
 	}
 
 	//append and store
-	bondValues := getDelegatorBonds(store)
-	bondValues = append(bondValues, bondValue)
-	setDelegatorBonds(store, bondValues)
+	delegatorBonds := getDelegatorBonds(store)
+	delegatorBonds = append(delegatorBonds, delegatorBond)
+	setDelegatorBonds(store, delegatorBonds)
 
 	return abci.OK
 }
@@ -262,7 +262,7 @@ func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB, ctx types.CallCo
 	//append and store
 	bonds := getDelegatorBonds(store)
 	bonds = append(bonds, bond)
-	setDelegatorBonds(store, bondValues)
+	setDelegatorBonds(store, delegatorBonds)
 
 	return abci.OK
 }
@@ -272,31 +272,31 @@ func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err 
 	queue := loadUnbondQueue(store)
 
 	//Get the peek unbond record from the queue
-	unbondBytes := queue.Peek()
 	var unbond Unbond
-	err = wire.ReadBinaryBytes(unbondBytes, unbond)
+	getUnbond := func() error {
+		unbondBytes := queue.Peek()
+		return wire.ReadBinaryBytes(unbondBytes, unbond)
+	}
+	err = getUnbond()
 	if err != nil {
-		return
+		return err
 	}
 
 	for unbond != nil && height-unbond.HeightAtInit > sp.UnbondingPeriod {
 		queue.Pop()
 
 		// add unbonded coins to basecoin account, based on current exchange rate
-		_, bondValue := loadBondValues(store).Get(unbond.ValidatorPubKey)
-		coinAmount := unbond.BondAmount * bondValue.ExchangeRate / Precision
+		_, delegatorBond := getDelegatorBonds(store).Get(unbond.ValidatorPubKey)
+		coinAmount := unbond.BondAmount * delegatorBond.ExchangeRate / Precision
 		account := bcs.GetAccount(store, unbond.Address)
 		payout := makeCoin(coinAmount, sp.CoinDenom)
 		account.Balance = account.Balance.Plus(payout)
 		bcs.SetAccount(store, unbond.Address, account)
 
-		// TODO make function variable with the previous time this code is called
 		// get next unbond record
-		unbondBytes := queue.Peek()
-		var unbond Unbond
-		err = wire.ReadBinaryBytes(unbondBytes, unbond)
+		err = getUnbond()
 		if err != nil {
-			return
+			return err
 		}
 	}
 }
