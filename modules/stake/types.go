@@ -86,7 +86,7 @@ func (bvs DelegatorBonds) Remove(i int) DelegatorBonds {
 	return append(bvs[:i], bvs[i+1:]...)
 }
 
-//--------------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////////
 
 // DelegateeBond defines an account of bond tokens. It is owned by one delegatee
 // account, and is associated with one delegator/validator account
@@ -98,10 +98,23 @@ type DelegateeBond struct {
 // DelegateeBonds - all delegatee bonds
 type DelegateeBonds []DelegateeBonds
 
-//Unbond defines an amount of bond tokens which are in the unbonding period
-type Unbond struct {
+////////////////////////////////////////////////////////////////////////////////
+
+// QueueElem - queue element, the basis of a queue interaction with a validator
+type QueueElem struct {
 	ValidatorPubKey []byte
-	Address         []byte // account to pay out to
-	Amount          uint64 // amount of bond tokens which are unbonding
-	HeightAtInit    uint64 // when the unbonding started
+	HeightAtInit    uint64 // when the queue was initiated
+}
+
+// UnbondQueueElem - the unbonding queue element
+type UnbondQueueElem struct {
+	QueueTx
+	Address []byte // account to pay out to
+	Amount  uint64 // amount of bond tokens which are unbonding
+}
+
+// ModCommQueueElem - the commission queue element
+type ModCommQueueElem struct {
+	QueueTx
+	Commission string // New commission for the
 }

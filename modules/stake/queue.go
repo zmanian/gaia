@@ -1,5 +1,6 @@
-//TODO  move to tmlibs
 package stake
+
+//TODO  move to tmlibs
 
 import (
 	"encoding/binary"
@@ -10,27 +11,26 @@ import (
 
 // Queue - Abstract queue implementation object
 type Queue struct {
-	tail    uint64         //Start position of the queue
-	head    uint64         //End position of the queue
-	store   state.SimpleDB //Queue store
-	name    string         //Queue name in the store
-	headKey []byte         //Store-key of the record which holds the head
-	tailKey []byte         //Store-key of the record which holds the tail
+	tail  uint64         //Start position of the queue
+	head  uint64         //End position of the queue
+	store state.SimpleDB //Queue store
+	name  string         //Queue name in the store
 }
+
+func (q Queue) headKey() []byte { return []byte(q.name + "head") }
+func (q Queue) tailKey() []byte { return []byte(q.name + "tail") }
 
 // NewQueue - create a new generic queue under the namespace prefixed by name
 func NewQueue(name string, store state.SimpleDB) (Queue, error) {
 	q := Queue{
-		tail:    0,
-		head:    0,
-		store:   store,
-		name:    name,
-		headKey: []byte(name + "head"),
-		tailKey: []byte(name + "tail"),
+		tail:  0,
+		head:  0,
+		store: store,
+		name:  name,
 	}
 
 	// Test to make sure that the Queue doesn't already exist
-	headBytes := store.Get(q.headKey)
+	headBytes := store.Get(q.headKey())
 	if headBytes != nil {
 		return q, fmt.Errorf("cannot create a Queue under the name %v, Queue already exists")
 	}
@@ -38,29 +38,33 @@ func NewQueue(name string, store state.SimpleDB) (Queue, error) {
 	// Set the position bytes
 	positionBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(positionBytes, 0)
-	q.store.Set(q.headKey, bytes)
-	q.store.Set(q.tailKey, bytes)
+	q.store.Set(q.headKey(), bytes)
+	q.store.Set(q.tailKey(), bytes)
 
 	return q, nil
 }
 
 // LoadQueue - load an existing namespace
-func LoadQueue(store state.KVStore) Queue {
-	q := Queue{}
-	q.store = store
+func LoadQueue(name string, store state.SimpleDB) (Queue, error) {
+
+	q = Queue{
+		store: store,
+		name:  name,
+	}
+
 	headBytes := store.Get(headKey)
 	if headBytes == nil {
-		q.head = 0
-	} else {
-		q.head = binary.BigEndian.Uint64(headBytes)
+		return q, fmt.Errorf("cannot load Queue under the name %v, head does not exists")
 	}
+	q.head = binary.BigEndian.Uint64(headBytes)
+
 	tailBytes := store.Get(tailKey)
 	if tailBytes == nil {
-		q.tail = 0
-	} else {
-		q.tail = binary.BigEndian.Uint64(tailBytes)
+		return q, fmt.Errorf("cannot load Queue under the name %v, head does not exists")
 	}
-	return q
+	q.tail = binary.BigEndian.Uint64(tailBytes)
+
+	return q, nil
 }
 
 // getQueueKey - get the key for the queue'd record at position 'n'

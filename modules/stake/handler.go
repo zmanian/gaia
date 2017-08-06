@@ -232,7 +232,7 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 
 func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
-	// create bond value object
+	// Create bond value object
 	delegatorBond := DelegatorBond{
 		ValidatorPubKey: tx.PubKey,
 		Commission:      tx.Commission,
@@ -240,7 +240,7 @@ func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.Call
 		ExchangeRate:    1 * Precision,
 	}
 
-	//append and store
+	// Append and store
 	delegatorBonds := getDelegatorBonds(store)
 	delegatorBonds = append(delegatorBonds, delegatorBond)
 	setDelegatorBonds(store, delegatorBonds)
@@ -251,30 +251,28 @@ func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.Call
 //TODO Update logic
 func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
-	//append and store
+	// Retrieve the record to modify
 	delegatorBonds, err := getDelegatorBonds(store)
 	delegatorBond := delegatorBonds.Get()
 
-	// create bond value object
-	delegatorBond := DelegatorBond{
-		ValidatorPubKey: tx.PubKey,
-		Commission:      tx.Commission,
-		Total:           tx.Amount.Amount,
-		ExchangeRate:    1 * Precision,
-	}
+	//TODO Check if there is a commission modification in the queue already?
 
+	// Add the commission modification the queue
+
+	// Modify and save the commission
+	delegatorBond.Commission = tx.Commission
 	delegatorBonds = append(delegatorBonds, delegatorBond)
 	setDelegatorBonds(store, delegatorBonds)
 
 	return abci.OK
 }
 
-// process unbonds which have finished
+// Process all unbonding for the current block
 func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err error) {
-	queue := loadUnbondQueue(store)
+	queue := LoadQueue("unbonding", store)
 
 	//Get the peek unbond record from the queue
-	var unbond Unbond
+	var unbond UnbondQueueElem
 	getUnbond := func() error {
 		unbondBytes := queue.Peek()
 		return wire.ReadBinaryBytes(unbondBytes, unbond)
@@ -297,6 +295,49 @@ func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err 
 
 		// get next unbond record
 		err = getUnbond()
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// Process all validator commission modification for the current block
+func (sp Plugin) processModCommQueue(store state.SimpleDB, height uint64, err error) {
+	queue := LoadQueue("commission", store)
+
+	//Get the peek record from the queue
+	var commission ModCommQueueElem
+	getCommission := func() error {
+		bytes := queue.Peek()
+		return wire.ReadBinaryBytes(bytes, commission)
+	}
+	err = getCommission()
+	if err != nil {
+		return err
+	}
+
+	for commission != nil && height-commission.HeightAtInit > sp.UnbondingPeriod {
+		queue.Pop()
+
+		// Retrieve the record to modify
+		delegatorBonds, err := getDelegatorBonds(store)
+		delegatorBond := delegatorBonds.Get(commission.ValidatorPubKey)
+
+		// Modify and save the commission
+		delegatorBond.Commission = commission.Commission
+		delegatorBonds = append(delegatorBonds, delegatorBond)
+		setDelegatorBonds(store, delegatorBonds)
+
+		// add unbonded coins to basecoin account, based on current exchange rate
+		_, delegatorBond := getDelegatorBonds(store).Get(unbond.ValidatorPubKey)
+		coinAmount := unbond.BondAmount * delegatorBond.ExchangeRate / Precision
+		account := bcs.GetAccount(store, unbond.Address) //TODO get caller signing address
+		payout := makeCoin(coinAmount, sp.CoinDenom)
+		account.Balance = account.Balance.Plus(payout)
+		bcs.SetAccount(store, unbond.Address, account) //TODO send coins
+
+		// get next unbond record
+		err = getCommission()
 		if err != nil {
 			return err
 		}
