@@ -1,3 +1,4 @@
+//TODO  move to tmlibs
 package stake
 
 import (

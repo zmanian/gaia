@@ -150,7 +150,7 @@ func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContex
 			return abci.ErrInternalError.AppendLog("Invalid sequence number")
 		}
 		// create new account for this (delegator, validator) pair
-		bondAccount = &BondAccount{
+		bondAccount = &DelegateeBond{
 			Amount:   0,
 			Sequence: 0,
 		}
@@ -251,17 +251,19 @@ func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB, ctx types.Call
 //TODO Update logic
 func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
 
+	//append and store
+	delegatorBonds, err := getDelegatorBonds(store)
+	delegatorBond := delegatorBonds.Get()
+
 	// create bond value object
-	bond := DelegatorBond{
+	delegatorBond := DelegatorBond{
 		ValidatorPubKey: tx.PubKey,
 		Commission:      tx.Commission,
 		Total:           tx.Amount.Amount,
 		ExchangeRate:    1 * Precision,
 	}
 
-	//append and store
-	bonds := getDelegatorBonds(store)
-	bonds = append(bonds, bond)
+	delegatorBonds = append(delegatorBonds, delegatorBond)
 	setDelegatorBonds(store, delegatorBonds)
 
 	return abci.OK
@@ -288,10 +290,10 @@ func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err 
 		// add unbonded coins to basecoin account, based on current exchange rate
 		_, delegatorBond := getDelegatorBonds(store).Get(unbond.ValidatorPubKey)
 		coinAmount := unbond.BondAmount * delegatorBond.ExchangeRate / Precision
-		account := bcs.GetAccount(store, unbond.Address)
+		account := bcs.GetAccount(store, unbond.Address) //TODO get caller signing address
 		payout := makeCoin(coinAmount, sp.CoinDenom)
 		account.Balance = account.Balance.Plus(payout)
-		bcs.SetAccount(store, unbond.Address, account)
+		bcs.SetAccount(store, unbond.Address, account) //TODO send coins
 
 		// get next unbond record
 		err = getUnbond()
