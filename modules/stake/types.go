@@ -106,15 +106,15 @@ type QueueElem struct {
 	HeightAtInit    uint64 // when the queue was initiated
 }
 
-// UnbondQueueElem - the unbonding queue element
-type UnbondQueueElem struct {
+// QueueElemUnbond - the unbonding queue element
+type QueueElemUnbond struct {
 	QueueTx
 	Address []byte // account to pay out to
 	Amount  uint64 // amount of bond tokens which are unbonding
 }
 
-// ModCommQueueElem - the commission queue element
-type ModCommQueueElem struct {
+// QueueElemModComm - the commission queue element
+type QueueElemModComm struct {
 	QueueTx
 	Commission string // New commission for the
 }

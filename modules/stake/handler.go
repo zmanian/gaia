@@ -126,8 +126,9 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 
 // Plugin is a proof-of-stake plugin for Basecoin
 type Plugin struct {
-	UnbondingPeriod uint64 // how long unbonding takes (measured in blocks)
-	CoinDenom       string // bondable coin denomination
+	Period2Unbond  uint64 // how long unbonding takes (measured in blocks)
+	Period2ModComm uint64 // how long modifying a validator commission takes (measured in blocks)
+	CoinDenom      string // bondable coin denomination
 }
 
 func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
@@ -144,17 +145,17 @@ func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContex
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
 	}
 
-	bondAccount := loadBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
-	if bondAccount == nil {
+	delegateeBonds := getDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	if delegateeBonds == nil {
 		if tx.Sequence != 0 {
 			return abci.ErrInternalError.AppendLog("Invalid sequence number")
 		}
 		// create new account for this (delegator, validator) pair
-		bondAccount = &DelegateeBond{
+		delegateeBonds = &DelegateeBond{
 			Amount:   0,
 			Sequence: 0,
 		}
-	} else if tx.Sequence != (bondAccount.Sequence + 1) {
+	} else if tx.Sequence != (delegateeBonds.Sequence + 1) {
 		return abci.ErrInternalError.AppendLog("Invalid sequence number")
 	}
 
@@ -173,13 +174,13 @@ func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContex
 	// calulcate amount of bond tokens to create, based on exchange rate
 	bondAmount := uint64(coinAmount) * Precision / delegatorBond.ExchangeRate
 	delegatorBond.Total += bondAmount
-	bondAccount.Amount += bondAmount
-	bondAccount.Sequence++
+	delegateeBonds.Amount += bondAmount
+	delegateeBonds.Sequence++
 
 	// TODO: special rules for entering validator set
 
 	setDelegatorBonds(store, delegatorBonds)
-	storeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
+	setDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegateeBonds)
 
 	return abci.OK
 }
@@ -190,20 +191,20 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
-	bondAccount := loadBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
-	if bondAccount == nil {
+	delegateeBonds := getDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	if delegateeBonds == nil {
 		return abci.ErrBaseUnknownAddress.AppendLog("No bond account for this (address, validator) pair")
 	}
-	if bondAccount.Amount < tx.BondAmount {
+	if delegateeBonds.Amount < tx.BondAmount {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 	}
 
 	// subtract tokens from bond account
-	bondAccount.Amount -= tx.BondAmount
-	if bondAccount.Amount == 0 {
-		removeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	delegateeBonds.Amount -= tx.BondAmount
+	if delegateeBonds.Amount == 0 {
+		removeDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
 	} else {
-		storeBondAccount(store, ctx.CallerAddress, tx.ValidatorPubKey, bondAccount)
+		setDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegateeBonds)
 	}
 
 	// subtract tokens from bond value
@@ -217,15 +218,17 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 	setDelegatorBonds(store, delegatorBonds)
 
 	// add unbond record to queue
-	unbond := Unbond{
-		ValidatorPubKey: tx.ValidatorPubKey,
-		Address:         ctx.CallerAddress,
-		BondAmount:      tx.BondAmount,
-		HeightAtInit:    height, // will unbond at `height + UnbondingPeriod`
+	queueElem := QueueElemUnbond{
+		QueueElem: QueueElem{
+			ValidatorPubKey: tx.ValidatorPubKey,
+			HeightAtInit:    height, // will unbond at `height + Period2Unbond`
+		},
+		Address:    ctx.CallerAddress,
+		BondAmount: tx.BondAmount,
 	}
-	unbondQueue := loadQueue(store)
-	unbondBytes := wire.BinaryBytes(unbond)
-	unbondQueue.Push(unbondBytes)
+	queue := loadQueue(store)
+	bytes := wire.BinaryBytes(queueElem)
+	queue.Push(bytes)
 
 	return abci.OK
 }
@@ -258,17 +261,24 @@ func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB, ctx types.CallCo
 	//TODO Check if there is a commission modification in the queue already?
 
 	// Add the commission modification the queue
-
-	// Modify and save the commission
-	delegatorBond.Commission = tx.Commission
-	delegatorBonds = append(delegatorBonds, delegatorBond)
-	setDelegatorBonds(store, delegatorBonds)
+	queueElem := QueueElemModComm{
+		QueueElem: QueueElem{
+			ValidatorPubKey: tx.ValidatorPubKey,
+			HeightAtInit:    height, // will unbond at `height + Period2Unbond`
+		},
+		Commission: tx.Commission,
+	}
+	queue := LoadQueue("commission", store)
+	bytes := wire.BinaryBytes(queueElem)
+	queue.Push(bytes)
 
 	return abci.OK
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Process all unbonding for the current block
-func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err error) {
+func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64) error {
 	queue := LoadQueue("unbonding", store)
 
 	//Get the peek unbond record from the queue
@@ -282,12 +292,16 @@ func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err 
 		return err
 	}
 
-	for unbond != nil && height-unbond.HeightAtInit > sp.UnbondingPeriod {
+	for unbond != nil && height-unbond.HeightAtInit > sp.Period2Unbond {
 		queue.Pop()
 
 		// add unbonded coins to basecoin account, based on current exchange rate
-		_, delegatorBond := getDelegatorBonds(store).Get(unbond.ValidatorPubKey)
-		coinAmount := unbond.BondAmount * delegatorBond.ExchangeRate / Precision
+		delegatorBonds, err := getDelegatorBonds(store)
+		if err != nil {
+			return err
+		}
+		_, delegatorBond := delegatorBonds.Get(unbond.ValidatorPubKey)
+		coinAmount := unbond.Amount * delegatorBond.ExchangeRate / Precision
 		account := bcs.GetAccount(store, unbond.Address) //TODO get caller signing address
 		payout := makeCoin(coinAmount, sp.CoinDenom)
 		account.Balance = account.Balance.Plus(payout)
@@ -302,7 +316,7 @@ func (sp Plugin) processUnbondingQueue(store state.SimpleDB, height uint64, err 
 }
 
 // Process all validator commission modification for the current block
-func (sp Plugin) processModCommQueue(store state.SimpleDB, height uint64, err error) {
+func (sp Plugin) processModCommQueue(store state.SimpleDB, height uint64) error {
 	queue := LoadQueue("commission", store)
 
 	//Get the peek record from the queue
@@ -316,27 +330,22 @@ func (sp Plugin) processModCommQueue(store state.SimpleDB, height uint64, err er
 		return err
 	}
 
-	for commission != nil && height-commission.HeightAtInit > sp.UnbondingPeriod {
+	for commission != nil && height-commission.HeightAtInit > sp.Period2ModComm {
 		queue.Pop()
 
-		// Retrieve the record to modify
+		// Retrieve, Modify and save the commission
 		delegatorBonds, err := getDelegatorBonds(store)
-		delegatorBond := delegatorBonds.Get(commission.ValidatorPubKey)
-
-		// Modify and save the commission
-		delegatorBond.Commission = commission.Commission
-		delegatorBonds = append(delegatorBonds, delegatorBond)
+		if err != nil {
+			return err
+		}
+		record, _ := delegatorBonds.Get(commission.ValidatorPubKey)
+		if err != nil {
+			return err
+		}
+		delegatorBonds[record].Commission = commission.Commission
 		setDelegatorBonds(store, delegatorBonds)
 
-		// add unbonded coins to basecoin account, based on current exchange rate
-		_, delegatorBond := getDelegatorBonds(store).Get(unbond.ValidatorPubKey)
-		coinAmount := unbond.BondAmount * delegatorBond.ExchangeRate / Precision
-		account := bcs.GetAccount(store, unbond.Address) //TODO get caller signing address
-		payout := makeCoin(coinAmount, sp.CoinDenom)
-		account.Balance = account.Balance.Plus(payout)
-		bcs.SetAccount(store, unbond.Address, account) //TODO send coins
-
-		// get next unbond record
+		// check the next record in the queue record
 		err = getCommission()
 		if err != nil {
 			return err
