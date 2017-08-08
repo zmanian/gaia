@@ -1,22 +1,38 @@
+//nolint
 package stake
 
-import "github.com/tendermint/basecoin/errors"
+import (
+	"fmt"
 
-//var (
-//errInvalidCounter = fmt.Errorf("Counter Tx marked invalid")
-//)
+	"github.com/tendermint/basecoin/errors"
+)
 
-//// ErrInvalidCounter - custom error class
-//func ErrInvalidCounter() error {
-//return errors.WithCode(errInvalidCounter, abci.CodeType_BaseInvalidInput)
-//}
+var (
+	errValidatorEmpty      = fmt.Errorf("Cannot bond to an empty validator")
+	errBadBondingDenom     = fmt.Errorf("Invalid coin denomination")
+	errBadBondingAmount    = fmt.Errorf("Amount must be > 0")
+	errBadBondingValidator = fmt.Errorf("Cannot bond to non-nominated account")
+	errNoBondingAcct       = fmt.Errorf("No bond account for this (address, validator) pair")
+	errNotEnoughTokens     = fmt.Errorf("Insufficient bond tokens")
 
-//// IsInvalidCounterErr - custom error class check
-//func IsInvalidCounterErr(err error) bool {
-//return errors.IsSameError(errInvalidCounter, err)
-//}
+	invalidInput = abci.CodeType_BaseInvalidInput
+)
 
-// ErrDecoding - This is just a helper function to return a generic "internal error"
-func ErrDecoding() error {
-	return errors.ErrInternal("Error decoding state")
+func ErrValidatorEmpty() errors.TMError {
+	return errors.WithCode(errValidatorEmpty, invalidInput)
+}
+func ErrBadBondingDenom() errors.TMError {
+	return errors.WithCode(errBadBondingDenom, invalidInput)
+}
+func ErrBadBondingAmount() errors.TMError {
+	return errors.WithCode(errBadBondingAmount, invalidInput)
+}
+func ErrBadBondingValidator() errors.TMError {
+	return errors.WithCode(errBadBondingValidator, invalidInput)
+}
+func ErrNoBondingAcct() errors.TMError {
+	return errors.WithCode(errNoBondingAcct, invalidInput)
+}
+func ErrNotEnoughTokens() errors.TMError {
+	return errors.WithCode(errNotEnoughTokens, invalidInput)
 }

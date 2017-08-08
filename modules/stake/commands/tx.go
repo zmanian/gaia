@@ -26,7 +26,7 @@ const (
 var (
 	CmdBond = &cobra.Command{
 		Use:   "bond",
-		Short: "Bond some coins to give voting power to a validator",
+		Short: "bond some coins to give voting power to a validator",
 		RunE:  cmdBond,
 	}
 	CmdUnbond = &cobra.Command{

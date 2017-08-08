@@ -5,9 +5,9 @@ import (
 	"sort"
 
 	abci "github.com/tendermint/abci/types"
+	"github.com/tendermint/basecoin"
 )
 
-//TODO make genesis parameter
 const maxValidators = 100
 
 // DelegatorBond defines an total amount of bond tokens and their exchange rate to
@@ -19,13 +19,15 @@ const maxValidators = 100
 type DelegatorBond struct {
 	ValidatorPubKey []byte
 	Commission      string
-	Total           uint64 // Number of bond tokens for this validator
-	ExchangeRate    uint64 // Exchange rate for this validator's bond tokens (in millionths of coins)
+	ExchangeRate    uint64         // Exchange rate for this validator's bond tokens (in millionths of coins)
+	Account         basecoin.Actor // Account where the bonded tokens are held
 }
 
 // VotingPower - voting power based onthe bond value
 func (bc DelegatorBond) VotingPower() uint64 {
-	return bc.Total * bc.ExchangeRate / Precision
+	//TODO must query from the account
+	return bc.Total * bc.ExchangeRate
+	//return bc.Total * bc.ExchangeRate / Precision
 }
 
 // Validator - Get the validator from a bond value
@@ -109,8 +111,8 @@ type QueueElem struct {
 // QueueElemUnbond - the unbonding queue element
 type QueueElemUnbond struct {
 	QueueTx
-	Address []byte // account to pay out to
-	Amount  uint64 // amount of bond tokens which are unbonding
+	Account basecoin.Actor //account to pay out to
+	Amount  uint64         // amount of bond tokens which are unbonding
 }
 
 // QueueElemModComm - the commission queue element

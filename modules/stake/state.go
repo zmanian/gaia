@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	bondAccountKeyPrefix = "ba/"
-	delegatorBondKey     = []byte("bv")
+	delegateeKeyPrefix = "de/"
+	delegatorKey       = []byte("dr")
 )
 
 func getDelegateeBondsKey(delegatorAddr, validatorPubKey []byte) []byte {
-	return []byte(bondAccountKeyPrefix + fmt.Sprintf("%x/%x", delegatorAddr, validatorPubKey))
+	return []byte(delegateeKeyPrefix + fmt.Sprintf("%x/%x", delegatorAddr, validatorPubKey))
 }
 
 func setDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey []byte, delegatee *DelegateeBonds) {
@@ -44,11 +44,11 @@ func removeDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey [
 
 func setDelegatorBonds(store state.SimpleDB, delegatorBonds DelegatorBonds) {
 	bvBytes := wire.BinaryBytes(delegatorBonds)
-	store.Set(delegatorBondKey, bvBytes)
+	store.Set(delegatorKey, bvBytes)
 }
 
 func getDelegatorBonds(store state.SimpleDB) (delegatorBonds DelegatorBonds, err error) {
-	bvBytes := store.Get(delegatorBondKey)
+	bvBytes := store.Get(delegatorKey)
 	if bvBytes == nil {
 		return make(DelegatorBonds, 0)
 	}

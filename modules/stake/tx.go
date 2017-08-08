@@ -54,14 +54,17 @@ func (tx TxBond) Wrap() basecoin.Tx {
 	return basecoin.Tx{c}
 }
 
-// ValidateBasic - Check coins as well as that the validator is actually a validator
+// ValidateBasic - Check the bonding coins, Validator is non-empty
 func (tx TxBond) ValidateBasic() error {
-	//if !c.Fee.IsValid() {
-	//return coin.ErrInvalidCoins()
-	//}
-	//if !c.Fee.IsNonnegative() {
-	//return coin.ErrInvalidCoins()
-	//}
+	if tx.Validator.Empty() {
+		return errValidatorEmpty
+	}
+	if !tx.Amount.IsValid() {
+		return coin.ErrInvalidCoins()
+	}
+	if !tx.Amount.IsNonnegative() {
+		return coin.ErrInvalidCoins()
+	}
 	return nil
 }
 
@@ -89,12 +92,15 @@ func (tx TxUnbond) Wrap() basecoin.Tx {
 
 // ValidateBasic - Check coins as well as that you have coins in the validator
 func (tx TxUnbond) ValidateBasic() error {
-	//if !c.Fee.IsValid() {
-	//return coin.ErrInvalidCoins()
-	//}
-	//if !c.Fee.IsNonnegative() {
-	//return coin.ErrInvalidCoins()
-	//}
+	if tx.Validator.Empty() {
+		return errValidatorEmpty
+	}
+	if !tx.Amount.IsValid() {
+		return coin.ErrInvalidCoins()
+	}
+	if !tx.Amount.IsNonnegative() {
+		return coin.ErrInvalidCoins()
+	}
 	return nil
 }
 
@@ -123,13 +129,17 @@ func (tx TxNominate) Wrap() basecoin.Tx {
 }
 
 // ValidateBasic - Check coins as well as that the validator is actually a validator
+// TODO validate commission is not negative and valid
 func (tx TxNominate) ValidateBasic() error {
-	//if !c.Fee.IsValid() {
-	//return coin.ErrInvalidCoins()
-	//}
-	//if !c.Fee.IsNonnegative() {
-	//return coin.ErrInvalidCoins()
-	//}
+	if tx.Validator.Empty() {
+		return errValidatorEmpty
+	}
+	if !tx.Amount.IsValid() {
+		return coin.ErrInvalidCoins()
+	}
+	if !tx.Amount.IsNonnegative() {
+		return coin.ErrInvalidCoins()
+	}
 	return nil
 }
 
@@ -156,12 +166,10 @@ func (tx TxModComm) Wrap() basecoin.Tx {
 }
 
 // ValidateBasic - Check coins as well as that the validator is actually a validator
+// TODO validate commission is not negative and valid
 func (tx TxModComm) ValidateBasic() error {
-	//if !c.Fee.IsValid() {
-	//return coin.ErrInvalidCoins()
-	//}
-	//if !c.Fee.IsNonnegative() {
-	//return coin.ErrInvalidCoins()
-	//}
+	if tx.Validator.Empty() {
+		return errValidatorEmpty
+	}
 	return nil
 }
