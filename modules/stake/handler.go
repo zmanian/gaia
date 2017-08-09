@@ -13,7 +13,6 @@ import (
 	"github.com/tendermint/basecoin/modules/roles"
 	"github.com/tendermint/basecoin/stack"
 	"github.com/tendermint/basecoin/state"
-	"github.com/tendermint/basecoin/types"
 	"github.com/tendermint/go-wire"
 )
 
@@ -21,6 +20,10 @@ import (
 const (
 	Name = "stake"
 	//Precision = 10e8
+	Period2Unbond  uint64 = 30     // how long unbonding takes (measured in blocks)
+	Period2ModComm uint64 = 30     // how long modifying a validator commission takes (measured in blocks)
+	Inflation      uint   = 1      // inflation in percent (1 to 100)
+	CoinDenom      string = "atom" // bondable coin denomination
 )
 
 // NewHandler returns a new counter transaction processing handler
@@ -48,7 +51,8 @@ func NewHandler(feeDenom string) basecoin.Handler {
 
 // Handler the transaction processing handler
 type Handler struct {
-	stack.NopOption
+	stack.PassInitState
+	stack.PassInitValidate
 }
 
 var _ stack.Dispatchable = Handler{} //enforce interface at compile time
@@ -64,160 +68,154 @@ func (Handler) AssertDispatcher() {}
 // CheckTx checks if the tx is properly structured
 func (h Handler) CheckTx(ctx basecoin.Context, store state.SimpleDB,
 	tx basecoin.Tx, _ basecoin.Checker) (res basecoin.CheckResult, err error) {
-	_, err = checkTx(ctx, tx)
+	err = checkTx(ctx, tx)
 	return
 }
-func checkTx(ctx basecoin.Context, tx basecoin.Tx) (ctr basecoin.Tx, err error) {
-	ctr, ok := tx.Unwrap().(Tx)
-	if !ok {
-		return ctr, errors.ErrInvalidFormat(TypeTx, tx)
-	}
-	err = ctr.ValidateBasic()
-	if err != nil {
-		return ctr, err
-	}
-	return ctr, nil
+func checkTx(ctx basecoin.Context, tx basecoin.Tx) (err error) {
+	err = tx.Unwrap().ValidateBasic()
+	return
 }
 
 // DeliverTx executes the tx if valid
 func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	tx basecoin.Tx, dispatch basecoin.Deliver) (res basecoin.DeliverResult, err error) {
-	ctr, err := checkTx(ctx, tx)
+	err = checkTx(ctx, tx)
 	if err != nil {
-		return res, err
+		return
 	}
 
 	//start by processing the unbonding queue
 	height := ctx.BlockHeight()
-	processQueueUnbond(store, height)
-	processQueueModComm(store, height, dispatch)
-
-	//now actually run the transaction
-	var tx Tx
-	err := wire.ReadBinaryBytes(txBytes, &tx)
+	err = processQueueUnbond(ctx, store, height, dispatch)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error decoding tx: " + err.Error())
+		return
+	}
+	err = processQueueModComm(ctx, store, height)
+	if err != nil {
+		return
+	}
+	err = processValidatorRewards(ctx, store, height, dispatch)
+	if err != nil {
+		return
 	}
 
+	//now actually run the transaction
+	unwrap := tx.Unwrap()
 	var abciRes abci.Result
-	switch txType := tx.(type) {
+	switch txType := unwrap.(type) {
 	case TxBond:
-		abciRes, err = sp.runTxBond(txType, store, ctx)
+		abciRes = runTxBond(ctx, store, txType, dispatch)
 	case TxUnbond:
-		abciRes, err = sp.runTxUnbond(txType, store, ctx, height)
+		abciRes = runTxUnbond(ctx, store, txType, height)
 	case TxNominate:
-		abciRes, err = sp.runTxNominate(txType, store, ctx)
+		abciRes = runTxNominate(ctx, store, txType, dispatch)
 	case TxModComm:
-		abciRes, err = sp.runTxModComm(txType, store, ctx, height)
+		abciRes = runTxModComm(ctx, store, txType, height)
 	}
 
 	//determine the validator set changes
-	delegatorBonds := getDelegatorBonds(store)
+	delegateeBonds, err := getDelegateeBonds(store)
+	if err != nil {
+		return res, err
+	}
 	res = basecoin.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
-		Diff:    delegatorBonds.Validators(), //FIXME this is the full set, need to just use the diff
+		Diff:    delegateeBonds.Validators(), //FIXME this is the full set, need to just use the diff
 		GasUsed: 0,                           //TODO add gas accounting
 	}
-
-	return res, err
+	return
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Plugin is a proof-of-stake plugin for Basecoin
-type Plugin struct {
-	Period2Unbond  uint64 // how long unbonding takes (measured in blocks)
-	Period2ModComm uint64 // how long modifying a validator commission takes (measured in blocks)
-	CoinDenom      string // bondable coin denomination
-}
-
-func (sp Plugin) runTxBond(tx TxBond, store state.SimpleDB, ctx types.CallContext) (res abci.Result) {
-	if len(ctx.Coins) != 1 {
-		return abci.ErrInternalError.AppendLog("Invalid coins")
-	}
-	if ctx.Coins[0].Denom != sp.CoinDenom {
+func runTxBond(ctx basecoin.Context, store state.SimpleDB, tx TxBond,
+	dispatch basecoin.Deliver) (res abci.Result) {
+	if tx.Amount.Denom != CoinDenom {
 		return abci.ErrInternalError.AppendLog("Invalid coin denomination")
 	}
 
 	// Get amount of coins to bond
-	bondCoins := ctx.Coins[0].Amount
+	bondCoins := tx.Amount
 	if bondCoins.Amount <= 0 {
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
 	}
 
-	// Get the delegator bond account
-	delegatorBonds := getDelegatorBonds(store)
-	_, delegatorBond := delegatorBonds.Get(tx.ValidatorPubKey)
-	if delegatorBond == nil {
+	// Get the delegatee bond account
+	delegateeBonds, err := getDelegateeBonds(store)
+	if err != nil {
+		return abci.ErrInternalError.AppendLog(err.Error())
+	}
+	_, delegateeBond := delegateeBonds.Get(tx.ValidatorPubKey)
+	if delegateeBond == nil {
 		return abci.ErrInternalError.AppendLog("Cannot bond to non-nominated account")
 	}
 
-	// Move coins from the deletatee account to the delegator lock account
+	// Move coins from the deletatee account to the delegatee lock account
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) == 0 {
-		return res, errors.ErrMissingSignature()
+		return errors.ErrMissingSignature()
 	}
-	send := coin.NewSendOneTx(senders[0], delegatorBond.Account, bondCoins)
+	send := coin.NewSendOneTx(senders[0], delegateeBond.Account, bondCoins)
 
 	// If the deduction fails (too high), abort the command
 	_, err = dispatch.DeliverTx(ctx, store, send)
 	if err != nil {
-		return res, err
+		return abci.ErrInternalError.AppendLog(err.Error())
 	}
 
-	// Get or create delegatee account
-	delegateeBonds := getDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
-	if delegateeBonds == nil {
-		delegateeBonds = &DelegateeBond{
+	// Get or create delegator account
+	delegatorBonds := getDelegatorBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	if delegatorBonds == nil {
+		delegatorBonds = &DelegatorBond{
 			ValidatorPubKey: tx.ValidatorPubKey,
 			Amount:          0,
 		}
 	}
 
 	// Calculate amount of bond tokens to create, based on exchange rate
-	//bondAmount := uint64(coinAmount) * Precision / delegatorBond.ExchangeRate
-	bondAmount := uint64(coinAmount) / delegatorBond.ExchangeRate
-	delegateeBonds.Amount += bondAmount
+	//bondAmount := uint64(coinAmount) * Precision / delegateeBond.ExchangeRate
+	bondAmount := uint64(coinAmount) / delegateeBond.ExchangeRate
+	delegatorBonds.Amount += bondAmount
 
 	// Save to store
-	setDelegatorBonds(store, delegatorBonds)
-	setDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegateeBonds)
+	setDelegateeBonds(store, delegateeBonds)
+	setDelegatorBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegatorBonds)
 
 	return abci.OK
 }
 
-func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
-	ctx types.CallContext, height uint64) (res abci.Result) {
+func runTxUnbond(ctx basecoin.Context, store state.SimpleDB, tx TxUnbond,
+	height uint64) (res abci.Result) {
 	if tx.BondAmount <= 0 {
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
-	delegateeBonds := getDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
-	if delegateeBonds == nil {
+	delegatorBonds := getDelegatorBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	if delegatorBonds == nil {
 		return abci.ErrBaseUnknownAddress.AppendLog("No bond account for this (address, validator) pair")
 	}
-	if delegateeBonds.Amount < tx.BondAmount {
+	if delegatorBonds.Amount < tx.BondAmount {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 	}
 
 	// subtract tokens from bond account
-	delegateeBonds.Amount -= tx.BondAmount
-	if delegateeBonds.Amount == 0 {
-		removeDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
+	delegatorBonds.Amount -= tx.BondAmount
+	if delegatorBonds.Amount == 0 {
+		removeDelegatorBonds(store, ctx.CallerAddress, tx.ValidatorPubKey)
 	} else {
-		setDelegateeBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegateeBonds)
+		setDelegatorBonds(store, ctx.CallerAddress, tx.ValidatorPubKey, delegatorBonds)
 	}
 
 	// subtract tokens from bond value
-	delegatorBonds := getDelegatorBonds(store)
-	bvIndex, delegatorBond := delegatorBonds.Get(tx.ValidatorPubKey)
-	delegatorBond.Total -= tx.BondAmount
-	if delegatorBond.Total == 0 {
-		delegatorBonds.Remove(bvIndex)
+	delegateeBonds := getDelegateeBonds(store)
+	bvIndex, delegateeBond := delegateeBonds.Get(tx.ValidatorPubKey)
+	delegateeBond.Total -= tx.BondAmount
+	if delegateeBond.Total == 0 {
+		delegateeBonds.Remove(bvIndex)
 	}
-	setDelegatorBonds(store, delegatorBonds)
-	// TODO Delegator bonds?
+	setDelegateeBonds(store, delegateeBonds)
+	// TODO Delegatee bonds?
 
 	// add unbond record to queue
 	queueElem := QueueElemUnbond{
@@ -235,11 +233,11 @@ func (sp Plugin) runTxUnbond(tx TxUnbond, store state.SimpleDB,
 	return abci.OK
 }
 
-func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB,
-	ctx types.CallContext, dispatch basecoin.Deliver) (res abci.Result) {
+func runTxNominate(ctx basecoin.Context, store state.SimpleDB, tx TxNominate,
+	dispatch basecoin.Deliver) (res abci.Result) {
 
 	// Create bond value object
-	delegatorBond := DelegatorBond{
+	delegateeBond := DelegateeBond{
 		ValidatorPubKey: tx.PubKey,
 		Commission:      tx.Commission,
 		ExchangeRate:    1, // * Precision,
@@ -250,27 +248,27 @@ func (sp Plugin) runNominate(tx TxNominate, store state.SimpleDB,
 	if len(senders) == 0 {
 		return res, errors.ErrMissingSignature()
 	}
-	send := coin.NewSendOneTx(senders[0], delegatorBond.Account, tx.Amount)
+	send := coin.NewSendOneTx(senders[0], delegateeBond.Account, tx.Amount)
 	_, err = dispatch.DeliverTx(ctx, store, send)
 	if err != nil {
 		return res, err
 	}
 
 	// Append and store
-	delegatorBonds := getDelegatorBonds(store)
-	delegatorBonds = append(delegatorBonds, delegatorBond)
-	setDelegatorBonds(store, delegatorBonds)
+	delegateeBonds := getDelegateeBonds(store)
+	delegateeBonds = append(delegateeBonds, delegateeBond)
+	setDelegateeBonds(store, delegateeBonds)
 
 	return abci.OK
 }
 
 //TODO Update logic
-func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB,
-	ctx types.CallContext, height uint64) (res abci.Result) {
+func runTxModComm(ctx basecoin.Context, store state.SimpleDB, tx TxModComm,
+	height uint64) (res abci.Result) {
 
 	// Retrieve the record to modify
-	delegatorBonds, err := getDelegatorBonds(store)
-	delegatorBond := delegatorBonds.Get()
+	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBond := delegateeBonds.Get()
 
 	// Add the commission modification the queue
 	queueElem := QueueElemModComm{
@@ -291,7 +289,8 @@ func (sp Plugin) runModComm(tx TxModComm, store state.SimpleDB,
 
 // Process all unbonding for the current block, note that the unbonding amounts
 //   have already been subtracted from the bond account when they were added to the queue
-func (sp Plugin) processQueueUnbond(store state.SimpleDB, height uint64, dispatch basecoin.Deliver) error {
+func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
+	height uint64, dispatch basecoin.Deliver) error {
 	queue := LoadQueue("unbonding", store)
 
 	//Get the peek unbond record from the queue
@@ -305,19 +304,19 @@ func (sp Plugin) processQueueUnbond(store state.SimpleDB, height uint64, dispatc
 		return err
 	}
 
-	for unbond != nil && height-unbond.HeightAtInit > sp.Period2Unbond {
+	for unbond != nil && height-unbond.HeightAtInit > Period2Unbond {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
-		delegatorBonds, err := getDelegatorBonds(store)
+		delegateeBonds, err := getDelegateeBonds(store)
 		if err != nil {
 			return err
 		}
-		_, delegatorBond := delegatorBonds.Get(unbond.ValidatorPubKey)
-		coinAmount := unbond.Amount * delegatorBond.ExchangeRate // / Precision
-		payout := coin.Coin{sp.CoinDenom, coinAmount}
+		_, delegateeBond := delegateeBonds.Get(unbond.ValidatorPubKey)
+		coinAmount := unbond.Amount * delegateeBond.ExchangeRate // / Precision
+		payout := coin.Coin{CoinDenom, coinAmount}
 
-		send := coin.NewSendOneTx(delegatorBond.Account, unbond.Account, payout)
+		send := coin.NewSendOneTx(delegateeBond.Account, unbond.Account, payout)
 		_, err = dispatch.DeliverTx(ctx, store, send)
 		if err != nil {
 			return res, err
@@ -332,7 +331,8 @@ func (sp Plugin) processQueueUnbond(store state.SimpleDB, height uint64, dispatc
 }
 
 // Process all validator commission modification for the current block
-func (sp Plugin) processQueueModComm(store state.SimpleDB, height uint64) error {
+func processQueueModComm(ctx basecoin.Context, store state.SimpleDB,
+	height uint64) error {
 	queue := LoadQueue("commission", store)
 
 	//Get the peek record from the queue
@@ -346,25 +346,47 @@ func (sp Plugin) processQueueModComm(store state.SimpleDB, height uint64) error 
 		return err
 	}
 
-	for commission != nil && height-commission.HeightAtInit > sp.Period2ModComm {
+	for commission != nil && height-commission.HeightAtInit > Period2ModComm {
 		queue.Pop()
 
 		// Retrieve, Modify and save the commission
-		delegatorBonds, err := getDelegatorBonds(store)
+		delegateeBonds, err := getDelegateeBonds(store)
 		if err != nil {
 			return err
 		}
-		record, _ := delegatorBonds.Get(commission.ValidatorPubKey)
+		record, _ := delegateeBonds.Get(commission.ValidatorPubKey)
 		if err != nil {
 			return err
 		}
-		delegatorBonds[record].Commission = commission.Commission
-		setDelegatorBonds(store, delegatorBonds)
+		delegateeBonds[record].Commission = commission.Commission
+		setDelegateeBonds(store, delegateeBonds)
 
 		// check the next record in the queue record
 		err = getCommission()
 		if err != nil {
 			return err
+		}
+	}
+}
+
+func processValidatorRewards(ctx basecoin.Context, store state.SimpleDB,
+	height uint64, dispatch basecoin.Deliver) error {
+
+	// Retrieve the list of validators
+	delegateeBonds, err := getDelegateeBonds(store)
+	if err != nil {
+		return err
+	}
+	validators := delegateeBonds.Validators()
+
+	for _, validator := range validators {
+
+		credit := coin.Coins{{"atom", 10}} //TODO update to relative to the amount of coins held by validator
+
+		creditTx := coin.NewCreditTx(validator.Account, credit)
+		_, err = dispatch.DeliverTx(ctx, store, creditTx)
+		if err != nil {
+			return res, err
 		}
 	}
 }

@@ -26,22 +26,22 @@ const (
 var (
 	CmdBond = &cobra.Command{
 		Use:   "bond",
-		Short: "bond some coins to give voting power to a validator",
+		Short: "bond some coins to give voting power to a delegatee/validator",
 		RunE:  cmdBond,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "unbond",
-		Short: "unbond your coins from a validator",
-		RunE:  cmdBond,
+		Short: "unbond your coins from a delegatee/validator",
+		RunE:  cmdUnbond,
 	}
 	CmdNominate = &cobra.Command{
 		Use:   "nominate",
-		Short: "nominate yourself to become a valdator",
+		Short: "nominate yourself to become a delegatee/validator",
 		RunE:  cmdNominate,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "modify-commission",
-		Short: "modify your commission rate if you are a validator",
+		Short: "modify your commission rate if you are a delegatee/validator",
 		RunE:  cmdModComm,
 	}
 )

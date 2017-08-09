@@ -13,12 +13,13 @@ import (
 	"github.com/tendermint/basecoin/client/commands/proxy"
 	"github.com/tendermint/basecoin/client/commands/seeds"
 	txcmd "github.com/tendermint/basecoin/client/commands/txs"
-	bcount "github.com/tendermint/basecoin/docs/guide/counter/cmd/countercli/commands"
 	authcmd "github.com/tendermint/basecoin/modules/auth/commands"
 	basecmd "github.com/tendermint/basecoin/modules/base/commands"
 	coincmd "github.com/tendermint/basecoin/modules/coin/commands"
 	feecmd "github.com/tendermint/basecoin/modules/fee/commands"
 	noncecmd "github.com/tendermint/basecoin/modules/nonce/commands"
+
+	stkcmd "github.com/cosmos/gaia/modules/stake/commands"
 )
 
 // GaiaCli represents the base command when called without any subcommands
@@ -38,8 +39,9 @@ func main() {
 		coincmd.AccountQueryCmd,
 		noncecmd.NonceQueryCmd,
 
-		// XXX IMPORTANT: here is how you add custom query commands in your app
-		bcount.CounterQueryCmd,
+		// Staking commands
+		stkcmd.CmdQueryDelegatee,
+		stkcmd.CmdQueryDelegator,
 	)
 
 	// set up the middleware
@@ -57,11 +59,14 @@ func main() {
 		// This is the default transaction, optional in your app
 		coincmd.SendTxCmd,
 
-		// XXX IMPORTANT: here is how you add custom tx construction for your app
-		bcount.CounterTxCmd,
+		// Staking commands
+		stkcmd.CmdBond,
+		stkcmd.CmdUnbond,
+		stkcmd.CmdNominate,
+		stkcmd.CmdModComm,
 	)
 
-	// Set up the various commands to use
+	// Set up the various high-level commands to use
 	GaiaCli.AddCommand(
 		commands.InitCmd,
 		commands.ResetCmd,
@@ -72,6 +77,6 @@ func main() {
 		proxy.RootCmd,
 	)
 
-	cmd := cli.PrepareMainCmd(GaiaCli, "CTL", os.ExpandEnv("$HOME/.countercli"))
+	cmd := cli.PrepareMainCmd(GaiaCli, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
 	cmd.Execute()
 }

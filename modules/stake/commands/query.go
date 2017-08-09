@@ -1,76 +1,89 @@
 package commands
 
-import (
-	"github.com/spf13/cobra"
-
-	proofcmd "github.com/tendermint/basecoin/client/commands/proofs"
-
-	"github.com/tendermint/basecoin/docs/guide/counter/plugins/counter"
-	"github.com/tendermint/basecoin/stack"
-)
+import "github.com/spf13/cobra"
 
 var (
-	//CmdQueryValidator - CLI command to query the counter state
-	CmdQueryValidator = &cobra.Command{
-		Use:   "validator",
-		Short: "Query a validator",
+	//CmdQueryDelegatee - CLI command to query the counter state
+	CmdQueryDelegatee = &cobra.Command{
+		Use:   "delegatee",
+		Short: "Query a delegatee",
 	}
 
-	//CmdQueryValidatorSummary - CLI command to query the counter state
-	CmdQueryValidatorSummary = &cobra.Command{
+	//CmdQueryDelegateeSummary - CLI command to query the counter state
+	CmdQueryDelegateeSummary = &cobra.Command{
 		Use:   "summary",
-		Short: "Query a validator summary",
-		RunE:  counterQueryCmd,
+		Short: "Query a delegatee summary",
+		RunE:  cmdQueryDelegateeSummary,
 	}
 
-	//CmdQueryValidatorDeligates - CLI command to query the counter state
-	CmdQueryValidatorDeligates = &cobra.Command{
-		Use:   "deligates",
-		Short: "Query a validator's deligates",
-		RunE:  counterQueryCmd,
+	//CmdQueryDelegateeDeligators - CLI command to query the counter state
+	CmdQueryDelegateeDeligators = &cobra.Command{
+		Use:   "deligators",
+		Short: "Query a delegatee's delegators",
+		RunE:  cmdQueryDelegateeDeligates,
 	}
 
 	//CmdQueryDeligator - CLI command to query the counter state
 	CmdQueryDeligator = &cobra.Command{
-		Use:   "deligator",
-		Short: "Query a the validators of a delagator",
+		Use:   "delegator",
+		Short: "Query a delegator",
 	}
 
 	//CmdQueryDeligatorSummary - CLI command to query the counter state
 	CmdQueryDeligatorSummary = &cobra.Command{
 		Use:   "summary",
-		Short: "Query a deligator summary",
-		RunE:  counterQueryCmd,
+		Short: "Query a delegator summary",
+		RunE:  cmdQueryDeligatorSummary,
 	}
 
-	//CmdQueryDeligatorValidators - CLI command to query the counter state
-	CmdQueryDeligatorValidators = &cobra.Command{
-		Use:   "validators",
-		Short: "Query a the validators of a delagator",
-		RunE:  counterQueryCmd,
+	//CmdQueryDeligatorDelegatees - CLI command to query the counter state
+	CmdQueryDeligatorDelegatees = &cobra.Command{
+		Use:   "delegatees",
+		Short: "Query a delegator's delegatees",
+		RunE:  cmdQueryDeligatorDelegatees,
 	}
 )
 
 func init() {
 	//combine the subcommands
-	CmdQueryValidator.AddCommand(
-		CmdQueryValidatorSummary,
-		CmdQueryValidatorDeligates,
+	CmdQueryDelegatee.AddCommand(
+		CmdQueryDelegateeSummary,
+		CmdQueryDelegateeDeligates,
 	)
 	CmdQueryDeligator.AddCommand(
 		CmdQueryDeligatorSummary,
-		CmdQueryDeligatorValidatos,
+		CmdQueryDeligatorValidators,
 	)
 }
 
-func counterQueryCmd(cmd *cobra.Command, args []string) error {
-	key := stack.PrefixedKey(counter.NameCounter, counter.StateKey())
-
-	var cp counter.State
-	proof, err := proofcmd.GetAndParseAppProof(key, &cp)
-	if err != nil {
-		return err
-	}
-
-	return proofcmd.OutputProof(cp, proof.BlockHeight())
+//TODO complete functionality
+func cmdQueryDelegateeSummary(cmd *cobra.Command, args []string) error {
+	return nil
 }
+
+//TODO complete functionality
+func cmdQueryDelegateeDeligates(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
+//TODO complete functionality
+func cmdQueryDeligatorSummary(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
+//TODO complete functionality
+func cmdQueryDeligatorDelegatees(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
+//func counterQueryCmd(cmd *cobra.Command, args []string) error {
+//key := stack.PrefixedKey(counter.NameCounter, counter.StateKey())
+
+//var cp counter.State
+//proof, err := proofcmd.GetAndParseAppProof(key, &cp)
+//if err != nil {
+//return err
+//}
+
+//return proofcmd.OutputProof(cp, proof.BlockHeight())
+//}

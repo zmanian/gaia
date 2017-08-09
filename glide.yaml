@@ -1,41 +1,61 @@
 package: github.com/cosmos/gaia
 import:
+- package: github.com/gorilla/websocket
 - package: github.com/pkg/errors
+  version: ^0.8.0
 - package: github.com/spf13/cobra
+- package: github.com/spf13/pflag
 - package: github.com/spf13/viper
 - package: github.com/tendermint/abci
+  version: develop
   subpackages:
+  - server
   - types
 - package: github.com/tendermint/basecoin
-  subpackages:
-  - client/commands
-  - client/commands/proofs
-  - client/commands/proxy
-  - client/commands/seeds
-  - client/commands/txs
-  - cmd/basecoin/commands
-  - docs/guide/counter/cmd/countercli/commands
-  - docs/guide/counter/plugins/counter
-  - errors
-  - modules/auth
-  - modules/auth/commands
-  - modules/base
-  - modules/base/commands
-  - modules/coin
-  - modules/coin/commands
-  - modules/fee
-  - modules/fee/commands
-  - modules/ibc
-  - modules/nonce
-  - modules/nonce/commands
-  - modules/roles
-  - stack
-  - state
-  - types
+  version: feature/184-overhaul-handler-interface
 - package: github.com/tendermint/go-crypto
+  version: develop
   subpackages:
   - cmd
+  - keys
 - package: github.com/tendermint/go-wire
+  version: develop
+  subpackages:
+  - data
+- package: github.com/tendermint/light-client
+  version: unstable
+  subpackages:
+  - proofs
+  - certifiers
+  - certifiers/client
+  - certifiers/files
+- package: github.com/tendermint/merkleeyes
+  version: unstable
+  subpackages:
+  - client
+  - iavl
+- package: github.com/tendermint/tendermint
+  version: no-internet
+  subpackages:
+  - config
+  - node
+  - proxy
+  - rpc/client
+  - rpc/core/types
+  - rpc/lib/client
+  - rpc/lib/types
+  - types
 - package: github.com/tendermint/tmlibs
+  version: develop
   subpackages:
   - cli
+  - cli/flags
+  - common
+  - events
+  - log
+  - logger
+testImport:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
+  - require

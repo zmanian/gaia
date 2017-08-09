@@ -8,51 +8,51 @@ import (
 	"github.com/tendermint/go-wire"
 )
 
-const (
-	delegateeKeyPrefix = "de/"
-	delegatorKey       = []byte("dr")
+var (
+	delegatorKeyPrefix = "de/"
+	delegateeKey       = []byte("dr")
 )
 
-func getDelegateeBondsKey(delegatorAddr, validatorPubKey []byte) []byte {
-	return []byte(delegateeKeyPrefix + fmt.Sprintf("%x/%x", delegatorAddr, validatorPubKey))
+func getDelegatorBondsKey(delegateeAddr, validatorPubKey []byte) []byte {
+	return []byte(delegatorKeyPrefix + fmt.Sprintf("%x/%x", delegateeAddr, validatorPubKey))
 }
 
-func setDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey []byte, delegatee *DelegateeBonds) {
-	delegateeBytes := wire.BinaryBytes(delegatee)
-	store.Set(getDelegateeBondsKey(delegatorAddr, validatorPubKey), delegateeBytes)
+func setDelegatorBonds(store state.SimpleDB, delegateeAddr, validatorPubKey []byte, delegator *DelegatorBonds) {
+	delegatorBytes := wire.BinaryBytes(delegator)
+	store.Set(getDelegatorBondsKey(delegateeAddr, validatorPubKey), delegatorBytes)
 }
 
-func getDelegateeBonds(store state.SimpleDB, delegatorAddr,
-	validatorPubKey []byte) (delegatee *DelegateeBonds, err error) {
+func getDelegatorBonds(store state.SimpleDB, delegateeAddr,
+	validatorPubKey []byte) (delegator *DelegatorBonds, err error) {
 
-	delegateeBytes := store.Get(getDelegateeBondsKey(delegatorAddr, validatorPubKey))
-	if delegateeBytes == nil {
+	delegatorBytes := store.Get(getDelegatorBondsKey(delegateeAddr, validatorPubKey))
+	if delegatorBytes == nil {
 		return nil
 	}
-	err := wire.ReadBinaryBytes(delegateeBytes, delegatee)
+	err = wire.ReadBinaryBytes(delegatorBytes, delegator)
 	if err != nil {
 		return errors.ErrDecoding()
 	}
 	return
 }
 
-func removeDelegateeBonds(store state.SimpleDB, delegatorAddr, validatorPubKey []byte) {
-	store.Remove(getDelegateeBondsKey(delegatorAddr, validatorPubKey))
+func removeDelegatorBonds(store state.SimpleDB, delegateeAddr, validatorPubKey []byte) {
+	store.Remove(getDelegatorBondsKey(delegateeAddr, validatorPubKey))
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-func setDelegatorBonds(store state.SimpleDB, delegatorBonds DelegatorBonds) {
-	bvBytes := wire.BinaryBytes(delegatorBonds)
-	store.Set(delegatorKey, bvBytes)
+func setDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
+	bvBytes := wire.BinaryBytes(delegateeBonds)
+	store.Set(delegateeKey, bvBytes)
 }
 
-func getDelegatorBonds(store state.SimpleDB) (delegatorBonds DelegatorBonds, err error) {
-	bvBytes := store.Get(delegatorKey)
+func getDelegateeBonds(store state.SimpleDB) (delegateeBonds DelegateeBonds, err error) {
+	bvBytes := store.Get(delegateeKey)
 	if bvBytes == nil {
-		return make(DelegatorBonds, 0)
+		return make(DelegateeBonds, 0)
 	}
-	err = wire.ReadBinaryBytes(bvBytes, delegatorBonds)
+	err = wire.ReadBinaryBytes(bvBytes, delegateeBonds)
 	if err != nil {
 		return errors.ErrDecoding()
 	}

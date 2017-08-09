@@ -17,9 +17,9 @@ const (
 	ByteTxNominate = 0x57
 	ByteTxModComm  = 0x58
 	TypeTxBond     = Name + "/bond"
-	ByteTxUnbond   = Name + "/unbond"
-	ByteTxNominate = Name + "/nominate"
-	ByteTxModComm  = Name + "/modComm" //modify commission rate
+	TypeTxUnbond   = Name + "/unbond"
+	TypeTxNominate = Name + "/nominate"
+	TypeTxModComm  = Name + "/modComm" //modify commission rate
 )
 
 func init() {
@@ -38,11 +38,11 @@ var _, _, _, _ basecoin.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModC
 // TxBond - struct for all staking transactions
 type TxBond struct {
 	Validator basecoin.Actor `json:"validator"`
-	Amount    coin.Coins     `json:"amount"`
+	Amount    coin.Coin      `json:"amount"`
 }
 
 // NewTxBond - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxBond(validator basecoin.Actor, amount coins.Coins) basecoin.Tx {
+func NewTxBond(validator basecoin.Actor, amount coin.Coins) basecoin.Tx {
 	return TxBond{
 		Validator: validator,
 		Amount:    amount,
@@ -74,11 +74,11 @@ func (tx TxBond) ValidateBasic() error {
 // TxUnbond - struct for all staking transactions
 type TxUnbond struct {
 	Validator basecoin.Actor `json:"validator"`
-	Amount    coin.Coins     `json:"amount"`
+	Amount    coin.Coin      `json:"amount"`
 }
 
 // NewTxUnbond - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxUnbond(validator basecoin.Actor, amount coins.Coins) basecoin.Tx {
+func NewTxUnbond(validator basecoin.Actor, amount coin.Coins) basecoin.Tx {
 	return TxUnbond{
 		Validator: validator,
 		Amount:    amount,
@@ -110,12 +110,12 @@ func (tx TxUnbond) ValidateBasic() error {
 // TxNominate - struct for all staking transactions
 type TxNominate struct {
 	Validator  basecoin.Actor `json:"validator"`
-	Amount     coin.Coins     `json:"amount"`
+	Amount     coin.Coin      `json:"amount"`
 	Commission string         `json:"commission"`
 }
 
 // NewTxNominate - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxNominate(validator basecoin.Actor, amount coins.Coins, commission int) basecoin.Tx {
+func NewTxNominate(validator basecoin.Actor, amount coin.Coins, commission int) basecoin.Tx {
 	return TxNominate{
 		Validator:  validator,
 		Amount:     amount,
