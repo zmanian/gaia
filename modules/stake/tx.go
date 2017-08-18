@@ -111,7 +111,7 @@ func (tx TxUnbond) ValidateBasic() error {
 type TxNominate struct {
 	Validator  basecoin.Actor `json:"validator"`
 	Amount     coin.Coin      `json:"amount"`
-	Commission string         `json:"commission"`
+	Commission uint64         `json:"commission"`
 }
 
 // NewTxNominate - return a new counter transaction struct wrapped as a basecoin transaction
@@ -149,7 +149,7 @@ func (tx TxNominate) ValidateBasic() error {
 // TxModComm - struct for all staking transactions
 type TxModComm struct {
 	Validator  basecoin.Actor `json:"validator"`
-	Commission string         `json:"commission"`
+	Commission uint64         `json:"commission"`
 }
 
 // NewTxModComm - return a new counter transaction struct wrapped as a basecoin transaction

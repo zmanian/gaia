@@ -17,21 +17,21 @@ func getDelegatorBondsKey(delegateeAddr, validatorPubKey []byte) []byte {
 	return []byte(delegatorKeyPrefix + fmt.Sprintf("%x/%x", delegateeAddr, validatorPubKey))
 }
 
-func setDelegatorBonds(store state.SimpleDB, delegateeAddr, validatorPubKey []byte, delegator *DelegatorBonds) {
-	delegatorBytes := wire.BinaryBytes(delegator)
+func setDelegatorBonds(store state.SimpleDB, delegateeAddr, validatorPubKey []byte, delegator DelegatorBonds) {
+	delegatorBytes := wire.BinaryBytes(&delegator)
 	store.Set(getDelegatorBondsKey(delegateeAddr, validatorPubKey), delegatorBytes)
 }
 
 func getDelegatorBonds(store state.SimpleDB, delegateeAddr,
-	validatorPubKey []byte) (delegator *DelegatorBonds, err error) {
+	validatorPubKey []byte) (delegator DelegatorBonds, err error) {
 
 	delegatorBytes := store.Get(getDelegatorBondsKey(delegateeAddr, validatorPubKey))
 	if delegatorBytes == nil {
-		return nil
+		return
 	}
 	err = wire.ReadBinaryBytes(delegatorBytes, delegator)
 	if err != nil {
-		return errors.ErrDecoding()
+		err = errors.ErrDecoding()
 	}
 	return
 }

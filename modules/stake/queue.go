@@ -17,11 +17,11 @@ type Queue struct {
 	name  string         //Queue name in the store
 }
 
-func (q Queue) headKey() []byte { return []byte(q.name + "head") }
-func (q Queue) tailKey() []byte { return []byte(q.name + "tail") }
+func (q Queue) headKey() []byte { return []byte{q.slot, 0x00} }
+func (q Queue) tailKey() []byte { return []byte{q.slot, 0x01} }
 
-// NewQueue - create a new generic queue under the namespace prefixed by name
-func NewQueue(name string, store state.SimpleDB) (Queue, error) {
+// NewQueue - create a new generic queue under for the designate slot
+func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
 	q := Queue{
 		tail:  0,
 		head:  0,
@@ -44,8 +44,8 @@ func NewQueue(name string, store state.SimpleDB) (Queue, error) {
 	return q, nil
 }
 
-// LoadQueue - load an existing namespace
-func LoadQueue(name string, store state.SimpleDB) (Queue, error) {
+// LoadQueue - load an existing queue for the slot
+func LoadQueue(slot byte, store state.SimpleDB) (Queue, error) {
 
 	q = Queue{
 		store: store,
