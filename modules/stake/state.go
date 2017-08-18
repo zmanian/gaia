@@ -50,11 +50,11 @@ func setDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
 func getDelegateeBonds(store state.SimpleDB) (delegateeBonds DelegateeBonds, err error) {
 	bvBytes := store.Get(delegateeKey)
 	if bvBytes == nil {
-		return make(DelegateeBonds, 0)
+		return make(DelegateeBonds, 0), nil
 	}
 	err = wire.ReadBinaryBytes(bvBytes, delegateeBonds)
 	if err != nil {
-		return errors.ErrDecoding()
+		err = errors.ErrDecoding()
 	}
 	return
 }

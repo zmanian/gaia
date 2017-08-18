@@ -29,76 +29,47 @@ func init() {
 	basecoin.TxMapper.RegisterImplementation(TxModComm{}, TypeTxModComm, ByteTxModComm)
 }
 
-//Verify interface at compilation
+//Verify interface at compile time
 var _, _, _, _ basecoin.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModComm{}
 
 /////////////////////////////////////////////////////////////////
 // TxBond
 
-// TxBond - struct for all staking transactions
-type TxBond struct {
+// TxBond - struct for bonding transactions
+type TxBond struct{ TxBonding }
+
+// TxUnbond - struct for unbonding transactions
+type TxUnbond struct{ TxBonding }
+
+// TxBonding - struct for bonding or unbonding transactions
+type TxBonding struct {
 	Validator basecoin.Actor `json:"validator"`
 	Amount    coin.Coin      `json:"amount"`
 }
 
-// NewTxBond - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxBond(validator basecoin.Actor, amount coin.Coins) basecoin.Tx {
-	return TxBond{
+// NewTxBonding - return a new counter transaction struct wrapped as a basecoin transaction
+func NewTxBonding(validator basecoin.Actor, amount coin.Coin) basecoin.Tx {
+	return TxBonding{
 		Validator: validator,
 		Amount:    amount,
 	}.Wrap()
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxBond) Wrap() basecoin.Tx {
-	return basecoin.Tx{c}
-}
-
-// ValidateBasic - Check the bonding coins, Validator is non-empty
-func (tx TxBond) ValidateBasic() error {
-	if tx.Validator.Empty() {
-		return errValidatorEmpty
-	}
-	if !tx.Amount.IsValid() {
-		return coin.ErrInvalidCoins()
-	}
-	if !tx.Amount.IsNonnegative() {
-		return coin.ErrInvalidCoins()
-	}
-	return nil
-}
-
-/////////////////////////////////////////////////////////////////
-// TxUnbond
-
-// TxUnbond - struct for all staking transactions
-type TxUnbond struct {
-	Validator basecoin.Actor `json:"validator"`
-	Amount    coin.Coin      `json:"amount"`
-}
-
-// NewTxUnbond - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxUnbond(validator basecoin.Actor, amount coin.Coins) basecoin.Tx {
-	return TxUnbond{
-		Validator: validator,
-		Amount:    amount,
-	}.Wrap()
-}
-
-// Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxUnbond) Wrap() basecoin.Tx {
+func (tx TxBonding) Wrap() basecoin.Tx {
 	return basecoin.Tx{tx}
 }
 
-// ValidateBasic - Check coins as well as that you have coins in the validator
-func (tx TxUnbond) ValidateBasic() error {
+// ValidateBasic - Check the bonding coins, Validator is non-empty
+func (tx TxBonding) ValidateBasic() error {
 	if tx.Validator.Empty() {
 		return errValidatorEmpty
 	}
-	if !tx.Amount.IsValid() {
+	coins := coin.Coins{tx.Amount}
+	if !coins.IsValid() {
 		return coin.ErrInvalidCoins()
 	}
-	if !tx.Amount.IsNonnegative() {
+	if !coins.IsNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
 	return nil
@@ -115,7 +86,7 @@ type TxNominate struct {
 }
 
 // NewTxNominate - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxNominate(validator basecoin.Actor, amount coin.Coins, commission int) basecoin.Tx {
+func NewTxNominate(validator basecoin.Actor, amount coin.Coin, commission uint64) basecoin.Tx {
 	return TxNominate{
 		Validator:  validator,
 		Amount:     amount,
@@ -134,10 +105,11 @@ func (tx TxNominate) ValidateBasic() error {
 	if tx.Validator.Empty() {
 		return errValidatorEmpty
 	}
-	if !tx.Amount.IsValid() {
+	coins := coin.Coins{tx.Amount}
+	if !coins.IsValid() {
 		return coin.ErrInvalidCoins()
 	}
-	if !tx.Amount.IsNonnegative() {
+	if !coins.IsNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
 	return nil
@@ -153,7 +125,7 @@ type TxModComm struct {
 }
 
 // NewTxModComm - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxModComm(validator basecoin.Actor, commission string) basecoin.Tx {
+func NewTxModComm(validator basecoin.Actor, commission uint64) basecoin.Tx {
 	return TxModComm{
 		Validator:  validator,
 		Commission: commission,

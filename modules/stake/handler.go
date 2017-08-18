@@ -329,7 +329,10 @@ func runTxModComm(ctx basecoin.Context, store state.SimpleDB, tx TxModComm,
 		},
 		Commission: tx.Commission,
 	}
-	queue := LoadQueue(queueCommissionTB, store)
+	queue, err := LoadQueue(queueCommissionTB, store)
+	if err != nil {
+		return abci.ErrInternalError.AppendLog(err.Error())
+	}
 	bytes := wire.BinaryBytes(queueElem)
 	queue.Push(bytes)
 
@@ -342,7 +345,10 @@ func runTxModComm(ctx basecoin.Context, store state.SimpleDB, tx TxModComm,
 //   have already been subtracted from the bond account when they were added to the queue
 func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
 	height uint64, dispatch basecoin.Deliver) error {
-	queue := LoadQueue(queueUnbondTB, store)
+	queue, err := LoadQueue(queueUnbondTB, store)
+	if err != nil {
+		return err
+	}
 
 	//Get the peek unbond record from the queue
 	var unbond QueueElemUnbond
@@ -355,7 +361,7 @@ func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
 		return err
 	}
 
-	for unbond != nil && height-unbond.HeightAtInit > Period2Unbond {
+	for unbond.DelegateeAddr != nil && height-unbond.HeightAtInit > Period2Unbond {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
@@ -363,17 +369,17 @@ func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
 		if err != nil {
 			return err
 		}
-		_, delegateeBond := delegateeBonds.Get(unbond.ValidatorPubKey)
-		if delegatorBond == nil {
+		_, delegateeBond := delegateeBonds.Get(unbond.DelegateeAddr)
+		if delegateeBond == nil {
 			return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 		}
-		coinAmount := unbond.Amount * delegateeBond.ExchangeRate // / Precision
-		payout := coin.Coin{CoinDenom, coinAmount}
+		coinAmount := unbond.BondTokens * delegateeBond.ExchangeRate // / Precision
+		payout := coin.Coins{{CoinDenom, int64(coinAmount)}}
 
 		send := coin.NewSendOneTx(delegateeBond.Account, unbond.Account, payout)
 		_, err = dispatch.DeliverTx(ctx, store, send)
 		if err != nil {
-			return res, err
+			return err
 		}
 
 		// get next unbond record
@@ -382,12 +388,15 @@ func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
 			return err
 		}
 	}
+	return nil
 }
 
 // Process all validator commission modification for the current block
-func processQueueModComm(ctx basecoin.Context, store state.SimpleDB,
-	height uint64) error {
-	queue := LoadQueue(queueCommissionTB, store)
+func processQueueModComm(ctx basecoin.Context, store state.SimpleDB, height uint64) error {
+	queue, err := LoadQueue(queueCommissionTB, store)
+	if err != nil {
+		return err
+	}
 
 	//Get the peek record from the queue
 	var commission QueueElemModComm
@@ -400,7 +409,7 @@ func processQueueModComm(ctx basecoin.Context, store state.SimpleDB,
 		return err
 	}
 
-	for commission != nil && height-commission.HeightAtInit > Period2ModComm {
+	for commission.DelegateeAddr != nil && height-commission.HeightAtInit > Period2ModComm {
 		queue.Pop()
 
 		// Retrieve, Modify and save the commission
@@ -408,7 +417,7 @@ func processQueueModComm(ctx basecoin.Context, store state.SimpleDB,
 		if err != nil {
 			return err
 		}
-		record, _ := delegateeBonds.Get(commission.ValidatorPubKey)
+		record, _ := delegateeBonds.Get(commission.DelegateeAddr)
 		if err != nil {
 			return err
 		}
@@ -421,6 +430,7 @@ func processQueueModComm(ctx basecoin.Context, store state.SimpleDB,
 			return err
 		}
 	}
+	return nil
 }
 
 //TODO add processing of the commission
@@ -432,16 +442,17 @@ func processValidatorRewards(ctx basecoin.Context, store state.SimpleDB,
 	if err != nil {
 		return err
 	}
-	validators := delegateeBonds.Validators()
+	_, validatorAccounts := delegateeBonds.Validators()
 
-	for _, validator := range validators {
+	for _, account := range validatorAccounts {
 
 		credit := coin.Coins{{"atom", 10}} //TODO update to relative to the amount of coins held by validator
 
-		creditTx := coin.NewCreditTx(validator.Account, credit)
+		creditTx := coin.NewCreditTx(account, credit)
 		_, err = dispatch.DeliverTx(ctx, store, creditTx)
 		if err != nil {
-			return res, err
+			return err
 		}
 	}
+	return nil
 }

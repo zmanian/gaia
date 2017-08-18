@@ -24,17 +24,17 @@ type DelegateeBond struct {
 }
 
 // VotingPower - voting power based onthe bond value
-func (bc DelegateeBond) VotingPower() uint64 {
+func (b DelegateeBond) VotingPower() uint64 {
 	//TODO must query from the account
-	return bc.Total * bc.ExchangeRate
-	//return bc.Total * bc.ExchangeRate / Precision
+	return b.Total * b.ExchangeRate
+	//return b.Total * b.ExchangeRate / Precision
 }
 
 // Validator - Get the validator from a bond value
-func (bc DelegateeBond) Validator() *abci.Validator {
+func (b DelegateeBond) Validator() *abci.Validator {
 	return &abci.Validator{
-		PubKey: bc.DelegateeAddr,
-		Power:  bc.VotingPower(),
+		PubKey: b.DelegateeAddr,
+		Power:  b.VotingPower(),
 	}
 }
 
@@ -51,7 +51,7 @@ func (b DelegateeBonds) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
 func (b DelegateeBonds) Less(i, j int) bool {
 	vp1, vp2 := b[i].VotingPower(), b[j].VotingPower()
 	if vp1 == vp2 {
-		return bytes.Compare(b[i].DelegateeAddr, b[j].ValidatorPubKey) == -1
+		return bytes.Compare(b[i].DelegateeAddr, b[j].DelegateeAddr) == -1
 	}
 	return vp1 > vp2
 }
@@ -62,15 +62,17 @@ func (b DelegateeBonds) Sort() {
 }
 
 // Validators - get the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) Validators() []*abci.Validator {
+func (b DelegateeBonds) Validators() ([]*abci.Validator, []basecoin.Actor) {
 	validators := make([]*abci.Validator, 0, maxValidators)
+	accounts := make([]basecoin.Actor, 0, maxValidators)
 	for i, bv := range b {
 		if i == maxValidators {
 			break
 		}
 		validators = append(validators, bv.Validator())
+		accounts = append(accounts, bv.Account)
 	}
-	return validators
+	return validators, accounts
 }
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
@@ -133,5 +135,5 @@ type QueueElemUnbond struct {
 // QueueElemModComm - the commission queue element
 type QueueElemModComm struct {
 	QueueElem
-	Commission string // new commission for the
+	Commission uint64 // new commission for the
 }
