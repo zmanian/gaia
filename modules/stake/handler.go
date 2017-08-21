@@ -124,8 +124,8 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	res = basecoin.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
-		Diff:    delegateeBonds.Validators(), //FIXME this is the full set, need to just use the diff
-		GasUsed: 0,                           //TODO add gas accounting
+		Diff:    delegateeBonds.ValidatorsDiff(previous), //TODO add the previous validator set
+		GasUsed: 0,                                       //TODO add gas accounting
 	}
 	return
 }

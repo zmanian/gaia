@@ -61,18 +61,58 @@ func (b DelegateeBonds) Sort() {
 	sort.Sort(b)
 }
 
-// Validators - get the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) Validators() ([]*abci.Validator, []basecoin.Actor) {
+// ValidatorSet - get the active validator list from the array of DelegateeBonds
+func (b DelegateeBonds) Validators() []*abci.Validator {
 	validators := make([]*abci.Validator, 0, maxValidators)
-	accounts := make([]basecoin.Actor, 0, maxValidators)
 	for i, bv := range b {
 		if i == maxValidators {
 			break
 		}
 		validators = append(validators, bv.Validator())
+	}
+	return validators
+}
+
+// ValidatorSet - get the difference in the validator set from the input validator set
+func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) []*abci.Validator {
+
+	//Get the current validator set
+	current := b.ValidatorSet()
+
+	//calculate any differences from the previous to the current validator set
+	diff := make([]*abci.Validator, 0, maxValidators)
+	for _, prev := range previous {
+
+		//test for a difference between the validator power of validator
+		currentPower := getValidatorPower(current, prev.PubKey)
+		if currentPower != prev.Power {
+			diff = append(diff, &abci.Validator{prev.PubKey, currentPower})
+		}
+	}
+	return diff
+}
+
+// getValidator - return the validator power with the matching pubKey from the validator list
+func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
+	for _, validator := range set {
+		if bytes.Equal(validator.PubKey, pubKey) {
+			return validator.Power
+		}
+	}
+	return 0 // no power if not found
+}
+
+// ValidatorSetActors - get the actors of the active validator list from the array of DelegateeBonds
+func (b DelegateeBonds) ValidatorsActors() []basecoin.Actor {
+	accounts := make([]basecoin.Actor, 0, maxValidators)
+	for i, bv := range b {
+		if i == maxValidators {
+			break
+		}
 		accounts = append(accounts, bv.Account)
 	}
-	return validators, accounts
+
+	return accounts
 }
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
