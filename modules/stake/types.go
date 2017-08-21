@@ -17,16 +17,16 @@ const maxValidators = 100
 // delegated and the current exchange rate. Voting power can be calculated as
 // total bonds multiplied by exchange rate.
 type DelegateeBond struct {
-	DelegateeAddr []byte
-	Commission    uint64
-	ExchangeRate  uint64         // Exchange rate for this validator's bond tokens (in millionths of coins)
-	Account       basecoin.Actor // Account where the bonded tokens are held
+	DelegateeAddr   []byte
+	Commission      uint64
+	ExchangeRate    uint64         // Exchange rate for this validator's bond tokens (in millionths of coins)
+	TotalBondTokens uint64         // Total number of bond tokens in the account
+	Account         basecoin.Actor // Account where the bonded tokens are held
 }
 
 // VotingPower - voting power based onthe bond value
 func (b DelegateeBond) VotingPower() uint64 {
-	//TODO must query from the account
-	return b.Total * b.ExchangeRate
+	return b.TotalBondTokens * b.ExchangeRate
 	//return b.Total * b.ExchangeRate / Precision
 }
 
@@ -77,7 +77,7 @@ func (b DelegateeBonds) Validators() []*abci.Validator {
 func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) []*abci.Validator {
 
 	//Get the current validator set
-	current := b.ValidatorSet()
+	current := b.Validators()
 
 	//calculate any differences from the previous to the current validator set
 	diff := make([]*abci.Validator, 0, maxValidators)

@@ -48,11 +48,11 @@ func init() {
 	//combine the subcommands
 	CmdQueryDelegatee.AddCommand(
 		CmdQueryDelegateeSummary,
-		CmdQueryDelegateeDeligates,
+		CmdQueryDelegateeDeligators,
 	)
 	CmdQueryDeligator.AddCommand(
 		CmdQueryDeligatorSummary,
-		CmdQueryDeligatorValidators,
+		CmdQueryDeligatorDelegatees,
 	)
 }
 

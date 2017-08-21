@@ -56,7 +56,7 @@ func init() {
 	fsDelegation.String(FlagValidator, "", "Validator's public key")
 	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms")
 
-	fsNominate.AddFlagSet(fsDelegation)
+	(*fsNominate).AddFlagSet(fsDelegation)
 	fsNominate.String(FlagCommission, "0.01", "Validator's commission rate")
 
 	fsModComm.String(FlagValidator, "", "Validator's public key")

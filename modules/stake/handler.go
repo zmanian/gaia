@@ -3,7 +3,6 @@ package stake
 import (
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/basecoin"
-	"github.com/tendermint/basecoin/errors"
 	"github.com/tendermint/basecoin/modules/auth"
 	"github.com/tendermint/basecoin/modules/base"
 	"github.com/tendermint/basecoin/modules/coin"
@@ -124,8 +123,8 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	res = basecoin.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
-		Diff:    delegateeBonds.ValidatorsDiff(previous), //TODO add the previous validator set
-		GasUsed: 0,                                       //TODO add gas accounting
+		Diff:    delegateeBonds.ValidatorsDiff(nil), //TODO add the previous validator set instead of nil
+		GasUsed: 0,                                  //TODO add gas accounting
 	}
 	return
 }
@@ -160,7 +159,7 @@ func runTxBond(ctx basecoin.Context, store state.SimpleDB, tx TxBond,
 	// Move coins from the deletatee account to the delegatee lock account
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 1 {
-		return errors.ErrMissingSignature()
+		return abci.ErrInternalError.AppendLog("Missing signature")
 	}
 	sender := senders[0]
 	send := coin.NewSendOneTx(sender, delegateeBond.Account, coin.Coins{bondCoin})
@@ -209,7 +208,7 @@ func runTxUnbond(ctx basecoin.Context, store state.SimpleDB, tx TxUnbond,
 
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 0 {
-		return errors.ErrMissingSignature()
+		return abci.ErrInternalError.AppendLog("Missing signature")
 	}
 	sender := senders[0]
 
@@ -248,8 +247,8 @@ func runTxUnbond(ctx basecoin.Context, store state.SimpleDB, tx TxUnbond,
 	if delegatorBond == nil {
 		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 	}
-	delegateeBond.Amount -= bondAmt
-	if delegateeBond.Amount == 0 {
+	delegateeBond.TotalBondTokens -= bondAmt
+	if delegateeBond.TotalBondTokens == 0 {
 		delegateeBonds.Remove(bvIndex)
 	}
 	setDelegateeBonds(store, delegateeBonds)
@@ -287,7 +286,7 @@ func runTxNominate(ctx basecoin.Context, store state.SimpleDB, tx TxNominate,
 	// Bond the tokens
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) == 0 {
-		return errors.ErrMissingSignature()
+		return abci.ErrInternalError.AppendLog("Missing signature")
 	}
 	send := coin.NewSendOneTx(senders[0], delegateeBond.Account, coin.Coins{tx.Amount})
 	_, err := dispatch.DeliverTx(ctx, store, send)
@@ -442,7 +441,7 @@ func processValidatorRewards(ctx basecoin.Context, store state.SimpleDB,
 	if err != nil {
 		return err
 	}
-	_, validatorAccounts := delegateeBonds.Validators()
+	validatorAccounts := delegateeBonds.ValidatorsActors()
 
 	for _, account := range validatorAccounts {
 
