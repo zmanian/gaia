@@ -96,7 +96,7 @@ func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) err
 
 func cmdNominate(cmd *cobra.Command, args []string) error {
 	// convert validator pubkey to bytes
-	validator, err := hex.DecodeString(bcmd.StripHex(validatorFlag))
+	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
@@ -104,19 +104,25 @@ func cmdNominate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	commission := viper.GetString(FlagCommission)
+	commission := viper.GetInt(FlagCommission)
+	if commission < 0 {
+		return errors.Errorf("Must use positive commission")
+	}
 
-	tx := stake.NewTxNominate(validator, amount, commission)
+	tx := stake.NewTxNominate(validator, amount, uint64(commission))
 	return txcmd.DoTx(tx)
 }
 
 func cmdModComm(cmd *cobra.Command, args []string) error {
-	validator, err := hex.DecodeString(bcmd.StripHex(validatorFlag))
+	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
-	commission := viper.GetString(FlagCommission)
+	commission := viper.GetInt(FlagCommission)
+	if commission < 0 {
+		return errors.Errorf("Must use positive commission")
+	}
 
-	tx := stake.NewTxModComm(validator, commission)
+	tx := stake.NewTxModComm(validator, uint64(commission))
 	return txcmd.DoTx(tx)
 }
