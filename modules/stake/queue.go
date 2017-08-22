@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/tendermint/basecoin/state"
+	"github.com/cosmos/cosmos-sdk/state"
 )
 
 // Queue - Abstract queue implementation object

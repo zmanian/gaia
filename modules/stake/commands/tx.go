@@ -2,15 +2,17 @@ package commands
 
 import (
 	"encoding/hex"
-	"flag"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/tendermint/basecoin"
-	txcmd "github.com/tendermint/basecoin/client/commands/txs"
-	"github.com/tendermint/basecoin/modules/coin"
+	cmn "github.com/tendermint/tmlibs/common"
+
+	"github.com/cosmos/cosmos-sdk"
+	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
+	"github.com/cosmos/cosmos-sdk/modules/coin"
 
 	"github.com/cosmos/gaia/modules/stake"
 )
@@ -39,7 +41,7 @@ var (
 		Short: "nominate yourself to become a delegatee/validator",
 		RunE:  cmdNominate,
 	}
-	CmdUnbond = &cobra.Command{
+	CmdModComm = &cobra.Command{
 		Use:   "modify-commission",
 		Short: "modify your commission rate if you are a delegatee/validator",
 		RunE:  cmdModComm,
@@ -56,7 +58,7 @@ func init() {
 	fsDelegation.String(FlagValidator, "", "Validator's public key")
 	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms")
 
-	(*fsNominate).AddFlagSet(fsDelegation)
+	fsNominate.AddFlagSet(fsDelegation)
 	fsNominate.String(FlagCommission, "0.01", "Validator's commission rate")
 
 	fsModComm.String(FlagValidator, "", "Validator's public key")
@@ -76,9 +78,9 @@ func cmdUnbond(cmd *cobra.Command, args []string) error {
 	return cmdDelegation(stake.NewTxUnbond)
 }
 
-func cmdDelegation(NewTx func(validator basecoin.Actor, amount coin.Coin) basecoin.TxInner) error {
+func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error {
 	// convert validator pubkey to bytes
-	validator, err := hex.DecodeString(bcmd.StripHex(validatorFlag))
+	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}

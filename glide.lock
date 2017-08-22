@@ -113,8 +113,8 @@ imports:
   - example/dummy
   - server
   - types
-- name: github.com/tendermint/basecoin
-  version: 640f06998afbe479fab7a5bf48edb3257fba4355
+- name: github.com/cosmos/cosmos-sdk
+  version: d77e81ae46153e30c582ed3a7833f60379eec49d
   subpackages:
   - app
   - client/commands
@@ -167,7 +167,7 @@ imports:
   - certifiers/files
   - proofs
 - name: github.com/tendermint/merkleeyes
-  version: 44c4c64c731db5be4261ff3971b01b7e19729419
+  version: 25b700b87a45619cb6bd85330ab4a81b7b7fbb0d
   subpackages:
   - client
   - iavl

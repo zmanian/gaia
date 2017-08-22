@@ -8,16 +8,25 @@ import (
 	keycmd "github.com/tendermint/go-crypto/cmd"
 	"github.com/tendermint/tmlibs/cli"
 
-	"github.com/tendermint/basecoin/client/commands"
-	"github.com/tendermint/basecoin/client/commands/proofs"
-	"github.com/tendermint/basecoin/client/commands/proxy"
-	"github.com/tendermint/basecoin/client/commands/seeds"
-	txcmd "github.com/tendermint/basecoin/client/commands/txs"
-	authcmd "github.com/tendermint/basecoin/modules/auth/commands"
-	basecmd "github.com/tendermint/basecoin/modules/base/commands"
-	coincmd "github.com/tendermint/basecoin/modules/coin/commands"
-	feecmd "github.com/tendermint/basecoin/modules/fee/commands"
-	noncecmd "github.com/tendermint/basecoin/modules/nonce/commands"
+	sdk "github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/client/commands"
+	"github.com/cosmos/cosmos-sdk/client/commands/proxy"
+	"github.com/cosmos/cosmos-sdk/client/commands/query"
+	"github.com/cosmos/cosmos-sdk/client/commands/seeds"
+	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
+	"github.com/cosmos/cosmos-sdk/modules/auth"
+	authcmd "github.com/cosmos/cosmos-sdk/modules/auth/commands"
+	"github.com/cosmos/cosmos-sdk/modules/base"
+	basecmd "github.com/cosmos/cosmos-sdk/modules/base/commands"
+	"github.com/cosmos/cosmos-sdk/modules/coin"
+	coincmd "github.com/cosmos/cosmos-sdk/modules/coin/commands"
+	"github.com/cosmos/cosmos-sdk/modules/fee"
+	feecmd "github.com/cosmos/cosmos-sdk/modules/fee/commands"
+	"github.com/cosmos/cosmos-sdk/modules/ibc"
+	"github.com/cosmos/cosmos-sdk/modules/nonce"
+	noncecmd "github.com/cosmos/cosmos-sdk/modules/nonce/commands"
+	"github.com/cosmos/cosmos-sdk/modules/roles"
+	"github.com/cosmos/cosmos-sdk/stack"
 
 	stkcmd "github.com/cosmos/gaia/modules/stake/commands"
 )
@@ -28,14 +37,37 @@ var GaiaCli = &cobra.Command{
 	Short: "Client for Cosmos-Gaia blockchain",
 }
 
+// BuildApp constructs the stack we want to use for this app
+func BuildApp(feeDenom string) sdk.Handler {
+	return stack.New(
+		base.Logger{},
+		stack.Recovery{},
+		auth.Signatures{},
+		base.Chain{},
+		stack.Checkpoint{OnCheck: true},
+		nonce.ReplayCheck{},
+	).
+		IBC(ibc.NewMiddleware()).
+		Apps(
+			roles.NewMiddleware(),
+			fee.NewSimpleFeeMiddleware(coin.Coin{feeDenom, 0}, fee.Bank),
+			stack.Checkpoint{OnDeliver: true},
+		).
+		Dispatch(
+			coin.NewHandler(),
+			stack.WrapHandler(roles.NewHandler()),
+			stack.WrapHandler(ibc.NewHandler()),
+		)
+}
+
 func main() {
 	commands.AddBasicFlags(GaiaCli)
 
 	// Prepare queries
-	proofs.RootCmd.AddCommand(
+	query.RootCmd.AddCommand(
 		// These are default parsers, optional in your app
-		proofs.TxQueryCmd,
-		proofs.KeyQueryCmd,
+		query.TxQueryCmd,
+		query.KeyQueryCmd,
 		coincmd.AccountQueryCmd,
 		noncecmd.NonceQueryCmd,
 
@@ -54,7 +86,7 @@ func main() {
 	txcmd.Middleware.Register(txcmd.RootCmd.PersistentFlags())
 
 	// Prepare transactions
-	proofs.TxPresenters.Register("base", txcmd.BaseTxPresenter{})
+	query.TxPresenters.Register("base", txcmd.BaseTxPresenter{})
 	txcmd.RootCmd.AddCommand(
 		// This is the default transaction, optional in your app
 		coincmd.SendTxCmd,
@@ -72,7 +104,7 @@ func main() {
 		commands.ResetCmd,
 		keycmd.RootCmd,
 		seeds.RootCmd,
-		proofs.RootCmd,
+		query.RootCmd,
 		txcmd.RootCmd,
 		proxy.RootCmd,
 	)

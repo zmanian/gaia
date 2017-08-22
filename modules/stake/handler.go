@@ -2,16 +2,16 @@ package stake
 
 import (
 	abci "github.com/tendermint/abci/types"
-	"github.com/tendermint/basecoin"
-	"github.com/tendermint/basecoin/modules/auth"
-	"github.com/tendermint/basecoin/modules/base"
-	"github.com/tendermint/basecoin/modules/coin"
-	"github.com/tendermint/basecoin/modules/fee"
-	"github.com/tendermint/basecoin/modules/ibc"
-	"github.com/tendermint/basecoin/modules/nonce"
-	"github.com/tendermint/basecoin/modules/roles"
-	"github.com/tendermint/basecoin/stack"
-	"github.com/tendermint/basecoin/state"
+	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/modules/auth"
+	"github.com/cosmos/cosmos-sdk/modules/base"
+	"github.com/cosmos/cosmos-sdk/modules/coin"
+	"github.com/cosmos/cosmos-sdk/modules/fee"
+	"github.com/cosmos/cosmos-sdk/modules/ibc"
+	"github.com/cosmos/cosmos-sdk/modules/nonce"
+	"github.com/cosmos/cosmos-sdk/modules/roles"
+	"github.com/cosmos/cosmos-sdk/stack"
+	"github.com/cosmos/cosmos-sdk/state"
 	"github.com/tendermint/go-wire"
 )
 
@@ -29,7 +29,7 @@ const (
 )
 
 // NewHandler returns a new counter transaction processing handler
-func NewHandler(feeDenom string) basecoin.Handler {
+func NewHandler(feeDenom string) sdk.Handler {
 	return stack.New(
 		base.Logger{},
 		stack.Recovery{},
@@ -68,19 +68,19 @@ func (Handler) Name() string {
 func (Handler) AssertDispatcher() {}
 
 // CheckTx checks if the tx is properly structured
-func (h Handler) CheckTx(ctx basecoin.Context, store state.SimpleDB,
-	tx basecoin.Tx, _ basecoin.Checker) (res basecoin.CheckResult, err error) {
+func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
+	tx sdk.Tx, _ sdk.Checker) (res sdk.CheckResult, err error) {
 	err = checkTx(ctx, tx)
 	return
 }
-func checkTx(ctx basecoin.Context, tx basecoin.Tx) (err error) {
+func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
 	err = tx.Unwrap().ValidateBasic()
 	return
 }
 
 // DeliverTx executes the tx if valid
-func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
-	tx basecoin.Tx, dispatch basecoin.Deliver) (res basecoin.DeliverResult, err error) {
+func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
+	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
 	err = checkTx(ctx, tx)
 	if err != nil {
 		return
@@ -120,7 +120,7 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 	if err != nil {
 		return res, err
 	}
-	res = basecoin.DeliverResult{
+	res = sdk.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
 		Diff:    delegateeBonds.ValidatorsDiff(nil), //TODO add the previous validator set instead of nil
@@ -131,8 +131,8 @@ func (h Handler) DeliverTx(ctx basecoin.Context, store state.SimpleDB,
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-func runTxBond(ctx basecoin.Context, store state.SimpleDB, tx TxBond,
-	dispatch basecoin.Deliver) (res abci.Result) {
+func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
+	dispatch sdk.Deliver) (res abci.Result) {
 
 	// Get amount of coins to bond
 	bondCoin := tx.Amount
@@ -196,7 +196,7 @@ func runTxBond(ctx basecoin.Context, store state.SimpleDB, tx TxBond,
 	return abci.OK
 }
 
-func runTxUnbond(ctx basecoin.Context, store state.SimpleDB, tx TxUnbond,
+func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
 	bondAmt := uint64(tx.Amount.Amount)
@@ -273,8 +273,8 @@ func runTxUnbond(ctx basecoin.Context, store state.SimpleDB, tx TxUnbond,
 	return abci.OK
 }
 
-func runTxNominate(ctx basecoin.Context, store state.SimpleDB, tx TxNominate,
-	dispatch basecoin.Deliver) (res abci.Result) {
+func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
+	dispatch sdk.Deliver) (res abci.Result) {
 
 	// Create bond value object
 	delegateeBond := DelegateeBond{
@@ -306,7 +306,7 @@ func runTxNominate(ctx basecoin.Context, store state.SimpleDB, tx TxNominate,
 }
 
 //TODO Update logic
-func runTxModComm(ctx basecoin.Context, store state.SimpleDB, tx TxModComm,
+func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
 	height uint64) (res abci.Result) {
 
 	// Retrieve the record to modify
@@ -342,8 +342,8 @@ func runTxModComm(ctx basecoin.Context, store state.SimpleDB, tx TxModComm,
 
 // Process all unbonding for the current block, note that the unbonding amounts
 //   have already been subtracted from the bond account when they were added to the queue
-func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
-	height uint64, dispatch basecoin.Deliver) error {
+func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
+	height uint64, dispatch sdk.Deliver) error {
 	queue, err := LoadQueue(queueUnbondTB, store)
 	if err != nil {
 		return err
@@ -391,7 +391,7 @@ func processQueueUnbond(ctx basecoin.Context, store state.SimpleDB,
 }
 
 // Process all validator commission modification for the current block
-func processQueueModComm(ctx basecoin.Context, store state.SimpleDB, height uint64) error {
+func processQueueModComm(ctx sdk.Context, store state.SimpleDB, height uint64) error {
 	queue, err := LoadQueue(queueCommissionTB, store)
 	if err != nil {
 		return err
@@ -433,8 +433,8 @@ func processQueueModComm(ctx basecoin.Context, store state.SimpleDB, height uint
 }
 
 //TODO add processing of the commission
-func processValidatorRewards(ctx basecoin.Context, store state.SimpleDB,
-	height uint64, dispatch basecoin.Deliver) error {
+func processValidatorRewards(ctx sdk.Context, store state.SimpleDB,
+	height uint64, dispatch sdk.Deliver) error {
 
 	// Retrieve the list of validators
 	delegateeBonds, err := getDelegateeBonds(store)

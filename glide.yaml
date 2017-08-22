@@ -11,8 +11,8 @@ import:
   subpackages:
   - server
   - types
-- package: github.com/tendermint/basecoin
-  version: feature/184-overhaul-handler-interface
+- package: github.com/cosmos/cosmos-sdk
+  version: develop
 - package: github.com/tendermint/go-crypto
   version: develop
   subpackages:
@@ -30,7 +30,7 @@ import:
   - certifiers/client
   - certifiers/files
 - package: github.com/tendermint/merkleeyes
-  version: unstable
+  version: origin/unstable
   subpackages:
   - client
   - iavl

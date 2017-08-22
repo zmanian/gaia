@@ -3,8 +3,8 @@ package stake
 import (
 	"fmt"
 
-	"github.com/tendermint/basecoin/errors"
-	"github.com/tendermint/basecoin/state"
+	"github.com/cosmos/cosmos-sdk/errors"
+	"github.com/cosmos/cosmos-sdk/state"
 	"github.com/tendermint/go-wire"
 )
 

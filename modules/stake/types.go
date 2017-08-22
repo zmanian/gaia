@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"sort"
 
+	"github.com/cosmos/cosmos-sdk"
 	abci "github.com/tendermint/abci/types"
-	"github.com/tendermint/basecoin"
 )
 
 const maxValidators = 100
@@ -19,9 +19,9 @@ const maxValidators = 100
 type DelegateeBond struct {
 	DelegateeAddr   []byte
 	Commission      uint64
-	ExchangeRate    uint64         // Exchange rate for this validator's bond tokens (in millionths of coins)
-	TotalBondTokens uint64         // Total number of bond tokens in the account
-	Account         basecoin.Actor // Account where the bonded tokens are held
+	ExchangeRate    uint64    // Exchange rate for this validator's bond tokens (in millionths of coins)
+	TotalBondTokens uint64    // Total number of bond tokens in the account
+	Account         sdk.Actor // Account where the bonded tokens are held
 }
 
 // VotingPower - voting power based onthe bond value
@@ -61,7 +61,7 @@ func (b DelegateeBonds) Sort() {
 	sort.Sort(b)
 }
 
-// ValidatorSet - get the active validator list from the array of DelegateeBonds
+// Validators - get the active validator list from the array of DelegateeBonds
 func (b DelegateeBonds) Validators() []*abci.Validator {
 	validators := make([]*abci.Validator, 0, maxValidators)
 	for i, bv := range b {
@@ -73,7 +73,7 @@ func (b DelegateeBonds) Validators() []*abci.Validator {
 	return validators
 }
 
-// ValidatorSet - get the difference in the validator set from the input validator set
+// ValidatorsDiff - get the difference in the validator set from the input validator set
 func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) []*abci.Validator {
 
 	//Get the current validator set
@@ -92,7 +92,7 @@ func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) []*abci.Valid
 	return diff
 }
 
-// getValidator - return the validator power with the matching pubKey from the validator list
+// getValidatorPower - return the validator power with the matching pubKey from the validator list
 func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 	for _, validator := range set {
 		if bytes.Equal(validator.PubKey, pubKey) {
@@ -102,9 +102,9 @@ func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 	return 0 // no power if not found
 }
 
-// ValidatorSetActors - get the actors of the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) ValidatorsActors() []basecoin.Actor {
-	accounts := make([]basecoin.Actor, 0, maxValidators)
+// ValidatorsActors - get the actors of the active validator list from the array of DelegateeBonds
+func (b DelegateeBonds) ValidatorsActors() []sdk.Actor {
+	accounts := make([]sdk.Actor, 0, maxValidators)
 	for i, bv := range b {
 		if i == maxValidators {
 			break
@@ -168,8 +168,8 @@ type QueueElem struct {
 // QueueElemUnbond - the unbonding queue element
 type QueueElemUnbond struct {
 	QueueElem
-	Account    basecoin.Actor // account to pay out to
-	BondTokens uint64         // amount of bond tokens which are unbonding
+	Account    sdk.Actor // account to pay out to
+	BondTokens uint64    // amount of bond tokens which are unbonding
 }
 
 // QueueElemModComm - the commission queue element

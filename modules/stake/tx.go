@@ -1,8 +1,8 @@
 package stake
 
 import (
-	"github.com/tendermint/basecoin"
-	"github.com/tendermint/basecoin/modules/coin"
+	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/modules/coin"
 )
 
 // Tx
@@ -23,14 +23,14 @@ const (
 )
 
 func init() {
-	basecoin.TxMapper.RegisterImplementation(TxBond{}, TypeTxBond, ByteTxBond)
-	basecoin.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
-	basecoin.TxMapper.RegisterImplementation(TxNominate{}, TypeTxNominate, ByteTxNominate)
-	basecoin.TxMapper.RegisterImplementation(TxModComm{}, TypeTxModComm, ByteTxModComm)
+	sdk.TxMapper.RegisterImplementation(TxBond{}, TypeTxBond, ByteTxBond)
+	sdk.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
+	sdk.TxMapper.RegisterImplementation(TxNominate{}, TypeTxNominate, ByteTxNominate)
+	sdk.TxMapper.RegisterImplementation(TxModComm{}, TypeTxModComm, ByteTxModComm)
 }
 
 //Verify interface at compile time
-var _, _, _, _ basecoin.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModComm{}
+var _, _, _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModComm{}
 
 /////////////////////////////////////////////////////////////////
 // TxBond
@@ -38,26 +38,34 @@ var _, _, _, _ basecoin.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModC
 // TxBond - struct for bonding transactions
 type TxBond struct{ TxBonding }
 
+// NewTxBond - new TxBond
+func NewTxBond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+	return TxBond{TxBonding{
+		Validator: validator,
+		Amount:    amount,
+	}}.Wrap()
+}
+
 // TxUnbond - struct for unbonding transactions
 type TxUnbond struct{ TxBonding }
 
-// TxBonding - struct for bonding or unbonding transactions
-type TxBonding struct {
-	Validator basecoin.Actor `json:"validator"`
-	Amount    coin.Coin      `json:"amount"`
-}
-
-// NewTxBonding - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxBonding(validator basecoin.Actor, amount coin.Coin) basecoin.Tx {
-	return TxBonding{
+// NewTxUnbond - new TxUnbond
+func NewTxUnbond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+	return TxUnbond{TxBonding{
 		Validator: validator,
 		Amount:    amount,
-	}.Wrap()
+	}}.Wrap()
+}
+
+// TxBonding - struct for bonding or unbonding transactions
+type TxBonding struct {
+	Validator sdk.Actor `json:"validator"`
+	Amount    coin.Coin `json:"amount"`
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxBonding) Wrap() basecoin.Tx {
-	return basecoin.Tx{tx}
+func (tx TxBonding) Wrap() sdk.Tx {
+	return sdk.Tx{tx}
 }
 
 // ValidateBasic - Check the bonding coins, Validator is non-empty
@@ -80,13 +88,13 @@ func (tx TxBonding) ValidateBasic() error {
 
 // TxNominate - struct for all staking transactions
 type TxNominate struct {
-	Validator  basecoin.Actor `json:"validator"`
-	Amount     coin.Coin      `json:"amount"`
-	Commission uint64         `json:"commission"`
+	Validator  sdk.Actor `json:"validator"`
+	Amount     coin.Coin `json:"amount"`
+	Commission uint64    `json:"commission"`
 }
 
-// NewTxNominate - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxNominate(validator basecoin.Actor, amount coin.Coin, commission uint64) basecoin.Tx {
+// NewTxNominate - return a new counter transaction struct wrapped as a sdk transaction
+func NewTxNominate(validator sdk.Actor, amount coin.Coin, commission uint64) sdk.Tx {
 	return TxNominate{
 		Validator:  validator,
 		Amount:     amount,
@@ -95,8 +103,8 @@ func NewTxNominate(validator basecoin.Actor, amount coin.Coin, commission uint64
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxNominate) Wrap() basecoin.Tx {
-	return basecoin.Tx{tx}
+func (tx TxNominate) Wrap() sdk.Tx {
+	return sdk.Tx{tx}
 }
 
 // ValidateBasic - Check coins as well as that the validator is actually a validator
@@ -120,12 +128,12 @@ func (tx TxNominate) ValidateBasic() error {
 
 // TxModComm - struct for all staking transactions
 type TxModComm struct {
-	Validator  basecoin.Actor `json:"validator"`
-	Commission uint64         `json:"commission"`
+	Validator  sdk.Actor `json:"validator"`
+	Commission uint64    `json:"commission"`
 }
 
-// NewTxModComm - return a new counter transaction struct wrapped as a basecoin transaction
-func NewTxModComm(validator basecoin.Actor, commission uint64) basecoin.Tx {
+// NewTxModComm - return a new counter transaction struct wrapped as a sdk transaction
+func NewTxModComm(validator sdk.Actor, commission uint64) sdk.Tx {
 	return TxModComm{
 		Validator:  validator,
 		Commission: commission,
@@ -133,8 +141,8 @@ func NewTxModComm(validator basecoin.Actor, commission uint64) basecoin.Tx {
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxModComm) Wrap() basecoin.Tx {
-	return basecoin.Tx{tx}
+func (tx TxModComm) Wrap() sdk.Tx {
+	return sdk.Tx{tx}
 }
 
 // ValidateBasic - Check coins as well as that the validator is actually a validator

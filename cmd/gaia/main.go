@@ -6,11 +6,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tendermint/tmlibs/cli"
+	tmflags "github.com/tendermint/tmlibs/cli/flags"
 	"github.com/tendermint/tmlibs/log"
 
+	"github.com/cosmos/cosmos-sdk/client/commands"
+	basecmd "github.com/cosmos/cosmos-sdk/cmd/basecoin/commands"
 	"github.com/cosmos/gaia/modules/stake"
-
-	"github.com/tendermint/basecoin/cmd/basecoin/commands"
 )
 
 //nolint
@@ -26,7 +27,7 @@ var (
 // RootCmd - main node command
 var RootCmd = &cobra.Command{
 	Use:   "gaia",
-	Short: "The Cosmos Network delegation-game blockchain",
+	Short: "The Cosmos Network delegation-game blockchain test",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		level := viper.GetString(FlagLogLevel)
 		logger, err = tmflags.ParseLogLevel(level, logger, defaultLogLevel)
@@ -46,12 +47,12 @@ func init() {
 
 func main() {
 	// require all fees in mycoin - change this in your app!
-	commands.Handler = stake.NewHandler("mycoin")
+	basecmd.Handler = stake.NewHandler("mycoin")
 
 	RootCmd.AddCommand(
 		commands.InitCmd,
-		commands.StartCmd,
-		commands.UnsafeResetAllCmd,
+		basecmd.StartCmd,
+		basecmd.UnsafeResetAllCmd,
 		commands.VersionCmd,
 	)
 
