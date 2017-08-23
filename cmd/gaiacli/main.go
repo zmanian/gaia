@@ -86,7 +86,6 @@ func main() {
 	txcmd.Middleware.Register(txcmd.RootCmd.PersistentFlags())
 
 	// Prepare transactions
-	query.TxPresenters.Register("base", txcmd.BaseTxPresenter{})
 	txcmd.RootCmd.AddCommand(
 		// This is the default transaction, optional in your app
 		coincmd.SendTxCmd,
@@ -102,6 +101,7 @@ func main() {
 	GaiaCli.AddCommand(
 		commands.InitCmd,
 		commands.ResetCmd,
+		commands.VersionCmd, //TODO update to custom version command
 		keycmd.RootCmd,
 		seeds.RootCmd,
 		query.RootCmd,

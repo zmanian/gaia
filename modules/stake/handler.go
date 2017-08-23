@@ -1,7 +1,6 @@
 package stake
 
 import (
-	abci "github.com/tendermint/abci/types"
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
@@ -12,12 +11,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/modules/roles"
 	"github.com/cosmos/cosmos-sdk/stack"
 	"github.com/cosmos/cosmos-sdk/state"
+	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/go-wire"
 )
 
 //nolint
 const (
-	Name = "stake"
+	name = "stake"
 	//Precision = 10e8
 	Period2Unbond  uint64 = 30     // how long unbonding takes (measured in blocks)
 	Period2ModComm uint64 = 30     // how long modifying a validator commission takes (measured in blocks)
@@ -27,6 +27,11 @@ const (
 	queueUnbondTB = iota
 	queueCommissionTB
 )
+
+// Name - simply the name TODO do we need name to be unexposed for security?
+func Name() string {
+	return name
+}
 
 // NewHandler returns a new counter transaction processing handler
 func NewHandler(feeDenom string) sdk.Handler {
@@ -61,7 +66,7 @@ var _ stack.Dispatchable = Handler{} //enforce interface at compile time
 
 // Name - return stake namespace
 func (Handler) Name() string {
-	return Name
+	return name
 }
 
 // AssertDispatcher - placeholder for stack.Dispatchable

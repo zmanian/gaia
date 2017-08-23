@@ -16,10 +16,10 @@ const (
 	ByteTxUnbond   = 0x56
 	ByteTxNominate = 0x57
 	ByteTxModComm  = 0x58
-	TypeTxBond     = Name + "/bond"
-	TypeTxUnbond   = Name + "/unbond"
-	TypeTxNominate = Name + "/nominate"
-	TypeTxModComm  = Name + "/modComm" //modify commission rate
+	TypeTxBond     = name + "/bond"
+	TypeTxUnbond   = name + "/unbond"
+	TypeTxNominate = name + "/nominate"
+	TypeTxModComm  = name + "/modComm" //modify commission rate
 )
 
 func init() {

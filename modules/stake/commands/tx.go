@@ -11,6 +11,7 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 
 	"github.com/cosmos/cosmos-sdk"
+	sdkcmd "github.com/cosmos/cosmos-sdk/client/commands"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 
@@ -78,12 +79,22 @@ func cmdUnbond(cmd *cobra.Command, args []string) error {
 	return cmdDelegation(stake.NewTxUnbond)
 }
 
+func getValidator(address []byte) sdk.Actor {
+	return sdk.Actor{
+		ChainID: sdkcmd.GetChainID(),
+		App:     stake.Name(),
+		Address: address,
+	}
+}
+
 func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error {
 	// convert validator pubkey to bytes
-	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
+
+	validator := getValidator(valAddr)
 
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
@@ -96,7 +107,7 @@ func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) err
 
 func cmdNominate(cmd *cobra.Command, args []string) error {
 	// convert validator pubkey to bytes
-	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
@@ -109,12 +120,14 @@ func cmdNominate(cmd *cobra.Command, args []string) error {
 		return errors.Errorf("Must use positive commission")
 	}
 
+	validator := getValidator(valAddr)
+
 	tx := stake.NewTxNominate(validator, amount, uint64(commission))
 	return txcmd.DoTx(tx)
 }
 
 func cmdModComm(cmd *cobra.Command, args []string) error {
-	validator, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
 		return errors.Errorf("Validator is invalid hex: %v\n", err)
 	}
@@ -122,6 +135,8 @@ func cmdModComm(cmd *cobra.Command, args []string) error {
 	if commission < 0 {
 		return errors.Errorf("Must use positive commission")
 	}
+
+	validator := getValidator(valAddr)
 
 	tx := stake.NewTxModComm(validator, uint64(commission))
 	return txcmd.DoTx(tx)

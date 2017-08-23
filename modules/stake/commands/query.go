@@ -16,31 +16,31 @@ var (
 		RunE:  cmdQueryDelegateeSummary,
 	}
 
-	//CmdQueryDelegateeDeligators - CLI command to query the counter state
-	CmdQueryDelegateeDeligators = &cobra.Command{
+	//CmdQueryDelegateeDelegators - CLI command to query the counter state
+	CmdQueryDelegateeDelegators = &cobra.Command{
 		Use:   "deligators",
 		Short: "Query a delegatee's delegators",
 		RunE:  cmdQueryDelegateeDeligates,
 	}
 
-	//CmdQueryDeligator - CLI command to query the counter state
-	CmdQueryDeligator = &cobra.Command{
+	//CmdQueryDelegator - CLI command to query the counter state
+	CmdQueryDelegator = &cobra.Command{
 		Use:   "delegator",
 		Short: "Query a delegator",
 	}
 
-	//CmdQueryDeligatorSummary - CLI command to query the counter state
-	CmdQueryDeligatorSummary = &cobra.Command{
+	//CmdQueryDelegatorSummary - CLI command to query the counter state
+	CmdQueryDelegatorSummary = &cobra.Command{
 		Use:   "summary",
 		Short: "Query a delegator summary",
-		RunE:  cmdQueryDeligatorSummary,
+		RunE:  cmdQueryDelegatorSummary,
 	}
 
-	//CmdQueryDeligatorDelegatees - CLI command to query the counter state
-	CmdQueryDeligatorDelegatees = &cobra.Command{
+	//CmdQueryDelegatorDelegatees - CLI command to query the counter state
+	CmdQueryDelegatorDelegatees = &cobra.Command{
 		Use:   "delegatees",
 		Short: "Query a delegator's delegatees",
-		RunE:  cmdQueryDeligatorDelegatees,
+		RunE:  cmdQueryDelegatorDelegatees,
 	}
 )
 
@@ -48,11 +48,11 @@ func init() {
 	//combine the subcommands
 	CmdQueryDelegatee.AddCommand(
 		CmdQueryDelegateeSummary,
-		CmdQueryDelegateeDeligators,
+		CmdQueryDelegateeDelegators,
 	)
-	CmdQueryDeligator.AddCommand(
-		CmdQueryDeligatorSummary,
-		CmdQueryDeligatorDelegatees,
+	CmdQueryDelegator.AddCommand(
+		CmdQueryDelegatorSummary,
+		CmdQueryDelegatorDelegatees,
 	)
 }
 
@@ -67,12 +67,12 @@ func cmdQueryDelegateeDeligates(cmd *cobra.Command, args []string) error {
 }
 
 //TODO complete functionality
-func cmdQueryDeligatorSummary(cmd *cobra.Command, args []string) error {
+func cmdQueryDelegatorSummary(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
 //TODO complete functionality
-func cmdQueryDeligatorDelegatees(cmd *cobra.Command, args []string) error {
+func cmdQueryDelegatorDelegatees(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
