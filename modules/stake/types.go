@@ -17,7 +17,7 @@ const maxValidators = 100
 // delegated and the current exchange rate. Voting power can be calculated as
 // total bonds multiplied by exchange rate.
 type DelegateeBond struct {
-	DelegateeAddr   []byte
+	Delegatee       sdk.Actor
 	Commission      uint64
 	ExchangeRate    uint64    // Exchange rate for this validator's bond tokens (in millionths of coins)
 	TotalBondTokens uint64    // Total number of bond tokens in the account
@@ -33,7 +33,7 @@ func (b DelegateeBond) VotingPower() uint64 {
 // Validator - Get the validator from a bond value
 func (b DelegateeBond) Validator() *abci.Validator {
 	return &abci.Validator{
-		PubKey: b.DelegateeAddr,
+		PubKey: b.Delegatee.Address,
 		Power:  b.VotingPower(),
 	}
 }
@@ -50,10 +50,21 @@ func (b DelegateeBonds) Len() int      { return len(b) }
 func (b DelegateeBonds) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
 func (b DelegateeBonds) Less(i, j int) bool {
 	vp1, vp2 := b[i].VotingPower(), b[j].VotingPower()
-	if vp1 == vp2 {
-		return bytes.Compare(b[i].DelegateeAddr, b[j].DelegateeAddr) == -1
+	d1, d2 := b[i].Delegatee, b[j].Delegatee
+	switch {
+	case vp1 != vp2:
+		return vp1 > vp2
+	case d1.ChainID < d2.ChainID:
+		return true
+	case d1.ChainID > d2.ChainID:
+		return false
+	case d1.App < d2.App:
+		return true
+	case d1.App > d2.App:
+		return false
+	default:
+		return bytes.Compare(d1.Address, d2.Address) == -1
 	}
-	return vp1 > vp2
 }
 
 // Sort - Sort the array of bonded values
@@ -116,9 +127,11 @@ func (b DelegateeBonds) ValidatorsActors() []sdk.Actor {
 }
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
-func (b DelegateeBonds) Get(delegateeAddr []byte) (int, *DelegateeBond) {
+func (b DelegateeBonds) Get(delegatee sdk.Actor) (int, *DelegateeBond) {
 	for i, bv := range b {
-		if bytes.Equal(bv.DelegateeAddr, delegateeAddr) {
+		if bytes.Equal(bv.Delegatee.Address, delegatee.Address) &&
+			bv.Delegatee.ChainID == delegatee.ChainID &&
+			bv.Delegatee.App == delegatee.App {
 			return i, &bv
 		}
 	}
@@ -135,17 +148,19 @@ func (b DelegateeBonds) Remove(i int) DelegateeBonds {
 // DelegatorBond defines an account of bond tokens. It is owned by one delegator
 // account, and is associated with one delegatee account
 type DelegatorBond struct {
-	DelegateeAddr []byte
-	BondTokens    uint64 // amount of bond tokens
+	Delegatee  sdk.Actor
+	BondTokens uint64 // amount of bond tokens
 }
 
-// DelegatorBonds - all delegator bonds
+// DelegatorBonds - all delegator bonds existing with multiple delegatees
 type DelegatorBonds []DelegatorBond
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
-func (b DelegatorBonds) Get(delegateeAddr []byte) (int, *DelegatorBond) {
+func (b DelegatorBonds) Get(delegatee sdk.Actor) (int, *DelegatorBond) {
 	for i, bv := range b {
-		if bytes.Equal(bv.DelegateeAddr, delegateeAddr) {
+		if bytes.Equal(bv.Delegatee.Address, delegatee.Address) &&
+			bv.Delegatee.ChainID == delegatee.ChainID &&
+			bv.Delegatee.App == delegatee.App {
 			return i, &bv
 		}
 	}
@@ -161,8 +176,8 @@ func (b DelegatorBonds) Remove(i int) DelegatorBonds {
 
 // QueueElem - queue element, the basis of a queue interaction with a delegatee/validator
 type QueueElem struct {
-	DelegateeAddr []byte
-	HeightAtInit  uint64 // when the queue was initiated
+	Delegatee    sdk.Actor
+	HeightAtInit uint64 // when the queue was initiated
 }
 
 // QueueElemUnbond - the unbonding queue element

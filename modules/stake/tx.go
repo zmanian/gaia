@@ -8,7 +8,7 @@ import (
 // Tx
 //--------------------------------------------------------------------------------
 
-// register the tx type with it's validation logic
+// register the tx type with its validation logic
 // make sure to use the name of the handler as the prefix in the tx type,
 // so it gets routed properly
 const (
@@ -39,9 +39,9 @@ var _, _, _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModComm{}
 type TxBond struct{ TxBonding }
 
 // NewTxBond - new TxBond
-func NewTxBond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+func NewTxBond(delegatee sdk.Actor, amount coin.Coin) sdk.Tx {
 	return TxBond{TxBonding{
-		Validator: validator,
+		Delegatee: delegatee,
 		Amount:    amount,
 	}}.Wrap()
 }
@@ -50,16 +50,16 @@ func NewTxBond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
 type TxUnbond struct{ TxBonding }
 
 // NewTxUnbond - new TxUnbond
-func NewTxUnbond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+func NewTxUnbond(delegatee sdk.Actor, amount coin.Coin) sdk.Tx {
 	return TxUnbond{TxBonding{
-		Validator: validator,
+		Delegatee: delegatee,
 		Amount:    amount,
 	}}.Wrap()
 }
 
 // TxBonding - struct for bonding or unbonding transactions
 type TxBonding struct {
-	Validator sdk.Actor `json:"validator"`
+	Delegatee sdk.Actor `json:"delegatee"`
 	Amount    coin.Coin `json:"amount"`
 }
 
@@ -70,7 +70,7 @@ func (tx TxBonding) Wrap() sdk.Tx {
 
 // ValidateBasic - Check the bonding coins, Validator is non-empty
 func (tx TxBonding) ValidateBasic() error {
-	if tx.Validator.Empty() {
+	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
 	}
 	coins := coin.Coins{tx.Amount}
@@ -88,15 +88,15 @@ func (tx TxBonding) ValidateBasic() error {
 
 // TxNominate - struct for all staking transactions
 type TxNominate struct {
-	Validator  sdk.Actor `json:"validator"`
+	Nominee    sdk.Actor `json:"nominee"`
 	Amount     coin.Coin `json:"amount"`
 	Commission uint64    `json:"commission"`
 }
 
-// NewTxNominate - return a new counter transaction struct wrapped as a sdk transaction
-func NewTxNominate(validator sdk.Actor, amount coin.Coin, commission uint64) sdk.Tx {
+// NewTxNominate - return a new transaction for validator self-nomination
+func NewTxNominate(nominee sdk.Actor, amount coin.Coin, commission uint64) sdk.Tx {
 	return TxNominate{
-		Validator:  validator,
+		Nominee:    nominee,
 		Amount:     amount,
 		Commission: commission,
 	}.Wrap()
@@ -107,10 +107,9 @@ func (tx TxNominate) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
-// ValidateBasic - Check coins as well as that the validator is actually a validator
-// TODO validate commission is not negative and valid
+// ValidateBasic - Check coins as well as that the delegatee is actually a delegatee
 func (tx TxNominate) ValidateBasic() error {
-	if tx.Validator.Empty() {
+	if tx.Nominee.Empty() {
 		return errValidatorEmpty
 	}
 	coins := coin.Coins{tx.Amount}
@@ -120,6 +119,12 @@ func (tx TxNominate) ValidateBasic() error {
 	if !coins.IsNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
+	if tx.Commission < 0 {
+		return errCommissionNegative
+	}
+	if tx.Commission > 100 { //XXX Integrate precision
+		return errCommissionHuge
+	}
 	return nil
 }
 
@@ -128,14 +133,14 @@ func (tx TxNominate) ValidateBasic() error {
 
 // TxModComm - struct for all staking transactions
 type TxModComm struct {
-	Validator  sdk.Actor `json:"validator"`
+	Delegatee  sdk.Actor `json:"delegatee"`
 	Commission uint64    `json:"commission"`
 }
 
 // NewTxModComm - return a new counter transaction struct wrapped as a sdk transaction
-func NewTxModComm(validator sdk.Actor, commission uint64) sdk.Tx {
+func NewTxModComm(delegatee sdk.Actor, commission uint64) sdk.Tx {
 	return TxModComm{
-		Validator:  validator,
+		Delegatee:  delegatee,
 		Commission: commission,
 	}.Wrap()
 }
@@ -145,11 +150,16 @@ func (tx TxModComm) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
-// ValidateBasic - Check coins as well as that the validator is actually a validator
-// TODO validate commission is not negative and valid
+// ValidateBasic - Check coins as well as that the delegatee is actually a delegatee
 func (tx TxModComm) ValidateBasic() error {
-	if tx.Validator.Empty() {
+	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
+	}
+	if tx.Commission < 0 {
+		return errCommissionNegative
+	}
+	if tx.Commission > 100 { //XXX Integrate precision
+		return errCommissionHuge
 	}
 	return nil
 }

@@ -4,8 +4,8 @@ package stake
 import (
 	"fmt"
 
-	abci "github.com/tendermint/abci/types"
 	"github.com/cosmos/cosmos-sdk/errors"
+	abci "github.com/tendermint/abci/types"
 )
 
 var (
@@ -15,6 +15,8 @@ var (
 	errBadBondingValidator = fmt.Errorf("Cannot bond to non-nominated account")
 	errNoBondingAcct       = fmt.Errorf("No bond account for this (address, validator) pair")
 	errNotEnoughTokens     = fmt.Errorf("Insufficient bond tokens")
+	errCommissionNegative  = fmt.Errorf("Commission must be positive")
+	errCommissionHuge      = fmt.Errorf("Commission cannot be more than 100%")
 
 	invalidInput = abci.CodeType_BaseInvalidInput
 )
