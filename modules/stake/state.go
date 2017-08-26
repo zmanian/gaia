@@ -42,19 +42,19 @@ func removeDelegatorBonds(store state.SimpleDB, delegator sdk.Actor) {
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-func setDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
-	bvBytes := wire.BinaryBytes(delegateeBonds)
-	store.Set([]byte{delegateeKey}, bvBytes)
-}
-
 func getDelegateeBonds(store state.SimpleDB) (delegateeBonds DelegateeBonds, err error) {
 	bvBytes := store.Get([]byte{delegateeKey})
 	if bvBytes == nil {
-		return make(DelegateeBonds, 0), nil
+		return
 	}
-	err = wire.ReadBinaryBytes(bvBytes, delegateeBonds)
+	err = wire.ReadBinaryBytes(bvBytes, &delegateeBonds)
 	if err != nil {
 		err = errors.ErrDecoding()
 	}
 	return
+}
+
+func setDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
+	bvBytes := wire.BinaryBytes(delegateeBonds)
+	store.Set([]byte{delegateeKey}, bvBytes)
 }

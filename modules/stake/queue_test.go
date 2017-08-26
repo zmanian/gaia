@@ -1,20 +1,12 @@
 package stake
 
 //import (
-//"encoding/json"
 //"testing"
 
 //"github.com/stretchr/testify/assert"
-//"github.com/stretchr/testify/require"
-
-//crypto "github.com/tendermint/go-crypto"
-//"github.com/tendermint/tmlibs/log"
 
 //sdk "github.com/cosmos/cosmos-sdk"
-//"github.com/cosmos/cosmos-sdk/errors"
-//"github.com/cosmos/cosmos-sdk/modules/auth"
 //"github.com/cosmos/cosmos-sdk/stack"
-//"github.com/cosmos/cosmos-sdk/state"
 //)
 
 //// this makes sure that txs are rejected with invalid data or permissions
