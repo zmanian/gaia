@@ -105,7 +105,7 @@ func (q *Queue) Pop() {
 		return
 	}
 	popKey := q.getQueueKey(q.head)
-	q.store.Set(popKey, nil) // TODO: remove
+	q.store.Remove(popKey)
 	q.incrementHead()
 }
 

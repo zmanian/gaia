@@ -10,7 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-// this makes sure that txs are rejected with invalid data or permissions
+// TestState - test the delegatee and delegator bonds store
 func TestState(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 

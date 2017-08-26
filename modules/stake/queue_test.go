@@ -1,78 +1,63 @@
 package stake
 
-//import (
-//"testing"
+import (
+	"testing"
 
-//"github.com/stretchr/testify/assert"
+	"github.com/cosmos/cosmos-sdk/state"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
-//sdk "github.com/cosmos/cosmos-sdk"
-//"github.com/cosmos/cosmos-sdk/stack"
-//)
+// this makes sure that txs are rejected with invalid data or permissions
+// TestQueue - test the queue!
+func TestQueue(t *testing.T) {
+	assert, require := assert.New(t), require.New(t)
 
-//// this makes sure that txs are rejected with invalid data or permissions
-//func TestHandlerValidation(t *testing.T) {
-//assert := assert.New(t)
+	store := state.NewMemKVStore()
 
-//// these are all valid, except for minusCoins
-//addr1 := sdk.Actor{App: "coin", Address: []byte{1, 2}}
-//addr2 := sdk.Actor{App: "role", Address: []byte{7, 8}}
-//someCoins := Coins{{"atom", 123}}
-//doubleCoins := Coins{{"atom", 246}}
-//minusCoins := Coins{{"eth", -34}}
+	//records for the queue
+	rec1, rec2, rec3 := []byte("record1"), []byte("record2"), []byte("record3")
+	var slot1, slot2 byte = 0x01, 0x02
 
-//cases := []struct {
-//valid bool
-//tx    sdk.Tx
-//perms []sdk.Actor
-//}{
-//// auth works with different apps
-//{true,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, someCoins)},
-//[]TxOutput{NewTxOutput(addr2, someCoins)}),
-//[]sdk.Actor{addr1}},
-//{true,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr2, someCoins)},
-//[]TxOutput{NewTxOutput(addr1, someCoins)}),
-//[]sdk.Actor{addr1, addr2}},
-//// check multi-input with both sigs
-//{true,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, someCoins), NewTxInput(addr2, someCoins)},
-//[]TxOutput{NewTxOutput(addr1, doubleCoins)}),
-//[]sdk.Actor{addr1, addr2}},
-//// wrong permissions fail
-//{false,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, someCoins)},
-//[]TxOutput{NewTxOutput(addr2, someCoins)}),
-//[]sdk.Actor{}},
-//{false,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, someCoins)},
-//[]TxOutput{NewTxOutput(addr2, someCoins)}),
-//[]sdk.Actor{addr2}},
-//{false,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, someCoins), NewTxInput(addr2, someCoins)},
-//[]TxOutput{NewTxOutput(addr1, doubleCoins)}),
-//[]sdk.Actor{addr1}},
-//// invalid input fails
-//{false,
-//NewSendTx(
-//[]TxInput{NewTxInput(addr1, minusCoins)},
-//[]TxOutput{NewTxOutput(addr2, minusCoins)}),
-//[]sdk.Actor{addr2}},
-//}
+	// Load a non-existent queue, should fail
+	_, err := LoadQueue(slot1, store)
+	require.NotNil(err)
 
-//for i, tc := range cases {
-//ctx := stack.MockContext("base-chain", 100).WithPermissions(tc.perms...)
-//err := checkTx(ctx, tc.tx.Unwrap().(SendTx))
-//if tc.valid {
-//assert.Nil(err, "%d: %+v", i, err)
-//} else {
-//assert.NotNil(err, "%d", i)
-//}
-//}
-//}
+	// Create new Queue, make sure empty
+	queueNew, err := NewQueue(slot1, store)
+	require.Nil(err)
+	assert.Nil(queueNew.Peek())
+
+	// Load the new queue
+	queueLoad, err := LoadQueue(slot1, store)
+	require.Nil(err)
+
+	// Make sure nothing has been added to another slot
+	_, err = LoadQueue(slot2, store)
+	require.NotNil(err)
+
+	// Push a record to the queue
+	queueLoad.Push(rec1)
+
+	// Reload the queue to make sure loaded queue has the newly added record
+	queueLoad2, err := LoadQueue(slot1, store)
+	require.Nil(err)
+	assert.Equal(rec1, queueLoad2.Peek())
+
+	// Add a two more records
+	// Pop and check the peek of all the records
+	queueLoad.Push(rec2)
+	queueLoad.Push(rec3)
+	assert.Equal(rec1, queueLoad.Peek())
+	queueLoad.Pop()
+	assert.Equal(rec2, queueLoad.Peek())
+	queueLoad.Pop()
+	assert.Equal(rec3, queueLoad.Peek())
+	queueLoad.Pop()
+	assert.Nil(queueLoad.Peek())
+
+	// Load the queue again to make sure is empty
+	queueLoad3, err := LoadQueue(slot1, store)
+	require.Nil(err)
+	assert.Nil(queueLoad3.Peek())
+}
