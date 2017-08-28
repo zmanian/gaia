@@ -90,11 +90,11 @@ func (tx TxBonding) ValidateBasic() error {
 type TxNominate struct {
 	Nominee    sdk.Actor `json:"nominee"`
 	Amount     coin.Coin `json:"amount"`
-	Commission uint64    `json:"commission"`
+	Commission Decimal   `json:"commission"`
 }
 
 // NewTxNominate - return a new transaction for validator self-nomination
-func NewTxNominate(nominee sdk.Actor, amount coin.Coin, commission uint64) sdk.Tx {
+func NewTxNominate(nominee sdk.Actor, amount coin.Coin, commission Decimal) sdk.Tx {
 	return TxNominate{
 		Nominee:    nominee,
 		Amount:     amount,
@@ -119,10 +119,10 @@ func (tx TxNominate) ValidateBasic() error {
 	if !coins.IsNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
-	if tx.Commission < 0 {
+	if tx.Commission.LT(NewDecimal(0, 1)) {
 		return errCommissionNegative
 	}
-	if tx.Commission > 100 { //XXX Integrate precision
+	if tx.Commission.GT(NewDecimal(1, 1)) {
 		return errCommissionHuge
 	}
 	return nil
@@ -134,11 +134,11 @@ func (tx TxNominate) ValidateBasic() error {
 // TxModComm - struct for all staking transactions
 type TxModComm struct {
 	Delegatee  sdk.Actor `json:"delegatee"`
-	Commission uint64    `json:"commission"`
+	Commission Decimal   `json:"commission"`
 }
 
 // NewTxModComm - return a new counter transaction struct wrapped as a sdk transaction
-func NewTxModComm(delegatee sdk.Actor, commission uint64) sdk.Tx {
+func NewTxModComm(delegatee sdk.Actor, commission Decimal) sdk.Tx {
 	return TxModComm{
 		Delegatee:  delegatee,
 		Commission: commission,
@@ -155,10 +155,10 @@ func (tx TxModComm) ValidateBasic() error {
 	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
 	}
-	if tx.Commission < 0 {
+	if tx.Commission.LT(NewDecimal(0, 1)) {
 		return errCommissionNegative
 	}
-	if tx.Commission > 100 { //XXX Integrate precision
+	if tx.Commission.GT(NewDecimal(1, 1)) {
 		return errCommissionHuge
 	}
 	return nil

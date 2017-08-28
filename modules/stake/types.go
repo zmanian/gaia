@@ -18,16 +18,18 @@ const maxValidators = 100
 // total bonds multiplied by exchange rate.
 type DelegateeBond struct {
 	Delegatee       sdk.Actor
-	Commission      uint64
-	ExchangeRate    uint64    // Exchange rate for this validator's bond tokens (in millionths of coins)
-	TotalBondTokens uint64    // Total number of bond tokens in the account
+	Commission      Decimal
+	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in millionths of coins)
+	TotalBondTokens Decimal   // Total number of bond tokens in the account
 	Account         sdk.Actor // Account where the bonded tokens are held
 }
 
 // VotingPower - voting power based onthe bond value
 func (b DelegateeBond) VotingPower() uint64 {
-	return b.TotalBondTokens * b.ExchangeRate
-	//return b.Total * b.ExchangeRate / Precision
+	decPower := b.TotalBondTokens.Mul(b.ExchangeRate)
+
+	//in order to pass the voting power as an uint64 with some precision multiple by a large number
+	return uint64(decPower.Mul(NewDecimal(1, 10)).IntPart())
 }
 
 // Validator - Get the validator from a bond value
@@ -149,7 +151,7 @@ func (b DelegateeBonds) Remove(i int) DelegateeBonds {
 // account, and is associated with one delegatee account
 type DelegatorBond struct {
 	Delegatee  sdk.Actor
-	BondTokens uint64 // amount of bond tokens
+	BondTokens Decimal // amount of bond tokens
 }
 
 // DelegatorBonds - all delegator bonds existing with multiple delegatees
@@ -184,11 +186,11 @@ type QueueElem struct {
 type QueueElemUnbond struct {
 	QueueElem
 	Account    sdk.Actor // account to pay out to
-	BondTokens uint64    // amount of bond tokens which are unbonding
+	BondTokens Decimal   // amount of bond tokens which are unbonding
 }
 
 // QueueElemModComm - the commission queue element
 type QueueElemModComm struct {
 	QueueElem
-	Commission uint64 // new commission for the
+	Commission Decimal // new commission for the
 }

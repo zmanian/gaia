@@ -1,6 +1,9 @@
 package stake
 
 import (
+	abci "github.com/tendermint/abci/types"
+	"github.com/tendermint/go-wire"
+
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
@@ -11,21 +14,23 @@ import (
 	"github.com/cosmos/cosmos-sdk/modules/roles"
 	"github.com/cosmos/cosmos-sdk/stack"
 	"github.com/cosmos/cosmos-sdk/state"
-	abci "github.com/tendermint/abci/types"
-	"github.com/tendermint/go-wire"
 )
 
 //nolint
 const (
 	name = "stake"
-	//Precision = 10e8
-	Period2Unbond  uint64 = 30     // how long unbonding takes (measured in blocks)
-	Period2ModComm uint64 = 30     // how long modifying a validator commission takes (measured in blocks)
-	Inflation      uint   = 1      // inflation in percent (1 to 100)
+
+	Period2Unbond  uint64 = 30     // queue blocks before unbond
+	Period2ModComm uint64 = 30     // queue blocks before commission can change
 	CoinDenom      string = "atom" // bondable coin denomination
 
 	queueUnbondTB = iota
 	queueCommissionTB
+)
+
+//nolint
+var (
+	Inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
 )
 
 // Name - simply the name TODO do we need name to be unexposed for security?
@@ -141,12 +146,12 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 
 	// Get amount of coins to bond
 	bondCoin := tx.Amount
-	bondAmt := bondCoin.Amount
+	bondAmt := NewDecimal(bondCoin.Amount, 1)
 
 	switch {
 	case bondCoin.Denom != CoinDenom:
 		return abci.ErrInternalError.AppendLog("Invalid coin denomination")
-	case bondAmt <= 0:
+	case bondAmt.LTE(Zero):
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
 	}
 
@@ -183,15 +188,14 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 		delegatorBonds = DelegatorBonds{
 			DelegatorBond{
 				Delegatee:  tx.Delegatee,
-				BondTokens: 0,
+				BondTokens: Zero,
 			},
 		}
 	}
 
 	// Calculate amount of bond tokens to create, based on exchange rate
-	//bondTokenAmt := uint64(coinAmount) * Precision / delegateeBond.ExchangeRate
-	bondTokens := uint64(bondAmt) / delegateeBond.ExchangeRate
-	delegatorBonds[0].BondTokens += bondTokens
+	bondTokens := bondAmt.Div(delegateeBond.ExchangeRate)
+	delegatorBonds[0].BondTokens = delegatorBonds[0].BondTokens.Plus(bondTokens)
 
 	// Save to store
 	setDelegateeBonds(store, delegateeBonds)
@@ -203,9 +207,9 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
-	bondAmt := uint64(tx.Amount.Amount)
+	bondAmt := NewDecimal(tx.Amount.Amount, 1)
 
-	if bondAmt <= 0 {
+	if bondAmt.LTE(Zero) {
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
@@ -228,14 +232,14 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	}
 
 	// subtract bond tokens from bond account
-	if delegatorBond.BondTokens < bondAmt {
+	if delegatorBond.BondTokens.LT(bondAmt) {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 	}
-	delegatorBond.BondTokens -= bondAmt
+	delegatorBond.BondTokens = delegatorBond.BondTokens.Minus(bondAmt)
 	//New exchange rate = (new number of bonded atoms)/ total number of bondTokens for validator
 	//delegateeBond.ExchangeRate := uint64(bondAmt) / bondTokens
 
-	if delegatorBond.BondTokens == 0 {
+	if delegatorBond.BondTokens.Equal(Zero) {
 		removeDelegatorBonds(store, sender)
 	} else {
 		setDelegatorBonds(store, sender, delegatorBonds)
@@ -250,8 +254,8 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	if delegatorBond == nil {
 		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 	}
-	delegateeBond.TotalBondTokens -= bondAmt
-	if delegateeBond.TotalBondTokens == 0 {
+	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Minus(bondAmt)
+	if delegateeBond.TotalBondTokens.Equal(Zero) {
 		delegateeBonds.Remove(bvIndex)
 	}
 	setDelegateeBonds(store, delegateeBonds)
@@ -283,7 +287,7 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	delegateeBond := DelegateeBond{
 		Delegatee:    tx.Nominee,
 		Commission:   tx.Commission,
-		ExchangeRate: 1, // * Precision,
+		ExchangeRate: One,
 	}
 
 	// Bond the tokens
@@ -374,8 +378,8 @@ func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 		if delegateeBond == nil {
 			return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 		}
-		coinAmount := unbond.BondTokens * delegateeBond.ExchangeRate // / Precision
-		payout := coin.Coins{{CoinDenom, int64(coinAmount)}}
+		coinAmount := unbond.BondTokens.Mul(delegateeBond.ExchangeRate)
+		payout := coin.Coins{{CoinDenom, coinAmount.IntPart()}} //TODO here coins must also be decimal!!!!
 
 		send := coin.NewSendOneTx(delegateeBond.Account, unbond.Account, payout)
 		_, err = dispatch.DeliverTx(ctx, store, send)

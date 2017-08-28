@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -57,13 +58,13 @@ func init() {
 	fsModComm := flag.NewFlagSet("", flag.ContinueOnError)
 
 	fsDelegation.String(FlagValidator, "", "Validator's public key")
-	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms")
+	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms") //TODO make string once decimal integrated with coin
 
 	fsNominate.AddFlagSet(fsDelegation)
-	fsNominate.String(FlagCommission, "0.01", "Validator's commission rate")
+	fsNominate.String(FlagCommission, "0", "Validator's commission rate")
 
 	fsModComm.String(FlagValidator, "", "Validator's public key")
-	fsModComm.String(FlagCommission, "0.01", "Validator's commission rate")
+	fsModComm.String(FlagCommission, "0", "Validator's commission rate")
 
 	CmdBond.Flags().AddFlagSet(fsDelegation)
 	CmdUnbond.Flags().AddFlagSet(fsDelegation)
@@ -72,22 +73,14 @@ func init() {
 }
 
 func cmdBond(cmd *cobra.Command, args []string) error {
-	return cmdDelegation(stake.NewTxBond)
+	return cmdBonding(stake.NewTxBond)
 }
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
-	return cmdDelegation(stake.NewTxUnbond)
+	return cmdBonding(stake.NewTxUnbond)
 }
 
-func getValidator(address []byte) sdk.Actor {
-	return sdk.Actor{
-		ChainID: sdkcmd.GetChainID(),
-		App:     stake.Name(),
-		Address: address,
-	}
-}
-
-func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error {
+func cmdBonding(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error {
 	// convert validator pubkey to bytes
 	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
@@ -106,38 +99,67 @@ func cmdDelegation(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) err
 }
 
 func cmdNominate(cmd *cobra.Command, args []string) error {
-	// convert validator pubkey to bytes
-	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+	validator, err := getValidator(valAddr)
 	if err != nil {
-		return errors.Errorf("Validator is invalid hex: %v\n", err)
+		return err
 	}
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err
 	}
-	commission := viper.GetInt(FlagCommission)
-	if commission < 0 {
-		return errors.Errorf("Must use positive commission")
+	commission, err := getCommission()
+	if err != nil {
+		return err
 	}
 
 	validator := getValidator(valAddr)
 
-	tx := stake.NewTxNominate(validator, amount, uint64(commission))
+	tx := stake.NewTxNominate(validator, amount, commission)
 	return txcmd.DoTx(tx)
 }
 
 func cmdModComm(cmd *cobra.Command, args []string) error {
-	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+
+	validator, err := getValidator(valAddr)
 	if err != nil {
-		return errors.Errorf("Validator is invalid hex: %v\n", err)
+		return err
 	}
-	commission := viper.GetInt(FlagCommission)
-	if commission < 0 {
-		return errors.Errorf("Must use positive commission")
+	commission, err := getCommission()
+	if err != nil {
+		return err
 	}
 
-	validator := getValidator(valAddr)
-
-	tx := stake.NewTxModComm(validator, uint64(commission))
+	tx := stake.NewTxModComm(validator, commission)
 	return txcmd.DoTx(tx)
+}
+
+////////////////////////////////////////////////////////////
+
+func getCommission() (commission stake.Decimal, err error) {
+	commissionStr := viper.GetString(FlagCommission)
+	commission, err = stake.NewDecimalFromString(commissionStr)
+	if err != nil {
+		err = fmt.Errorf("Error parsing commission, must be in decimal format (eg 0.05), Error: ", err.Error())
+		return
+	}
+	if commission.LT(stake.Zero) {
+		err = errors.Errorf("Must use positive commission")
+		return
+	}
+	return commission, nil
+}
+
+func getValidator(address []byte) (validator sdk.Actor, err error) {
+	var valAddr []byte
+	valAddr, err = hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+	if err != nil {
+		err = errors.Errorf("Validator is invalid hex: %v\n", err)
+		return
+	}
+	validator = sdk.Actor{
+		ChainID: sdkcmd.GetChainID(),
+		App:     stake.Name(),
+		Address: address,
+	}
+	return
 }
