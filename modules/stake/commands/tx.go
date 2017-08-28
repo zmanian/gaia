@@ -81,14 +81,11 @@ func cmdUnbond(cmd *cobra.Command, args []string) error {
 }
 
 func cmdBonding(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error {
-	// convert validator pubkey to bytes
-	valAddr, err := hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
+
+	validator, err := getValidator()
 	if err != nil {
-		return errors.Errorf("Validator is invalid hex: %v\n", err)
+		return err
 	}
-
-	validator := getValidator(valAddr)
-
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err
@@ -99,7 +96,8 @@ func cmdBonding(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error 
 }
 
 func cmdNominate(cmd *cobra.Command, args []string) error {
-	validator, err := getValidator(valAddr)
+
+	validator, err := getValidator()
 	if err != nil {
 		return err
 	}
@@ -112,15 +110,13 @@ func cmdNominate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	validator := getValidator(valAddr)
-
 	tx := stake.NewTxNominate(validator, amount, commission)
 	return txcmd.DoTx(tx)
 }
 
 func cmdModComm(cmd *cobra.Command, args []string) error {
 
-	validator, err := getValidator(valAddr)
+	validator, err := getValidator()
 	if err != nil {
 		return err
 	}
@@ -149,7 +145,7 @@ func getCommission() (commission stake.Decimal, err error) {
 	return commission, nil
 }
 
-func getValidator(address []byte) (validator sdk.Actor, err error) {
+func getValidator() (validator sdk.Actor, err error) {
 	var valAddr []byte
 	valAddr, err = hex.DecodeString(cmn.StripHex(viper.GetString(FlagValidator)))
 	if err != nil {
@@ -159,7 +155,7 @@ func getValidator(address []byte) (validator sdk.Actor, err error) {
 	validator = sdk.Actor{
 		ChainID: sdkcmd.GetChainID(),
 		App:     stake.Name(),
-		Address: address,
+		Address: valAddr,
 	}
 	return
 }

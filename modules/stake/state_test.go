@@ -24,17 +24,29 @@ func TestState(t *testing.T) {
 	delegator2 := sdk.Actor{"testChain", "testapp", []byte("addressdelegator2")}
 	delegator3 := sdk.Actor{"testChain", "testapp", []byte("addressdelegator3")}
 
-	delegator1Bonds := DelegatorBonds{{delegatee1, 2}, {delegatee2, 3}, {delegatee3, 4}}
-	delegator2Bonds := DelegatorBonds{{delegatee1, 12}, {delegatee2, 13}, {delegatee3, 14}}
-	delegator3Bonds := DelegatorBonds{{delegatee1, 22}, {delegatee2, 23}, {delegatee3, 24}}
+	delegator1Bonds := DelegatorBonds{
+		{delegatee1, NewDecimal(2, 1)},
+		{delegatee2, NewDecimal(3, 1)},
+		{delegatee3, NewDecimal(4, 1)},
+	}
+	delegator2Bonds := DelegatorBonds{
+		{delegatee1, NewDecimal(12, 1)},
+		{delegatee2, NewDecimal(13, 1)},
+		{delegatee3, NewDecimal(14, 1)},
+	}
+	delegator3Bonds := DelegatorBonds{
+		{delegatee1, NewDecimal(22, 1)},
+		{delegatee2, NewDecimal(23, 1)},
+		{delegatee3, NewDecimal(24, 1)},
+	}
 	var delegatorNilBonds DelegatorBonds
 
 	delegateeBonds := DelegateeBonds{
 		DelegateeBond{
 			Delegatee:       delegatee1,
-			Commission:      7,
-			ExchangeRate:    8,
-			TotalBondTokens: 9,
+			Commission:      NewDecimal(7, -2),
+			ExchangeRate:    NewDecimal(8, -1),
+			TotalBondTokens: NewDecimal(9, 1),
 			Account:         sdk.Actor{"testChain", "testapp", []byte("addresslockedtoapp")},
 		}}
 	var delegateeNilBonds DelegateeBonds
@@ -78,7 +90,11 @@ func TestState(t *testing.T) {
 	assert.Equal(delegator3Bonds, resGet3)
 
 	// Modify and Set a new delegator bond, check out the mods
-	delegator3Bonds = DelegatorBonds{{delegatee1, 54}, {delegatee2, 53}, {delegatee3, 54}}
+	delegator3Bonds = DelegatorBonds{
+		{delegatee1, NewDecimal(52, 1)},
+		{delegatee2, NewDecimal(53, 1)},
+		{delegatee3, NewDecimal(54, 1)},
+	}
 	setDelegatorBonds(store, delegator3, delegator3Bonds)
 	resBasicGet, err = getDelegatorBonds(store, delegator3)
 	require.Nil(err)
@@ -99,7 +115,7 @@ func TestState(t *testing.T) {
 	assert.Equal(delegateeBonds, resGet)
 
 	//modify a records, save, and retrieve
-	delegateeBonds[0].Commission = 99
+	delegateeBonds[0].Commission = NewDecimal(99, 1)
 	setDelegateeBonds(store, delegateeBonds)
 	resGet, err = getDelegateeBonds(store)
 	require.Nil(err)
