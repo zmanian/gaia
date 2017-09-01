@@ -7,35 +7,35 @@ import:
 - package: github.com/spf13/pflag
 - package: github.com/spf13/viper
 - package: github.com/tendermint/abci
-  version: develop
+  version: 7f5f48b6b9ec3964de4b07b6c3cd05d7c91aeee5
   subpackages:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: develop
+  version: feature/init-option
 - package: github.com/tendermint/go-crypto
-  version: develop
+  version: 03d2b2446e8587f159e52070b1f1e0def971a2c7
   subpackages:
   - cmd
   - keys
 - package: github.com/tendermint/go-wire
-  version: develop
+  version: 5f88da3dbc1a72844e6dfaf274ce87f851d488eb
   subpackages:
   - data
 - package: github.com/tendermint/light-client
-  version: unstable
+  version: b2afece9635d11e77dd404019b9cf3885d34f4e5
   subpackages:
   - proofs
   - certifiers
   - certifiers/client
   - certifiers/files
 - package: github.com/tendermint/merkleeyes
-  version: origin/unstable
+  version: 25b700b87a45619cb6bd85330ab4a81b7b7fbb0d
   subpackages:
   - client
   - iavl
 - package: github.com/tendermint/tendermint
-  version: no-internet
+  version: 2d4c86dfe8f78568abd8e3847ce703d2085ed929
   subpackages:
   - config
   - node
@@ -46,7 +46,7 @@ import:
   - rpc/lib/types
   - types
 - package: github.com/tendermint/tmlibs
-  version: develop
+  version: 75372988e737a9f672c0e7f6308042620bd3e151
   subpackages:
   - cli
   - cli/flags

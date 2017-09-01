@@ -1,10 +1,15 @@
 package stake
 
 import (
+	"fmt"
+	"strconv"
+
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/go-wire"
+	"github.com/tendermint/tmlibs/log"
 
 	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/errors"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -20,16 +25,16 @@ import (
 const (
 	name = "stake"
 
-	Period2Unbond  uint64 = 30     // queue blocks before unbond
-	Period2ModComm uint64 = 30     // queue blocks before commission can change
-	CoinDenom      string = "atom" // bondable coin denomination
-
 	queueUnbondTB = iota
 	queueCommissionTB
 )
 
 //nolint
 var (
+	Period2Unbond  uint64 = 30     // queue blocks before unbond
+	Period2ModComm uint64 = 30     // queue blocks before commission can change
+	CoinDenom      string = "atom" // bondable coin denomination
+
 	Inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
 )
 
@@ -63,7 +68,6 @@ func NewHandler(feeDenom string) sdk.Handler {
 
 // Handler the transaction processing handler
 type Handler struct {
-	stack.PassInitState
 	stack.PassInitValidate
 }
 
@@ -77,10 +81,36 @@ func (Handler) Name() string {
 // AssertDispatcher - placeholder for stack.Dispatchable
 func (Handler) AssertDispatcher() {}
 
+// InitState - set genesis parameters for staking
+func (Handler) InitState(l log.Logger, store state.SimpleDB,
+	module, key, value string, cb sdk.InitStater) (log string, err error) {
+	if module != name {
+		return "", errors.ErrUnknownModule(module)
+	}
+	switch key {
+	case "unbond_period":
+		period, err := strconv.Atoi(value)
+		if err != nil {
+			return "", fmt.Errorf("unbond period must be int, Error: %v", err.Error())
+		}
+		Period2Unbond = uint64(period)
+	case "modcomm_period":
+		period, err := strconv.Atoi(value)
+		if err != nil {
+			return "", fmt.Errorf("modcomm period must be int, Error: %v", err.Error())
+		}
+		Period2ModComm = uint64(period)
+	case "bond_coin":
+		CoinDenom = value
+	}
+	return "", errors.ErrUnknownKey(key)
+}
+
 // CheckTx checks if the tx is properly structured
 func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, _ sdk.Checker) (res sdk.CheckResult, err error) {
 	err = checkTx(ctx, tx)
+
 	return
 }
 func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
@@ -108,6 +138,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	}
 	err = processValidatorRewards(ctx, store, height, dispatch)
 	if err != nil {
+		return
 		return
 	}
 
@@ -345,7 +376,6 @@ func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Process all unbonding for the current block, note that the unbonding amounts
 //   have already been subtracted from the bond account when they were added to the queue
 func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
