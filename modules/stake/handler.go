@@ -31,9 +31,9 @@ const (
 
 //nolint
 var (
-	Period2Unbond  uint64 = 30     // queue blocks before unbond
-	Period2ModComm uint64 = 30     // queue blocks before commission can change
-	CoinDenom      string = "atom" // bondable coin denomination
+	PeriodUnbonding uint64 = 30     // queue blocks before unbond
+	Period2ModComm  uint64 = 30     // queue blocks before commission can change
+	CoinDenom       string = "atom" // bondable coin denomination
 
 	Inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
 )
@@ -66,12 +66,12 @@ func NewHandler(feeDenom string) sdk.Handler {
 		)
 }
 
-// Handler the transaction processing handler
+// Handler - the transaction processing handler
 type Handler struct {
 	stack.PassInitValidate
 }
 
-var _ stack.Dispatchable = Handler{} //enforce interface at compile time
+var _ stack.Dispatchable = Handler{} // enforce interface at compile time
 
 // Name - return stake namespace
 func (Handler) Name() string {
@@ -93,7 +93,7 @@ func (Handler) InitState(l log.Logger, store state.SimpleDB,
 		if err != nil {
 			return "", fmt.Errorf("unbond period must be int, Error: %v", err.Error())
 		}
-		Period2Unbond = uint64(period)
+		PeriodUnbonding = uint64(period)
 	case "modcomm_period":
 		period, err := strconv.Atoi(value)
 		if err != nil {
@@ -196,7 +196,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 		return abci.ErrInternalError.AppendLog("Cannot bond to non-nominated account")
 	}
 
-	// Move coins from the deletatee account to the delegatee lock account
+	// Move coins from the deletator account to the delegatee lock account
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 1 {
 		return abci.ErrInternalError.AppendLog("Missing signature")
@@ -210,7 +210,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
 
-	// Get or create delegator account
+	// Get or create delegator bonds
 	delegatorBonds, err := getDelegatorBonds(store, sender)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
@@ -296,7 +296,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	queueElem := QueueElemUnbond{
 		QueueElem: QueueElem{
 			Delegatee:    tx.Delegatee,
-			HeightAtInit: height, // will unbond at `height + Period2Unbond`
+			HeightAtInit: height, // will unbond at `height + PeriodUnbonding`
 		},
 		Account:    sender,
 		BondTokens: bondAmt,
@@ -361,7 +361,7 @@ func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
 	queueElem := QueueElemModComm{
 		QueueElem: QueueElem{
 			Delegatee:    tx.Delegatee,
-			HeightAtInit: height, // will unbond at `height + Period2Unbond`
+			HeightAtInit: height, // will unbond at `height + PeriodUnbonding`
 		},
 		Commission: tx.Commission,
 	}
@@ -396,7 +396,7 @@ func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 		return err
 	}
 
-	for unbond.Delegatee.Address != nil && height-unbond.HeightAtInit > Period2Unbond {
+	for unbond.Delegatee.Address != nil && height-unbond.HeightAtInit > PeriodUnbonding {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
