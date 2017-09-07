@@ -31,13 +31,13 @@ const (
 
 //nolint
 var (
-	PeriodUnbonding uint64 = 30     // queue blocks before unbond
-	CoinDenom       string = "atom" // bondable coin denomination
+	periodUnbonding uint64 = 30     // queue blocks before unbond
+	coinDenom       string = "atom" // bondable coin denomination
 
-	MaxGroupCommChange        = newDecimal(5, -2) //maximum commission change permitted across the previous ModCommCheckBlocks blocks
-	ModCommCheckBlocks uint64 = 28800             //1 day at 1 block/3 sec
+	maxCommHistory           = NewDecimal(5, -2) //maximum total commission permitted across the queued commission history
+	periodCommHistory uint64 = 28800             //1 day @ 1 block/3 sec
 
-	Inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
+	inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
 )
 
 // Name - simply the name TODO do we need name to be unexposed for security?
@@ -95,15 +95,15 @@ func (Handler) InitState(l log.Logger, store state.SimpleDB,
 		if err != nil {
 			return "", fmt.Errorf("unbond period must be int, Error: %v", err.Error())
 		}
-		PeriodUnbonding = uint64(period)
+		periodUnbonding = uint64(period)
 	case "modcomm_period":
 		period, err := strconv.Atoi(value)
 		if err != nil {
 			return "", fmt.Errorf("modcomm period must be int, Error: %v", err.Error())
 		}
-		Period2ModComm = uint64(period)
+		periodCommHistory = uint64(period)
 	case "bond_coin":
-		CoinDenom = value
+		coinDenom = value
 	}
 	return "", errors.ErrUnknownKey(key)
 }
@@ -134,7 +134,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	if err != nil {
 		return
 	}
-	err = processQueueModComm(ctx, store, height)
+	err = processQueueCommHistory(store, height)
 	if err != nil {
 		return
 	}
@@ -182,7 +182,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 	bondAmt := NewDecimal(bondCoin.Amount, 1)
 
 	switch {
-	case bondCoin.Denom != CoinDenom:
+	case bondCoin.Denom != coinDenom:
 		return abci.ErrInternalError.AppendLog("Invalid coin denomination")
 	case bondAmt.LTE(Zero):
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
@@ -298,7 +298,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	queueElem := QueueElemUnbond{
 		QueueElem: QueueElem{
 			Delegatee:    tx.Delegatee,
-			HeightAtInit: height, // will unbond at `height + PeriodUnbonding`
+			HeightAtInit: height, // will unbond at `height + periodUnbonding`
 		},
 		Account:    sender,
 		BondTokens: bondAmt,
@@ -354,18 +354,25 @@ func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
-	_, delegateeBond := delegateeBonds.Get(tx.Delegatee)
+	record, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegateeBond == nil {
 		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 	}
+
+	//TODO determine that the amount of change proposed is permissable according to the queue change amount
+
+	//TODO if the change is permissable then execute the change and add the change amount to the queue
+	// Retrieve, Modify and save the commission
+	delegateeBonds[record].Commission = tx.Commission
+	setDelegateeBonds(store, delegateeBonds)
 
 	// Add the commission modification the queue
 	queueElem := QueueElemModComm{
 		QueueElem: QueueElem{
 			Delegatee:    tx.Delegatee,
-			HeightAtInit: height, // will unbond at `height + PeriodUnbonding`
+			HeightAtInit: height, // will unbond at `height + periodUnbonding`
 		},
-		Commission: tx.Commission,
+		CommChange: tx.Commission, //TODO make change not absolute
 	}
 	queue, err := LoadQueue(queueCommissionTB, store)
 	if err != nil {
@@ -378,10 +385,25 @@ func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Process all unbonding for the current block, note that the unbonding amounts
 //   have already been subtracted from the bond account when they were added to the queue
 func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 	height uint64, dispatch sdk.Deliver) error {
+
+	sendCoins := func(sender, receiver sdk.Actor, amount coin.Coins) error {
+		send := coin.NewSendOneTx(sender, receiver, amount)
+		_, err := dispatch.DeliverTx(ctx, store, send)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return processQueueUnbondAbstracted(sendCoins, store, height)
+}
+
+func processQueueUnbondAbstracted(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) error,
+	store state.SimpleDB, height uint64) error {
 	queue, err := LoadQueue(queueUnbondTB, store)
 	if err != nil {
 		return err
@@ -389,16 +411,13 @@ func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 
 	//Get the peek unbond record from the queue
 	var unbond QueueElemUnbond
-	getUnbond := func() error {
-		unbondBytes := queue.Peek()
-		return wire.ReadBinaryBytes(unbondBytes, unbond)
-	}
-	err = getUnbond()
+	unbondBytes := queue.Peek()
+	err = wire.ReadBinaryBytes(unbondBytes, unbond)
 	if err != nil {
 		return err
 	}
 
-	for unbond.Delegatee.Address != nil && height-unbond.HeightAtInit > PeriodUnbonding {
+	for unbond.Delegatee.Address != nil && height-unbond.HeightAtInit > periodUnbonding {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
@@ -411,26 +430,26 @@ func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 			return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 		}
 		coinAmount := unbond.BondTokens.Mul(delegateeBond.ExchangeRate)
-		payout := coin.Coins{{CoinDenom, coinAmount.IntPart()}} //TODO here coins must also be decimal!!!!
+		payout := coin.Coins{{coinDenom, coinAmount.IntPart()}} //TODO here coins must also be decimal!!!!
 
-		send := coin.NewSendOneTx(delegateeBond.Account, unbond.Account, payout)
-		_, err = dispatch.DeliverTx(ctx, store, send)
+		err = sendCoins(delegateeBond.Account, unbond.Account, payout)
 		if err != nil {
 			return err
 		}
 
 		// get next unbond record
-		err = getUnbond()
+		unbondBytes := queue.Peek()
+		err = wire.ReadBinaryBytes(unbondBytes, unbond)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+
 }
 
-// TODO modComm nolonger uses the queue should remove this function all together
 // Process all validator commission modification for the current block
-func processQueueModComm(ctx sdk.Context, store state.SimpleDB, height uint64) error {
+func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 	queue, err := LoadQueue(queueCommissionTB, store)
 	if err != nil {
 		return err
@@ -438,32 +457,18 @@ func processQueueModComm(ctx sdk.Context, store state.SimpleDB, height uint64) e
 
 	//Get the peek record from the queue
 	var commission QueueElemModComm
-	getCommission := func() error {
-		bytes := queue.Peek()
-		return wire.ReadBinaryBytes(bytes, commission)
-	}
-	err = getCommission()
+	bytes := queue.Peek()
+	err = wire.ReadBinaryBytes(bytes, commission)
 	if err != nil {
 		return err
 	}
 
-	for commission.Delegatee.Address != nil && height-commission.HeightAtInit > Period2ModComm {
+	for commission.Delegatee.Address != nil && height-commission.HeightAtInit > periodCommHistory {
 		queue.Pop()
 
-		// Retrieve, Modify and save the commission
-		delegateeBonds, err := getDelegateeBonds(store)
-		if err != nil {
-			return err
-		}
-		record, _ := delegateeBonds.Get(commission.Delegatee)
-		if err != nil {
-			return err
-		}
-		delegateeBonds[record].Commission = commission.Commission
-		setDelegateeBonds(store, delegateeBonds)
-
 		// check the next record in the queue record
-		err = getCommission()
+		bytes := queue.Peek()
+		err = wire.ReadBinaryBytes(bytes, commission)
 		if err != nil {
 			return err
 		}
@@ -471,9 +476,22 @@ func processQueueModComm(ctx sdk.Context, store state.SimpleDB, height uint64) e
 	return nil
 }
 
-//TODO add processing of the commission
 func processValidatorRewards(ctx sdk.Context, store state.SimpleDB,
 	height uint64, dispatch sdk.Deliver) error {
+
+	creditAcc := func(receiver sdk.Actor, amount coin.Coins) error {
+		creditTx := coin.NewCreditTx(receiver, amount)
+		_, err := dispatch.DeliverTx(ctx, store, creditTx)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return processValidatorRewardsAbstration(creditAcc, store, height)
+}
+
+//TODO add processing of the commission
+func processValidatorRewardsAbstration(creditAcc func(receiver sdk.Actor, amount coin.Coins) error, store state.SimpleDB, height uint64) error {
 
 	// Retrieve the list of validators
 	delegateeBonds, err := getDelegateeBonds(store)
@@ -486,8 +504,7 @@ func processValidatorRewards(ctx sdk.Context, store state.SimpleDB,
 
 		credit := coin.Coins{{"atom", 10}} //TODO update to relative to the amount of coins held by validator
 
-		creditTx := coin.NewCreditTx(account, credit)
-		_, err = dispatch.DeliverTx(ctx, store, creditTx)
+		err = creditAcc(account, credit)
 		if err != nil {
 			return err
 		}

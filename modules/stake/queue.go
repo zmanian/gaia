@@ -117,3 +117,16 @@ func (q Queue) Peek() []byte {
 	peekKey := q.getQueueKey(q.head)
 	return q.store.Get(peekKey)
 }
+
+// GetAll - Return an array of all the elements inside the queue
+func (q Queue) GetAll() [][]byte {
+	if q.length() == 0 {
+		return nil
+	}
+	var res [][]byte
+	for i := q.tail; i <= q.head; i++ {
+		key := q.getQueueKey(i)
+		res = append(res, q.store.Get(key))
+	}
+	return res
+}

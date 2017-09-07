@@ -193,5 +193,5 @@ type QueueElemUnbond struct {
 // QueueElemModComm - the commission queue element
 type QueueElemModComm struct {
 	QueueElem
-	Commission Decimal // new commission for the
+	CommChange Decimal // Proposed change in commission
 }
