@@ -10,18 +10,19 @@ import (
 
 const maxValidators = 100
 
-// DelegateeBond defines an total amount of bond tokens and their exchange rate to
-// coins, associated with a single validator. Interest increases the exchange
-// rate, and slashing decreases it. When coins are delegated to this validator,
-// the delegatee is credited with bond tokens based on amount of coins
-// delegated and the current exchange rate. Voting power can be calculated as
+// DelegateeBond defines the total amount of bond tokens and their exchange rate to
+// coins, associated with a single validator. Accumulation of interest is modelled
+// as an in increase in the exchange rate, and slashing as a decrease.
+// When coins are delegated to this validator, the delegatee is credited
+// with a DelegatorBond whose number of bond tokens is based on the amount of coins
+// delegated divided by the current exchange rate. Voting power can be calculated as
 // total bonds multiplied by exchange rate.
 type DelegateeBond struct {
 	Delegatee       sdk.Actor
 	Commission      Decimal
 	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in millionths of coins)
 	TotalBondTokens Decimal   // Total number of bond tokens in the account
-	Account         sdk.Actor // Account where the bonded tokens are held
+	Account         sdk.Actor // Account where the bonded tokens are held. Controlled by the app
 }
 
 // VotingPower - voting power based onthe bond value
@@ -147,8 +148,8 @@ func (b DelegateeBonds) Remove(i int) DelegateeBonds {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// DelegatorBond defines an account of bond tokens. It is owned by one delegator
-// account, and is associated with one delegatee account
+// DelegatorBond represents some bond tokens held by an account.
+// It is owned by one delegator, and is associated with the voting power of one delegatee.
 type DelegatorBond struct {
 	Delegatee  sdk.Actor
 	BondTokens Decimal // amount of bond tokens

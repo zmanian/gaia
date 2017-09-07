@@ -20,7 +20,7 @@ type Queue struct {
 func (q Queue) headKey() []byte { return []byte{q.slot, 0x00} }
 func (q Queue) tailKey() []byte { return []byte{q.slot, 0x01} }
 
-// NewQueue - create a new generic queue under for the designate slot
+// NewQueue - create a new generic queue under the designate slot
 func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
 	q := Queue{
 		slot:  slot,
