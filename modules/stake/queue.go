@@ -70,7 +70,7 @@ func LoadQueue(slot byte, store state.SimpleDB) (Queue, error) {
 // getQueueKey - get the key for the queue'd record at position 'n'
 func (q Queue) getQueueKey(n uint64) []byte {
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(n))
+	binary.BigEndian.PutUint64(b, uint64(n))
 	return append([]byte{q.slot}, b...) //prepend slot byte
 }
 

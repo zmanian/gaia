@@ -31,9 +31,11 @@ const (
 
 //nolint
 var (
-	Period2Unbond  uint64 = 30     // queue blocks before unbond
-	Period2ModComm uint64 = 30     // queue blocks before commission can change
-	CoinDenom      string = "atom" // bondable coin denomination
+	Period2Unbond uint64 = 30     // queue blocks before unbond
+	CoinDenom     string = "atom" // bondable coin denomination
+
+	MaxGroupCommChange        = newDecimal(5, -2) //maximum commission change permitted across the previous ModCommCheckBlocks blocks
+	ModCommCheckBlocks uint64 = 28800             //1 day at 1 block/3 sec
 
 	Inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
 )
@@ -426,6 +428,7 @@ func processQueueUnbond(ctx sdk.Context, store state.SimpleDB,
 	return nil
 }
 
+// TODO modComm nolonger uses the queue should remove this function all together
 // Process all validator commission modification for the current block
 func processQueueModComm(ctx sdk.Context, store state.SimpleDB, height uint64) error {
 	queue, err := LoadQueue(queueCommissionTB, store)
