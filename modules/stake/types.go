@@ -8,8 +8,6 @@ import (
 	abci "github.com/tendermint/abci/types"
 )
 
-const maxValidators = 100
-
 // DelegateeBond defines the total amount of bond tokens and their exchange rate to
 // coins, associated with a single validator. Accumulation of interest is modelled
 // as an in increase in the exchange rate, and slashing as a decrease.
@@ -29,6 +27,7 @@ type DelegateeBond struct {
 func (b DelegateeBond) VotingPower() uint64 {
 	decPower := b.TotalBondTokens.Mul(b.ExchangeRate)
 
+	//XXX maybe find a better mechanism determing voting power
 	//in order to pass the voting power as an uint64 with some precision multiple by a large number
 	return uint64(decPower.Mul(NewDecimal(1, 10)).IntPart())
 }
@@ -76,10 +75,10 @@ func (b DelegateeBonds) Sort() {
 }
 
 // Validators - get the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) Validators() []*abci.Validator {
-	validators := make([]*abci.Validator, 0, maxValidators)
+func (b DelegateeBonds) Validators(maxVal int) []*abci.Validator {
+	validators := make([]*abci.Validator, 0, maxVal)
 	for i, bv := range b {
-		if i == maxValidators {
+		if i == maxVal {
 			break
 		}
 		validators = append(validators, bv.Validator())
@@ -88,22 +87,22 @@ func (b DelegateeBonds) Validators() []*abci.Validator {
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) []*abci.Validator {
+func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (diff, new []*abci.Validator) {
 
-	//Get the current validator set
-	current := b.Validators()
+	//Get the new validator set
+	new = b.Validators(maxVal)
 
-	//calculate any differences from the previous to the current validator set
-	diff := make([]*abci.Validator, 0, maxValidators)
+	//calculate any differences from the previous to the new validator set
+	diff = make([]*abci.Validator, 0, maxVal)
 	for _, prev := range previous {
 
 		//test for a difference between the validator power of validator
-		currentPower := getValidatorPower(current, prev.PubKey)
+		currentPower := getValidatorPower(new, prev.PubKey)
 		if currentPower != prev.Power {
 			diff = append(diff, &abci.Validator{prev.PubKey, currentPower})
 		}
 	}
-	return diff
+	return diff, new
 }
 
 // getValidatorPower - return the validator power with the matching pubKey from the validator list
@@ -117,10 +116,10 @@ func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 }
 
 // ValidatorsActors - get the actors of the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) ValidatorsActors() []sdk.Actor {
-	accounts := make([]sdk.Actor, 0, maxValidators)
+func (b DelegateeBonds) ValidatorsActors(maxVal int) []sdk.Actor {
+	accounts := make([]sdk.Actor, 0, maxVal)
 	for i, bv := range b {
-		if i == maxValidators {
+		if i == maxVal {
 			break
 		}
 		accounts = append(accounts, bv.Account)
