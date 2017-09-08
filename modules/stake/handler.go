@@ -132,6 +132,36 @@ func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
 	return
 }
 
+// Tick - Called every block even if no transaction, process all queues and validator rewards
+func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB, dispatch sdk.Deliver) error {
+
+	sendCoins := func(sender, receiver sdk.Actor, amount coin.Coins) (err error) {
+		tx := coin.NewSendOneTx(sender, receiver, amount)
+		_, err = dispatch.DeliverTx(ctx, store, tx)
+		return
+	}
+	err := processQueueUnbond(sendCoins, store, height)
+	if err != nil {
+		return err
+	}
+
+	err = processQueueCommHistory(store, height)
+	if err != nil {
+		return err
+	}
+
+	creditCoins := func(receiver sdk.Actor, amount coin.Coins) (err error) {
+		tx := coin.NewCreditTx(receiver, amount)
+		_, err = dispatch.DeliverTx(ctx, store, tx)
+		return err
+	}
+	err = processValidatorRewards(creditCoins, store, height)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // DeliverTx executes the tx if valid
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
@@ -140,47 +170,18 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		return
 	}
 
-	//start by processing the unbonding queue
-	height := ctx.BlockHeight()
-
-	sendCoins := func(sender, receiver sdk.Actor, amount coin.Coins) error {
-		send := coin.NewSendOneTx(sender, receiver, amount)
-		_, err := dispatch.DeliverTx(ctx, store, send)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	err = processQueueUnbond(sendCoins, store, height)
-	if err != nil {
-		return
-	}
-	err = processQueueCommHistory(store, height)
-	if err != nil {
-		return
-	}
-	creditAcc := func(receiver sdk.Actor, amount coin.Coins) error {
-		creditTx := coin.NewCreditTx(receiver, amount)
-		_, err := dispatch.DeliverTx(ctx, store, creditTx)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	err = processValidatorRewards(creditAcc, store, height)
-
-	//now actually run the transaction
+	//Run the transaction
 	unwrap := tx.Unwrap()
 	var abciRes abci.Result
 	switch txType := unwrap.(type) {
 	case TxBond:
 		abciRes = runTxBond(ctx, store, txType, dispatch)
 	case TxUnbond:
-		abciRes = runTxUnbond(ctx, store, txType, height)
+		abciRes = runTxUnbond(ctx, store, txType)
 	case TxNominate:
 		abciRes = runTxNominate(ctx, store, txType, dispatch)
 	case TxModComm:
-		abciRes = runTxModComm(ctx, store, txType, height)
+		abciRes = runTxModComm(ctx, store, txType)
 	}
 
 	//determine the validator set changes
@@ -204,6 +205,29 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 	dispatch sdk.Deliver) (res abci.Result) {
 
+	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
+	if len(senders) != 1 {
+		return abci.ErrInternalError.AppendLog("Missing signature")
+	}
+	sender := senders[0]
+
+	sendCoins := func(receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
+		// Move coins from the deletator account to the delegatee lock account
+		send := coin.NewSendOneTx(sender, receiver, amount)
+
+		// If the deduction fails (too high), abort the command
+		_, err := dispatch.DeliverTx(ctx, store, send)
+		if err != nil {
+			return abci.ErrInternalError.AppendLog(err.Error())
+		}
+		return
+	}
+	return runTxBondGuts(sendCoins, store, tx, sender)
+}
+
+func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Result,
+	store state.SimpleDB, tx TxBond, sender sdk.Actor) abci.Result {
+
 	// Get amount of coins to bond
 	bondCoin := tx.Amount
 	bondAmt := NewDecimal(bondCoin.Amount, 1)
@@ -226,17 +250,9 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 	}
 
 	// Move coins from the deletator account to the delegatee lock account
-	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
-	if len(senders) != 1 {
-		return abci.ErrInternalError.AppendLog("Missing signature")
-	}
-	sender := senders[0]
-	send := coin.NewSendOneTx(sender, delegateeBond.Account, coin.Coins{bondCoin})
-
-	// If the deduction fails (too high), abort the command
-	_, err = dispatch.DeliverTx(ctx, store, send)
-	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+	res := sendCoins(delegateeBond.Account, coin.Coins{bondCoin})
+	if res.IsErr() {
+		return res
 	}
 
 	// Get or create delegator bonds
@@ -264,7 +280,20 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 	return abci.OK
 }
 
-func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
+func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.Result) {
+
+	getSender := func() sdk.Actor {
+		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
+		if len(senders) != 0 {
+			return abci.ErrInternalError.AppendLog("Missing signature")
+		}
+		sender := senders[0]
+	}
+
+	return runTxUnbondGuts(sender, store, tx, ctx.BlockHeight())
+}
+
+func runTxUnbondGuts(getSender func() sdk.Actor, store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
 	bondAmt := NewDecimal(tx.Amount.Amount, 1)
@@ -273,11 +302,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
-	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
-	if len(senders) != 0 {
-		return abci.ErrInternalError.AppendLog("Missing signature")
-	}
-	sender := senders[0]
+	sender := getSender()
 
 	delegatorBonds, err := getDelegatorBonds(store, sender)
 	if err != nil {
@@ -343,6 +368,23 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	dispatch sdk.Deliver) (res abci.Result) {
 
+	bondCoins := func(bondAccount sdk.Actor, amount coin.Coins) abci.Result {
+		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
+		if len(senders) == 0 {
+			return abci.ErrInternalError.AppendLog("Missing signature")
+		}
+		send := coin.NewSendOneTx(senders[0], bondAccount, amount)
+		_, err := dispatch.DeliverTx(ctx, store, send)
+		if err != nil {
+			return abci.ErrInternalError.AppendLog(err.Error())
+		}
+	}
+	return runTxNominateGuts(bondCoins, store, tx)
+}
+
+func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) abci.Result,
+	store state.SimpleDB, tx TxNominate) (res abci.Result) {
+
 	// Create bond value object
 	delegateeBond := DelegateeBond{
 		Delegatee:    tx.Nominee,
@@ -350,15 +392,10 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 		ExchangeRate: One,
 	}
 
-	// Bond the tokens
-	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
-	if len(senders) == 0 {
-		return abci.ErrInternalError.AppendLog("Missing signature")
-	}
-	send := coin.NewSendOneTx(senders[0], delegateeBond.Account, coin.Coins{tx.Amount})
-	_, err := dispatch.DeliverTx(ctx, store, send)
-	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+	// Bond the coins to the bond account
+	res = bondCoins(delegateeBond.Account, coin.Coins{tx.Amount})
+	if res.IsErr() {
+		return res
 	}
 
 	// Append and store
@@ -372,8 +409,11 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	return abci.OK
 }
 
-func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm,
-	height uint64) (res abci.Result) {
+func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm) (res abci.Result) {
+	return runTxModCommGuts(store, tx, ctx.BlockHeight())
+}
+
+func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res abci.Result) {
 
 	// Retrieve the record to modify
 	delegateeBonds, err := getDelegateeBonds(store)
