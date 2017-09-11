@@ -271,7 +271,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 
 	// Calculate amount of bond tokens to create, based on exchange rate
 	bondTokens := bondAmt.Div(delegateeBond.ExchangeRate)
-	delegatorBonds[0].BondTokens = delegatorBonds[0].BondTokens.Plus(bondTokens)
+	delegatorBonds[0].BondTokens = delegatorBonds[0].BondTokens.Add(bondTokens)
 
 	// Save to store
 	setDelegateeBonds(store, delegateeBonds)
@@ -282,18 +282,20 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 
 func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.Result) {
 
-	getSender := func() sdk.Actor {
+	getSender := func() (sender sdk.Actor, err error) {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) != 0 {
-			return abci.ErrInternalError.AppendLog("Missing signature")
+			err = fmt.Errorf("Missing signature")
+			return
 		}
-		sender := senders[0]
+		sender = senders[0]
+		return
 	}
 
-	return runTxUnbondGuts(sender, store, tx, ctx.BlockHeight())
+	return runTxUnbondGuts(getSender, store, tx, ctx.BlockHeight())
 }
 
-func runTxUnbondGuts(getSender func() sdk.Actor, store state.SimpleDB, tx TxUnbond,
+func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
 	bondAmt := NewDecimal(tx.Amount.Amount, 1)
@@ -302,7 +304,10 @@ func runTxUnbondGuts(getSender func() sdk.Actor, store state.SimpleDB, tx TxUnbo
 		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
 	}
 
-	sender := getSender()
+	sender, err := getSender()
+	if err != nil {
+		return abci.ErrUnauthorized.AppendLog(err.Error())
+	}
 
 	delegatorBonds, err := getDelegatorBonds(store, sender)
 	if err != nil {
@@ -320,7 +325,7 @@ func runTxUnbondGuts(getSender func() sdk.Actor, store state.SimpleDB, tx TxUnbo
 	if delegatorBond.BondTokens.LT(bondAmt) {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 	}
-	delegatorBond.BondTokens = delegatorBond.BondTokens.Minus(bondAmt)
+	delegatorBond.BondTokens = delegatorBond.BondTokens.Sub(bondAmt)
 	//New exchange rate = (new number of bonded atoms)/ total number of bondTokens for validator
 	//delegateeBond.ExchangeRate := uint64(bondAmt) / bondTokens
 
@@ -339,7 +344,7 @@ func runTxUnbondGuts(getSender func() sdk.Actor, store state.SimpleDB, tx TxUnbo
 	if delegatorBond == nil {
 		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 	}
-	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Minus(bondAmt)
+	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Sub(bondAmt)
 	if delegateeBond.TotalBondTokens.Equal(Zero) {
 		delegateeBonds.Remove(bvIndex)
 	}
@@ -378,6 +383,7 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 		if err != nil {
 			return abci.ErrInternalError.AppendLog(err.Error())
 		}
+		return abci.OK
 	}
 	return runTxNominateGuts(bondCoins, store, tx)
 }
@@ -451,7 +457,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 		}
 	}
 
-	commChange := tx.Commission.Minus(delegateeBond.Commission)
+	commChange := tx.Commission.Sub(delegateeBond.Commission)
 	if sumModCommQueue.Add(commChange).GT(maxCommHistory) {
 		return abci.ErrUnauthorized.AppendLog(
 			fmt.Sprintf("proposed change is greater than is permissible. \n"+

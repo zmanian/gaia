@@ -41,14 +41,14 @@ func set(d Decimal) decimal.Decimal {
 	return decimal.New(d.Value, d.Exp)
 }
 
-func (d Decimal) String() string { return set(d).StringFixedBank() }
+func (d Decimal) String() string { return set(d).StringFixedBank(places) }
 func (d Decimal) IntPart() int64 { return set(d).IntPart() }
 
-func (d Decimal) Plus(d2 Decimal) Decimal  { return get(set(d).Add(set(d2))) }
-func (d Decimal) Minus(d2 Decimal) Decimal { return get(set(d).Sub(set(d2))) }
-func (d Decimal) Negative() Decimal        { return get(set(d).Neg()) }
-func (d Decimal) Mul(d2 Decimal) Decimal   { return get(set(d).Mul(set(d2))) }
-func (d Decimal) Div(d2 Decimal) Decimal   { return get(set(d).Div(set(d2))) }
+func (d Decimal) Add(d2 Decimal) Decimal { return get(set(d).Add(set(d2))) }
+func (d Decimal) Sub(d2 Decimal) Decimal { return get(set(d).Sub(set(d2))) }
+func (d Decimal) Negative() Decimal      { return get(set(d).Neg()) }
+func (d Decimal) Mul(d2 Decimal) Decimal { return get(set(d).Mul(set(d2))) }
+func (d Decimal) Div(d2 Decimal) Decimal { return get(set(d).Div(set(d2))) }
 
 func (d Decimal) Equal(d2 Decimal) bool { return set(d).Equal(set(d2)) }
 func (d Decimal) GT(d2 Decimal) bool    { return set(d).GreaterThan(set(d2)) }
