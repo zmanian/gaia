@@ -4,14 +4,16 @@ package stake
 //TODO move to tendermint/tmlibs?
 
 import (
-	"github.com/shopspring/decimal"
+	"github.com/rigelrozanski/decimal"
 )
+
+const places int32 = 18 //number of decimal places
 
 // NOTE we need to use custom Value and Exp instead of
 // just using decimal.Decimal here to maintain exposed
 // variables for go-wire serialization
 type Decimal struct {
-	Value int64
+	Value int64 // Number = Value * 10 ^ Exp
 	Exp   int32
 }
 
@@ -32,13 +34,14 @@ func NewDecimalFromString(value string) (Decimal, error) {
 
 //coversion to/from the shopspring decimal format
 func get(d decimal.Decimal) Decimal {
+	d = d.RoundBank(places)
 	return Decimal{d.IntPart(), d.Exponent()}
 }
 func set(d Decimal) decimal.Decimal {
 	return decimal.New(d.Value, d.Exp)
 }
 
-func (d Decimal) String() string { return set(d).String() }
+func (d Decimal) String() string { return set(d).StringFixedBank() }
 func (d Decimal) IntPart() int64 { return set(d).IntPart() }
 
 func (d Decimal) Plus(d2 Decimal) Decimal  { return get(set(d).Add(set(d2))) }

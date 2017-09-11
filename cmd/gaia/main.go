@@ -10,7 +10,7 @@ import (
 	"github.com/tendermint/tmlibs/log"
 
 	"github.com/cosmos/cosmos-sdk/client/commands"
-	basecmd "github.com/cosmos/cosmos-sdk/cmd/basecoin/commands"
+	basecmd "github.com/cosmos/cosmos-sdk/server/commands"
 	"github.com/cosmos/gaia/modules/stake"
 )
 

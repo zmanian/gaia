@@ -12,7 +12,7 @@ import:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: feature/init-option
+  version: develop
 - package: github.com/tendermint/go-crypto
   version: 03d2b2446e8587f159e52070b1f1e0def971a2c7
   subpackages:
@@ -35,7 +35,7 @@ import:
   - client
   - iavl
 - package: github.com/tendermint/tendermint
-  version: 2d4c86dfe8f78568abd8e3847ce703d2085ed929
+  version: 54c63726b03cbba067d10fa6b69b885c85678d17
   subpackages:
   - config
   - node
