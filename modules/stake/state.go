@@ -4,12 +4,14 @@ import (
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/errors"
 	"github.com/cosmos/cosmos-sdk/state"
+	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/go-wire"
 )
 
 const (
 	delegatorKeyPrefix = iota
 	delegateeKey
+	validatorSetKey
 )
 
 func getDelegatorBondsKey(delegator sdk.Actor) []byte {
@@ -43,11 +45,11 @@ func removeDelegatorBonds(store state.SimpleDB, delegator sdk.Actor) {
 //////////////////////////////////////////////////////////////////////////////////////////
 
 func getDelegateeBonds(store state.SimpleDB) (delegateeBonds DelegateeBonds, err error) {
-	bvBytes := store.Get([]byte{delegateeKey})
-	if bvBytes == nil {
+	b := store.Get([]byte{delegateeKey})
+	if b == nil {
 		return
 	}
-	err = wire.ReadBinaryBytes(bvBytes, &delegateeBonds)
+	err = wire.ReadBinaryBytes(b, &delegateeBonds)
 	if err != nil {
 		err = errors.ErrDecoding()
 	}
@@ -55,6 +57,25 @@ func getDelegateeBonds(store state.SimpleDB) (delegateeBonds DelegateeBonds, err
 }
 
 func setDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
-	bvBytes := wire.BinaryBytes(delegateeBonds)
-	store.Set([]byte{delegateeKey}, bvBytes)
+	b := wire.BinaryBytes(delegateeBonds)
+	store.Set([]byte{delegateeKey}, b)
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+func getValidatorSet(store state.SimpleDB) (validators []*abci.Validator, err error) {
+	b := store.Get([]byte{validatorSetKey})
+	if b == nil {
+		return
+	}
+	err = wire.ReadBinaryBytes(b, &validators)
+	if err != nil {
+		err = errors.ErrDecoding()
+	}
+	return
+}
+
+func setValidatorSet(store state.SimpleDB, validators []*abci.Validator) {
+	b := wire.BinaryBytes(validators)
+	store.Set([]byte{validatorSetKey}, b)
 }

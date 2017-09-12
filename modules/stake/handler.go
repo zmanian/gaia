@@ -72,7 +72,6 @@ func NewHandler(feeDenom string) sdk.Handler {
 // Handler - the transaction processing handler
 type Handler struct {
 	stack.PassInitValidate
-	validatorSet []*abci.Validator
 }
 
 var _ stack.Dispatchable = Handler{} // enforce interface at compile time
@@ -189,8 +188,12 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	if err != nil {
 		return res, err
 	}
-	diffVal, newVal := delegateeBonds.ValidatorsDiff(h.validatorSet, maxVal)
-	h.validatorSet = newVal
+	oldVal, err := getValidatorSet(store)
+	if err != nil {
+		return res, err
+	}
+	diffVal, newVal := delegateeBonds.ValidatorsDiff(oldVal, maxVal)
+	setValidatorSet(store, newVal)
 	res = sdk.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
