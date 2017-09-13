@@ -55,20 +55,20 @@ func TestState(t *testing.T) {
 	// DelegatorBonds checks
 
 	// Test a basic set and get
-	setDelegatorBonds(store, delegator1, delegator1Bonds)
-	resBasicGet, err := getDelegatorBonds(store, delegator1)
+	saveDelegatorBonds(store, delegator1, delegator1Bonds)
+	resBasicGet, err := loadDelegatorBonds(store, delegator1)
 	require.Nil(err)
 	assert.Equal(delegator1Bonds, resBasicGet)
 
 	// Set two more records, get and check  them all
-	setDelegatorBonds(store, delegator2, delegator2Bonds)
-	setDelegatorBonds(store, delegator3, delegator3Bonds)
+	saveDelegatorBonds(store, delegator2, delegator2Bonds)
+	saveDelegatorBonds(store, delegator3, delegator3Bonds)
 
-	resGet1, err := getDelegatorBonds(store, delegator1)
+	resGet1, err := loadDelegatorBonds(store, delegator1)
 	require.Nil(err)
-	resGet2, err := getDelegatorBonds(store, delegator2)
+	resGet2, err := loadDelegatorBonds(store, delegator2)
 	require.Nil(err)
-	resGet3, err := getDelegatorBonds(store, delegator3)
+	resGet3, err := loadDelegatorBonds(store, delegator3)
 	require.Nil(err)
 
 	assert.Equal(delegator1Bonds, resGet1)
@@ -78,11 +78,11 @@ func TestState(t *testing.T) {
 	// Delete one of the record, get and check them all
 	removeDelegatorBonds(store, delegator2)
 
-	resGet1, err = getDelegatorBonds(store, delegator1)
+	resGet1, err = loadDelegatorBonds(store, delegator1)
 	require.Nil(err)
-	resGet2, err = getDelegatorBonds(store, delegator2)
+	resGet2, err = loadDelegatorBonds(store, delegator2)
 	require.Nil(err)
-	resGet3, err = getDelegatorBonds(store, delegator3)
+	resGet3, err = loadDelegatorBonds(store, delegator3)
 	require.Nil(err)
 
 	assert.Equal(delegator1Bonds, resGet1)
@@ -95,8 +95,8 @@ func TestState(t *testing.T) {
 		{delegatee2, NewDecimal(53, 1)},
 		{delegatee3, NewDecimal(54, 1)},
 	}
-	setDelegatorBonds(store, delegator3, delegator3Bonds)
-	resBasicGet, err = getDelegatorBonds(store, delegator3)
+	saveDelegatorBonds(store, delegator3, delegator3Bonds)
+	resBasicGet, err = loadDelegatorBonds(store, delegator3)
 	require.Nil(err)
 	assert.Equal(delegator3Bonds, resBasicGet)
 
@@ -104,20 +104,20 @@ func TestState(t *testing.T) {
 	// DelegateeBonds checks
 
 	//check the empty store first
-	resGet, err := getDelegateeBonds(store)
+	resGet, err := loadDelegateeBonds(store)
 	require.Nil(err)
 	assert.Equal(delegateeNilBonds, resGet)
 
 	//Set and retrieve a record
-	setDelegateeBonds(store, delegateeBonds)
-	resGet, err = getDelegateeBonds(store)
+	saveDelegateeBonds(store, delegateeBonds)
+	resGet, err = loadDelegateeBonds(store)
 	require.Nil(err)
 	assert.Equal(delegateeBonds, resGet)
 
 	//modify a records, save, and retrieve
 	delegateeBonds[0].Commission = NewDecimal(99, 1)
-	setDelegateeBonds(store, delegateeBonds)
-	resGet, err = getDelegateeBonds(store)
+	saveDelegateeBonds(store, delegateeBonds)
+	resGet, err = loadDelegateeBonds(store)
 	require.Nil(err)
 	assert.Equal(delegateeBonds, resGet)
 

@@ -21,22 +21,14 @@ type DelegateeBond struct {
 	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in millionths of coins)
 	TotalBondTokens Decimal   // Total number of bond tokens in the account
 	Account         sdk.Actor // Account where the bonded tokens are held. Controlled by the app
-}
-
-// VotingPower - voting power based onthe bond value
-func (b DelegateeBond) VotingPower() uint64 {
-	decPower := b.TotalBondTokens.Mul(b.ExchangeRate)
-
-	//XXX maybe find a better mechanism determing voting power
-	//in order to pass the voting power as an uint64 with some precision multiple by a large number
-	return uint64(decPower.Mul(NewDecimal(1, 10)).IntPart())
+	VotingPower     Decimal   // Last calculated voting power based on bond value
 }
 
 // Validator - Get the validator from a bond value
 func (b DelegateeBond) Validator() *abci.Validator {
 	return &abci.Validator{
 		PubKey: b.Delegatee.Address,
-		Power:  b.VotingPower(),
+		Power:  uint64(b.VotingPower.IntPart()), //TODO could be a problem sending in truncated IntPart here
 	}
 }
 
@@ -51,11 +43,11 @@ var _ sort.Interface = DelegateeBonds{} //enforce the sort interface at compile 
 func (b DelegateeBonds) Len() int      { return len(b) }
 func (b DelegateeBonds) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
 func (b DelegateeBonds) Less(i, j int) bool {
-	vp1, vp2 := b[i].VotingPower(), b[j].VotingPower()
+	vp1, vp2 := b[i].VotingPower, b[j].VotingPower
 	d1, d2 := b[i].Delegatee, b[j].Delegatee
 	switch {
 	case vp1 != vp2:
-		return vp1 > vp2
+		return vp1.GT(vp2)
 	case d1.ChainID < d2.ChainID:
 		return true
 	case d1.ChainID > d2.ChainID:
@@ -74,8 +66,28 @@ func (b DelegateeBonds) Sort() {
 	sort.Sort(b)
 }
 
-// Validators - get the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) Validators(maxVal int) []*abci.Validator {
+// UpdateVotingPower - voting power based onthe bond value
+func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
+
+	//first update the voting power for all delegatees
+	for _, bv := range b {
+		bv.VotingPower = bv.TotalBondTokens.Mul(bv.ExchangeRate)
+	}
+
+	//now sort and truncate the power
+	b.Sort()
+	for i, bv := range b {
+		if i <= maxVal {
+			totalPower = totalPower.Add(bv.VotingPower)
+		} else {
+			bv.VotingPower = Zero
+		}
+	}
+	return
+}
+
+// GetValidators - get the active validator list from the array of DelegateeBonds
+func (b DelegateeBonds) GetValidators(maxVal int) []*abci.Validator {
 	validators := make([]*abci.Validator, 0, maxVal)
 	for i, bv := range b {
 		if i == maxVal {
@@ -90,7 +102,7 @@ func (b DelegateeBonds) Validators(maxVal int) []*abci.Validator {
 func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (diff, new []*abci.Validator) {
 
 	//Get the new validator set
-	new = b.Validators(maxVal)
+	new = b.GetValidators(maxVal)
 
 	//calculate any differences from the previous to the new validator set
 	diff = make([]*abci.Validator, 0, maxVal)
@@ -105,6 +117,7 @@ func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (
 	return diff, new
 }
 
+// TODO remove this code, could be made much more efficient
 // getValidatorPower - return the validator power with the matching pubKey from the validator list
 func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 	for _, validator := range set {
@@ -113,19 +126,6 @@ func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 		}
 	}
 	return 0 // no power if not found
-}
-
-// ValidatorsActors - get the actors of the active validator list from the array of DelegateeBonds
-func (b DelegateeBonds) ValidatorsActors(maxVal int) []sdk.Actor {
-	accounts := make([]sdk.Actor, 0, maxVal)
-	for i, bv := range b {
-		if i == maxVal {
-			break
-		}
-		accounts = append(accounts, bv.Account)
-	}
-
-	return accounts
 }
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds

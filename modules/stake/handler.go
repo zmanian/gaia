@@ -31,14 +31,15 @@ const (
 
 //nolint
 var (
+	//TODO should all these global parameters be moved to the state?
 	periodUnbonding uint64 = 30     // queue blocks before unbond
-	coinDenom       string = "atom" // bondable coin denomination
+	bondDenom       string = "atom" // bondable coin denomination
 	maxVal          int    = 100    // maximum number of validators
 
 	maxCommHistory           = NewDecimal(5, -2) // maximum total commission permitted across the queued commission history
 	periodCommHistory uint64 = 28800             // 1 day @ 1 block/3 sec
 
-	inflation Decimal = NewDecimal(7, -2) // inflation between (0 to 1)
+	inflationPerReward Decimal = NewDecimal(6654498, -15) // inflation between (0 to 1). ~7% annual at 1 block/3sec
 )
 
 // Name - simply the name TODO do we need name to be unexposed for security?
@@ -114,7 +115,7 @@ func initState(module, key, value string) (err error) {
 			return fmt.Errorf("maxval must be int, Error: %v", err.Error())
 		}
 	case "bond_coin":
-		coinDenom = value
+		bondDenom = value
 	}
 	return errors.ErrUnknownKey(key)
 }
@@ -131,34 +132,57 @@ func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
 	return
 }
 
-// Tick - Called every block even if no transaction, process all queues and validator rewards
-func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB, dispatch sdk.Deliver) error {
+// TickBeginBlock - Called every block even if no transaction, process all queues and validator rewards
+func (h Handler) TickBeginBlock(ctx sdk.Context, height uint64, store state.SimpleDB,
+	dispatch sdk.Deliver) (startVal []*abci.Validator, err error) {
 
 	sendCoins := func(sender, receiver sdk.Actor, amount coin.Coins) (err error) {
 		tx := coin.NewSendOneTx(sender, receiver, amount)
 		_, err = dispatch.DeliverTx(ctx, store, tx)
 		return
 	}
-	err := processQueueUnbond(sendCoins, store, height)
+	err = processQueueUnbond(sendCoins, store, height)
 	if err != nil {
-		return err
+		return
 	}
 
 	err = processQueueCommHistory(store, height)
 	if err != nil {
-		return err
+		return
 	}
+
+	//determine the start validator set
+	delegateeBonds, err := loadDelegateeBonds(store)
+	if err != nil {
+		return
+	}
+	startVal = delegateeBonds.GetValidators(maxVal)
+	return
+}
+
+//TODO should startVal or delegateeBonds be moved into the ctx?
+
+// TickEndBlock - executed at the end of every block transaction or not
+func (h Handler) TickEndBlock(ctx sdk.Context, startVal []*abci.Validator, height uint64,
+	store state.SimpleDB, dispatch sdk.Deliver) (diffVal []*abci.Validator, err error) {
 
 	creditCoins := func(receiver sdk.Actor, amount coin.Coins) (err error) {
 		tx := coin.NewCreditTx(receiver, amount)
 		_, err = dispatch.DeliverTx(ctx, store, tx)
-		return err
+		return
 	}
 	err = processValidatorRewards(creditCoins, store, height)
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+
+	// Determine the validator set changes
+	delegateeBonds, err := loadDelegateeBonds(store)
+	if err != nil {
+		return
+	}
+	diffVal, _ = delegateeBonds.ValidatorsDiff(startVal, maxVal)
+	return
 }
 
 // DeliverTx executes the tx if valid
@@ -183,22 +207,9 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		abciRes = runTxModComm(ctx, store, txType)
 	}
 
-	//determine the validator set changes
-	delegateeBonds, err := getDelegateeBonds(store)
-	if err != nil {
-		return res, err
-	}
-	oldVal, err := getValidatorSet(store)
-	if err != nil {
-		return res, err
-	}
-	diffVal, newVal := delegateeBonds.ValidatorsDiff(oldVal, maxVal)
-	setValidatorSet(store, newVal)
 	res = sdk.DeliverResult{
-		Data:    abciRes.Data,
-		Log:     abciRes.Log,
-		Diff:    diffVal,
-		GasUsed: 0, //TODO add gas accounting
+		Data: abciRes.Data,
+		Log:  abciRes.Log,
 	}
 	return
 }
@@ -236,14 +247,14 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	bondAmt := NewDecimal(bondCoin.Amount, 1)
 
 	switch {
-	case bondCoin.Denom != coinDenom:
+	case bondCoin.Denom != bondDenom:
 		return abci.ErrInternalError.AppendLog("Invalid coin denomination")
 	case bondAmt.LTE(Zero):
 		return abci.ErrInternalError.AppendLog("Amount must be > 0")
 	}
 
 	// Get the delegatee bond account
-	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
@@ -259,7 +270,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	}
 
 	// Get or create delegator bonds
-	delegatorBonds, err := getDelegatorBonds(store, sender)
+	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
@@ -277,8 +288,8 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	delegatorBonds[0].BondTokens = delegatorBonds[0].BondTokens.Add(bondTokens)
 
 	// Save to store
-	setDelegateeBonds(store, delegateeBonds)
-	setDelegatorBonds(store, sender, delegatorBonds)
+	saveDelegateeBonds(store, delegateeBonds)
+	saveDelegatorBonds(store, sender, delegatorBonds)
 
 	return abci.OK
 }
@@ -312,7 +323,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		return abci.ErrUnauthorized.AppendLog(err.Error())
 	}
 
-	delegatorBonds, err := getDelegatorBonds(store, sender)
+	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
@@ -335,11 +346,11 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	if delegatorBond.BondTokens.Equal(Zero) {
 		removeDelegatorBonds(store, sender)
 	} else {
-		setDelegatorBonds(store, sender, delegatorBonds)
+		saveDelegatorBonds(store, sender, delegatorBonds)
 	}
 
 	// subtract tokens from bond value
-	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
@@ -351,7 +362,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	if delegateeBond.TotalBondTokens.Equal(Zero) {
 		delegateeBonds.Remove(bvIndex)
 	}
-	setDelegateeBonds(store, delegateeBonds)
+	saveDelegateeBonds(store, delegateeBonds)
 	// TODO Delegatee bonds?
 
 	// add unbond record to queue
@@ -408,12 +419,12 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 	}
 
 	// Append and store
-	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
 	delegateeBonds = append(delegateeBonds, delegateeBond)
-	setDelegateeBonds(store, delegateeBonds)
+	saveDelegateeBonds(store, delegateeBonds)
 
 	return abci.OK
 }
@@ -425,7 +436,7 @@ func runTxModComm(ctx sdk.Context, store state.SimpleDB, tx TxModComm) (res abci
 func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res abci.Result) {
 
 	// Retrieve the record to modify
-	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
@@ -471,7 +482,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	// Execute the change and add the change amount to the queue
 	// Retrieve, Modify and save the commission
 	delegateeBonds[record].Commission = tx.Commission
-	setDelegateeBonds(store, delegateeBonds)
+	saveDelegateeBonds(store, delegateeBonds)
 
 	// Add the commission modification the queue
 	queueElem := QueueElemModComm{
@@ -510,7 +521,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
-		delegateeBonds, err := getDelegateeBonds(store)
+		delegateeBonds, err := loadDelegateeBonds(store)
 		if err != nil {
 			return err
 		}
@@ -519,7 +530,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 			return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 		}
 		coinAmount := unbond.BondTokens.Mul(delegateeBond.ExchangeRate)
-		payout := coin.Coins{{coinDenom, coinAmount.IntPart()}} //TODO here coins must also be decimal!!!!
+		payout := coin.Coins{{bondDenom, coinAmount.IntPart()}} //TODO here coins must also be decimal!!!!
 
 		err = sendCoins(delegateeBond.Account, unbond.Account, payout)
 		if err != nil {
@@ -569,20 +580,39 @@ func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coins) error, store state.SimpleDB, height uint64) error {
 
 	// Retrieve the list of validators
-	delegateeBonds, err := getDelegateeBonds(store)
+	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return err
 	}
-	validatorAccounts := delegateeBonds.ValidatorsActors(maxVal)
 
-	for _, account := range validatorAccounts {
+	// Update validator power and get the total power, total atoms
+	totalPower := delegateeBonds.UpdateVotingPower()
+	totalAtoms, err := loadAtomSupply(store)
+	if err != nil {
+		return err
+	}
 
-		credit := coin.Coins{{"atom", 10}} //TODO update to relative to the amount of coins held by validator
+	//Rewards per power
+	rewardPerPower := (totalAtoms.Div(totalPower)).Mul(inflationPerReward)
 
-		err = creditAcc(account, credit)
+	for _, validator := range delegateeBonds {
+
+		vp := validator.VotingPower
+		if vp.Equal(Zero) { //is sorted so at first zero no more validators
+			break
+		}
+
+		reward := vp.Mul(rewardPerPower)
+		totalAtoms = totalAtoms.Add(reward)
+		credit := coin.Coins{{bondDenom, reward.IntPart()}} //TODO make Decimal
+		err = creditAcc(validator.Account, credit)
 		if err != nil {
 			return err
 		}
 	}
+
+	//save the inflated total atom supply
+	saveAtomSupply(store, totalAtoms)
+
 	return nil
 }
