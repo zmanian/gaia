@@ -88,11 +88,11 @@ func (Handler) AssertDispatcher() {}
 // InitState - set genesis parameters for staking
 func (Handler) InitState(l log.Logger, store state.SimpleDB,
 	module, key, value string, cb sdk.InitStater) (log string, err error) {
-	return "", initState(module, key, value)
+	return "", initState(module, key, value, store)
 }
 
 //separated for testing
-func initState(module, key, value string) (err error) {
+func initState(module, key, value string, store state.SimpleDB) (err error) {
 	if module != name {
 		return errors.ErrUnknownModule(module)
 	}
@@ -114,6 +114,12 @@ func initState(module, key, value string) (err error) {
 		if err != nil {
 			return fmt.Errorf("maxval must be int, Error: %v", err.Error())
 		}
+	case "atomsupply":
+		supply, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("atomsupply must be int, Error: %v", err.Error())
+		}
+		saveAtomSupply(store, NewDecimal(int64(supply), 0))
 	case "bond_coin":
 		bondDenom = value
 	}
@@ -335,7 +341,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		return abci.ErrInternalError.AppendLog("Delegator does not contain delegatee bond")
 	}
 
-	// subtract bond tokens from bond account
+	// subtract bond tokens from delegatorBond
 	if delegatorBond.BondTokens.LT(bondAmt) {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 	}
@@ -349,7 +355,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		saveDelegatorBonds(store, sender, delegatorBonds)
 	}
 
-	// subtract tokens from bond value
+	// subtract tokens from delegateeBonds
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
@@ -363,7 +369,6 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		delegateeBonds.Remove(bvIndex)
 	}
 	saveDelegateeBonds(store, delegateeBonds)
-	// TODO Delegatee bonds?
 
 	// add unbond record to queue
 	queueElem := QueueElemUnbond{

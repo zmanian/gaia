@@ -62,6 +62,8 @@ func saveDelegateeBonds(store state.SimpleDB, delegateeBonds DelegateeBonds) {
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+//AtomSupply is the total atom supply of the Hub
+
 func loadAtomSupply(store state.SimpleDB) (atoms Decimal, err error) {
 	b := store.Get([]byte{atomSupplyKey})
 	if b == nil {
