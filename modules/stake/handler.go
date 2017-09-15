@@ -144,6 +144,7 @@ func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
 	return
 }
 
+//TODO Context should be created within sendcoins based on the send
 // TickBeginBlock - Called every block even if no transaction, process all queues and validator rewards
 func (h Handler) TickBeginBlock(ctx sdk.Context, height uint64, store state.SimpleDB,
 	dispatch sdk.Deliver) (startVal []*abci.Validator, err error) {
