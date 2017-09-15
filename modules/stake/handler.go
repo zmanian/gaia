@@ -32,9 +32,10 @@ const (
 //nolint
 var (
 	//TODO should all these global parameters be moved to the state?
-	periodUnbonding uint64 = 30     // queue blocks before unbond
-	bondDenom       string = "atom" // bondable coin denomination
-	maxVal          int    = 100    // maximum number of validators
+	periodUnbonding uint64 = 30               // queue blocks before unbond
+	bondDenom       string = "atom"           // bondable coin denomination
+	maxVal          int    = 100              // maximum number of validators
+	minValBond             = NewDecimal(5, 5) // minumum number of bonded coins to be a validator
 
 	maxCommHistory           = NewDecimal(5, -2) // maximum total commission permitted across the queued commission history
 	periodCommHistory uint64 = 28800             // 1 day @ 1 block/3 sec
@@ -114,6 +115,12 @@ func initState(module, key, value string, store state.SimpleDB) (err error) {
 		if err != nil {
 			return fmt.Errorf("maxval must be int, Error: %v", err.Error())
 		}
+	case "minvalbond":
+		minValBondInt, err := strconv.Atoi(value)
+		minValBond = NewDecimal(int64(minValBondInt), 0)
+		if err != nil {
+			return fmt.Errorf("minvalbond must be int, Error: %v", err.Error())
+		}
 	case "atomsupply":
 		supply, err := strconv.Atoi(value)
 		if err != nil {
@@ -130,7 +137,6 @@ func initState(module, key, value string, store state.SimpleDB) (err error) {
 func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, _ sdk.Checker) (res sdk.CheckResult, err error) {
 	err = checkTx(ctx, tx)
-
 	return
 }
 func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
@@ -315,6 +321,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.R
 	return runTxUnbondGuts(getSender, store, tx, ctx.BlockHeight())
 }
 
+//TODO add logic for when the validator unbonds
 func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
@@ -522,7 +529,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 		return err
 	}
 
-	for unbond.Delegatee.Address != nil && height-unbond.HeightAtInit > periodUnbonding {
+	for !unbond.Delegatee.Empty() && height-unbond.HeightAtInit > periodUnbonding {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
@@ -553,7 +560,11 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 
 }
 
-// Process all validator commission modification for the current block
+// Process the validator commission history queue
+// This function doesn't change the commission rate, the commission rate
+// is changed instantaniously when modified, this queue allows for an
+// accurate accounting of the recent commission history modifications to
+// be held.
 func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 	queue, err := LoadQueue(queueCommissionTypeByte, store)
 	if err != nil {
@@ -568,7 +579,7 @@ func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 		return err
 	}
 
-	for commission.Delegatee.Address != nil && height-commission.HeightAtInit > periodCommHistory {
+	for !commission.Delegatee.Empty() && height-commission.HeightAtInit > periodCommHistory {
 		queue.Pop()
 
 		// check the next record in the queue record

@@ -66,15 +66,21 @@ func (b DelegateeBonds) Sort() {
 	sort.Sort(b)
 }
 
-// UpdateVotingPower - voting power based onthe bond value
+// UpdateVotingPower - voting power based on the bond value
 func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 
-	//first update the voting power for all delegatees
+	// First update the voting power for all delegatees be sure to give no
+	// power to validators without the minimum atoms required to be a validator
 	for _, bv := range b {
-		bv.VotingPower = bv.TotalBondTokens.Mul(bv.ExchangeRate)
+		vp := bv.TotalBondTokens.Mul(bv.ExchangeRate)
+		if vp.LT(minValBond) {
+			bv.VotingPower = Zero
+		} else {
+			bv.VotingPower = vp
+		}
 	}
 
-	//now sort and truncate the power
+	// Now sort and truncate the power
 	b.Sort()
 	for i, bv := range b {
 		if i <= maxVal {
@@ -86,11 +92,14 @@ func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 	return
 }
 
-// GetValidators - get the active validator list from the array of DelegateeBonds
+// GetValidators - get the most recent updated validator set from the
+// DelegateeBonds. These bonds are already sorted by VotingPower from
+// the UpdateVotingPower function which is the only function which
+// is to modify the VotingPower
 func (b DelegateeBonds) GetValidators(maxVal int) []*abci.Validator {
 	validators := make([]*abci.Validator, 0, maxVal)
-	for i, bv := range b {
-		if i == maxVal {
+	for _, bv := range b {
+		if bv.VotingPower.Equal(Zero) { //exit as soon as the first Voting power set to zero is found
 			break
 		}
 		validators = append(validators, bv.Validator())
