@@ -354,10 +354,14 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	}
 	delegatorBond.BondTokens = delegatorBond.BondTokens.Sub(bondAmt)
 	//New exchange rate = (new number of bonded atoms)/ total number of bondTokens for validator
-	//delegateeBond.ExchangeRate := uint64(bondAmt) / bondTokens
+	//delegateeBond.ExchangeRate := uint64(bondAmt) / bondTokens //TODO update exchange rate equation
 
 	if delegatorBond.BondTokens.Equal(Zero) {
-		removeDelegatorBonds(store, sender)
+		if sender.Equals(tx.Delegatee) {
+			fullyUnbondDelegatee(delegateeBond, store, height)
+		} else {
+			removeDelegatorBonds(store, sender)
+		}
 	} else {
 		saveDelegatorBonds(store, sender, delegatorBonds)
 	}
@@ -396,6 +400,36 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	return abci.OK
 }
 
+//TODO improve efficiency of this function
+func fullyUnbondDelegatee(delegateeBond DelegateeBond, store state.SimpleDB, height uint64) error {
+
+	//TODO XXX fix list queue's here
+	allDelegators := store.List([]byte{delegatorKeyPrefix}, []byte("foobar"), 1000)
+
+	for _, delegatorRec := range allDelegators {
+
+		delegatorBonds, err = loadDelegatorBonds(delegatorRec.Value)
+		if err != nil {
+			return err
+		}
+		delegator, err = getDelegatorFromKey(delegatorRec.Key)
+		if err != nil {
+			return err
+		}
+		for _, delegatorBond := range delegatorBonds {
+			if delegatorBond.Delegatee.Equals(delegateBonde.Delegatee) {
+				getSender := func() (sdk.Actor, error) {
+					return delegator, nil
+				}
+				coinAmount := delegatorBond.BondTokens.Mul(delegateeBond.ExchangeRate)
+				tx := NewTxUnbond(delegatee, coin.Coin{bondDenom,
+					coinAmount.IntPart()}) //TODO conv to decimal
+				res := runTxUnbondGuts(getSender, store, tx, height)
+			}
+		}
+	}
+}
+
 func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	dispatch sdk.Deliver) (res abci.Result) {
 
@@ -419,10 +453,18 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 
 	// Create bond value object
 	delegateeBond := DelegateeBond{
-		Delegatee:    tx.Nominee,
-		Commission:   tx.Commission,
-		ExchangeRate: One,
+		Delegatee:       tx.Nominee,
+		Commission:      tx.Commission,
+		ExchangeRate:    One,
+		TotalBondTokens: NewDecimal(int64(tx.Amount.Amount), 0), //TODO make coins decimal
+		Account:         One,
+		VotingPower:     Zero,
 	}
+
+	delegatorBonds := DelegatorBonds{{
+		Delegatee:  tx.Nominee,
+		BondTokens: NewDecimal(int64(tx.Amount.Amount), 0), //TODO make coins decimal
+	}}
 
 	// Bond the coins to the bond account
 	res = bondCoins(delegateeBond.Account, coin.Coins{tx.Amount})
@@ -430,13 +472,17 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 		return res
 	}
 
-	// Append and store
+	// Append and store to DelegateeBonds
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
 	}
 	delegateeBonds = append(delegateeBonds, delegateeBond)
 	saveDelegateeBonds(store, delegateeBonds)
+
+	// Also save a delegator account where the nominator
+	// has delegated coins to their own delegatee account
+	saveDelegatorBond(store, tx.Nominee, delegatorBonds)
 
 	return abci.OK
 }

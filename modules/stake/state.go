@@ -17,6 +17,13 @@ func loadDelegatorBondsKey(delegator sdk.Actor) []byte {
 	delegatorBytes := wire.BinaryBytes(&delegator)
 	return append([]byte{delegatorKeyPrefix}, delegatorBytes...)
 }
+func getDelegatorFromKey(key []byte) (delegator sdk.Actor, err error) {
+	err = wire.ReadBinaryBytes(key[1:], &delegator)
+	if err != nil {
+		err = errors.ErrDecoding()
+	}
+	return
+}
 
 func saveDelegatorBonds(store state.SimpleDB, delegator sdk.Actor, bonds DelegatorBonds) {
 	bondsBytes := wire.BinaryBytes(bonds)
@@ -30,6 +37,10 @@ func loadDelegatorBonds(store state.SimpleDB,
 	if delegatorBytes == nil {
 		return
 	}
+	return readDelegatorBonds(delegatorBytes)
+}
+
+func readDelegatorBonds(delegatorBytes []byte) (bonds DelegatorBonds, err error) {
 	err = wire.ReadBinaryBytes(delegatorBytes, &bonds)
 	if err != nil {
 		err = errors.ErrDecoding()
