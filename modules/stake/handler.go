@@ -145,6 +145,7 @@ func checkTx(ctx sdk.Context, tx sdk.Tx) (err error) {
 }
 
 //TODO Context should be created within sendcoins based on the send
+
 // TickBeginBlock - Called every block even if no transaction, process all queues and validator rewards
 func (h Handler) TickBeginBlock(ctx sdk.Context, height uint64, store state.SimpleDB,
 	dispatch sdk.Deliver) (startVal []*abci.Validator, err error) {
@@ -337,6 +338,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		return abci.ErrUnauthorized.AppendLog(err.Error())
 	}
 
+	//get delegator bond
 	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
 		return abci.ErrInternalError.AppendLog(err.Error())
@@ -349,6 +351,13 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 		return abci.ErrInternalError.AppendLog("Delegator does not contain delegatee bond")
 	}
 
+	//get delegatee bond
+	delegateeBonds, err := loadDelegateeBonds(store)
+	if err != nil {
+		return abci.ErrInternalError.AppendLog(err.Error())
+	}
+	bvIndex, delegateeBond := delegateeBonds.Get(tx.Delegatee)
+
 	// subtract bond tokens from delegatorBond
 	if delegatorBond.BondTokens.LT(bondAmt) {
 		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
@@ -358,8 +367,12 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	//delegateeBond.ExchangeRate := uint64(bondAmt) / bondTokens //TODO update exchange rate equation
 
 	if delegatorBond.BondTokens.Equal(Zero) {
+		//begin to unbond all of the tokens if the validator unbonds their last token
 		if sender.Equals(tx.Delegatee) {
-			fullyUnbondDelegatee(delegateeBond, store, height)
+			res = fullyUnbondDelegatee(delegateeBond, store, height)
+			if res.IsErr() {
+				return res //TODO add more context to this error?
+			}
 		} else {
 			removeDelegatorBonds(store, sender)
 		}
@@ -368,11 +381,6 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	}
 
 	// subtract tokens from delegateeBonds
-	delegateeBonds, err := loadDelegateeBonds(store)
-	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
-	}
-	bvIndex, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegatorBond == nil {
 		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
 	}
@@ -402,33 +410,37 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 }
 
 //TODO improve efficiency of this function
-func fullyUnbondDelegatee(delegateeBond DelegateeBond, store state.SimpleDB, height uint64) error {
+func fullyUnbondDelegatee(delegateeBond *DelegateeBond, store state.SimpleDB, height uint64) (res abci.Result) {
 
-	//TODO XXX fix list queue's here
-	allDelegators := store.List([]byte{delegatorKeyPrefix}, []byte("foobar"), 1000)
+	//TODO upgrade list queue... make sure that endByte as nil is okay
+	allDelegators := store.List([]byte{delegatorKeyPrefix}, nil, maxVal)
 
 	for _, delegatorRec := range allDelegators {
 
-		delegatorBonds, err = loadDelegatorBonds(delegatorRec.Value)
+		delegator, err := getDelegatorFromKey(delegatorRec.Key)
 		if err != nil {
-			return err
+			return abci.ErrInternalError.AppendLog(err.Error())
 		}
-		delegator, err = getDelegatorFromKey(delegatorRec.Key)
+		delegatorBonds, err := loadDelegatorBonds(store, delegator)
 		if err != nil {
-			return err
+			return abci.ErrInternalError.AppendLog(err.Error())
 		}
 		for _, delegatorBond := range delegatorBonds {
-			if delegatorBond.Delegatee.Equals(delegateBonde.Delegatee) {
+			if delegatorBond.Delegatee.Equals(delegateeBond.Delegatee) {
 				getSender := func() (sdk.Actor, error) {
 					return delegator, nil
 				}
 				coinAmount := delegatorBond.BondTokens.Mul(delegateeBond.ExchangeRate)
-				tx := NewTxUnbond(delegatee, coin.Coin{bondDenom,
+				tx := NewTxUnbond(delegateeBond.Delegatee, coin.Coin{bondDenom,
 					coinAmount.IntPart()}) //TODO conv to decimal
-				res := runTxUnbondGuts(getSender, store, tx, height)
+				res = runTxUnbondGuts(getSender, store, tx.Unwrap().(TxUnbond), height)
+				if res.IsErr() {
+					return res
+				}
 			}
 		}
 	}
+	return abci.OK
 }
 
 func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
@@ -458,7 +470,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 		Commission:      tx.Commission,
 		ExchangeRate:    One,
 		TotalBondTokens: NewDecimal(int64(tx.Amount.Amount), 0), //TODO make coins decimal
-		Account:         One,
+		Account:         sdk.NewActor(name, append([]byte{0x00}, tx.Nominee.Address...)),
 		VotingPower:     Zero,
 	}
 
@@ -483,7 +495,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 
 	// Also save a delegator account where the nominator
 	// has delegated coins to their own delegatee account
-	saveDelegatorBond(store, tx.Nominee, delegatorBonds)
+	saveDelegatorBonds(store, tx.Nominee, delegatorBonds)
 
 	return abci.OK
 }
