@@ -12,7 +12,7 @@ import:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: develop
+  version: feature/staking
 - package: github.com/tendermint/go-crypto
   version: 1bc8de4caa844f8b64c120e65b047898f22b7f3e
   subpackages:

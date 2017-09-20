@@ -36,48 +36,45 @@ var _, _, _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}, &TxNominate{}, &TxModComm{}
 // TxBond
 
 // TxBond - struct for bonding transactions
-type TxBond struct{ TxBonding }
+type TxBond struct{ BondUpdate }
 
 // NewTxBond - new TxBond
 func NewTxBond(delegatee sdk.Actor, amount coin.Coin) sdk.Tx {
-	return TxBond{TxBonding{
+	return TxBond{BondUpdate{
 		Delegatee: delegatee,
 		Amount:    amount,
 	}}.Wrap()
 }
 
 // TxUnbond - struct for unbonding transactions
-type TxUnbond struct{ TxBonding }
+type TxUnbond struct{ BondUpdate }
 
 // NewTxUnbond - new TxUnbond
 func NewTxUnbond(delegatee sdk.Actor, amount coin.Coin) sdk.Tx {
-	return TxUnbond{TxBonding{
+	return TxUnbond{BondUpdate{
 		Delegatee: delegatee,
 		Amount:    amount,
 	}}.Wrap()
 }
 
-// TxBonding - struct for bonding or unbonding transactions
-type TxBonding struct {
+// BondUpdate - struct for bonding or unbonding transactions
+type BondUpdate struct {
 	Delegatee sdk.Actor `json:"delegatee"`
 	Amount    coin.Coin `json:"amount"`
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxBonding) Wrap() sdk.Tx {
+func (tx BondUpdate) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
-// ValidateBasic - Check the bonding coins, Validator is non-empty
-func (tx TxBonding) ValidateBasic() error {
+// ValidateBasic - Check for non-empty actor, and valid coins
+func (tx BondUpdate) ValidateBasic() error {
 	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
 	}
 	coins := coin.Coins{tx.Amount}
-	if !coins.IsValid() {
-		return coin.ErrInvalidCoins()
-	}
-	if !coins.IsNonnegative() {
+	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
 	return nil
@@ -107,16 +104,13 @@ func (tx TxNominate) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
-// ValidateBasic - Check coins as well as that the delegatee is actually a delegatee
+// ValidateBasic - Check for non-empty actor, valid coins, and valid commission range
 func (tx TxNominate) ValidateBasic() error {
 	if tx.Nominee.Empty() {
 		return errValidatorEmpty
 	}
 	coins := coin.Coins{tx.Amount}
-	if !coins.IsValid() {
-		return coin.ErrInvalidCoins()
-	}
-	if !coins.IsNonnegative() {
+	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
 	if tx.Commission.LT(NewDecimal(0, 1)) {
@@ -150,7 +144,7 @@ func (tx TxModComm) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
-// ValidateBasic - Check coins as well as that the delegatee is actually a delegatee
+// ValidateBasic - Check for non-empty actor, and valid commission range
 func (tx TxModComm) ValidateBasic() error {
 	if tx.Delegatee.Empty() {
 		return errValidatorEmpty

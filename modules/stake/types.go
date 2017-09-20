@@ -2,6 +2,7 @@ package stake
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 
 	"github.com/cosmos/cosmos-sdk"
@@ -19,8 +20,8 @@ type DelegateeBond struct {
 	Delegatee       sdk.Actor
 	Commission      Decimal
 	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in millionths of coins)
-	TotalBondTokens Decimal   // Total number of bond tokens in the account
-	Account         sdk.Actor // Account where the bonded tokens are held. Controlled by the app
+	TotalBondTokens Decimal   // Total number of bond tokens for the delegatee
+	Account         sdk.Actor // Account where the bonded coins are held. Controlled by the app
 	VotingPower     Decimal   // Last calculated voting power based on bond value
 }
 
@@ -108,10 +109,10 @@ func (b DelegateeBonds) GetValidators(maxVal int) []*abci.Validator {
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (diff, new []*abci.Validator) {
+func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (diff []*abci.Validator) {
 
 	//Get the new validator set
-	new = b.GetValidators(maxVal)
+	new := b.GetValidators(maxVal)
 
 	//calculate any differences from the previous to the new validator set
 	diff = make([]*abci.Validator, 0, maxVal)
@@ -123,7 +124,7 @@ func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (
 			diff = append(diff, &abci.Validator{prev.PubKey, currentPower})
 		}
 	}
-	return diff, new
+	return
 }
 
 // TODO remove this code, could be made much more efficient
@@ -140,9 +141,7 @@ func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
 func (b DelegateeBonds) Get(delegatee sdk.Actor) (int, *DelegateeBond) {
 	for i, bv := range b {
-		if bytes.Equal(bv.Delegatee.Address, delegatee.Address) &&
-			bv.Delegatee.ChainID == delegatee.ChainID &&
-			bv.Delegatee.App == delegatee.App {
+		if bv.Delegatee.Equals(delegatee) {
 			return i, &bv
 		}
 	}
@@ -150,8 +149,15 @@ func (b DelegateeBonds) Get(delegatee sdk.Actor) (int, *DelegateeBond) {
 }
 
 // Remove - remove delegatee from the delegatee list
-func (b DelegateeBonds) Remove(i int) DelegateeBonds {
-	return append(b[:i], b[i+1:]...)
+func (b DelegateeBonds) Remove(i int) (DelegateeBonds, error) {
+	switch {
+	case i < 0:
+		return b, fmt.Errorf("Cannot remove a negative element")
+	case i >= len(b):
+		return b, fmt.Errorf("Element is out of upper bound")
+	default:
+		return append(b[:i], b[i+1:]...), nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -179,8 +185,15 @@ func (b DelegatorBonds) Get(delegatee sdk.Actor) (int, *DelegatorBond) {
 }
 
 // Remove - remove delegatee from the delegatee list
-func (b DelegatorBonds) Remove(i int) DelegatorBonds {
-	return append(b[:i], b[i+1:]...)
+func (b DelegatorBonds) Remove(i int) (DelegatorBonds, error) {
+	switch {
+	case i < 0:
+		return b, fmt.Errorf("Cannot remove a negative element")
+	case i >= len(b):
+		return b, fmt.Errorf("Element is out of upper bound")
+	default:
+		return append(b[:i], b[i+1:]...), nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

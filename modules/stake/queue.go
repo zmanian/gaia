@@ -17,8 +17,16 @@ type Queue struct {
 	head  uint64         //End position of the queue
 }
 
-func (q Queue) headKey() []byte { return []byte{q.slot, 0x00} }
-func (q Queue) tailKey() []byte { return []byte{q.slot, 0x01} }
+func (q Queue) headPositionKey() []byte { return []byte{q.slot, 0x00} }
+func (q Queue) tailPositionKey() []byte { return []byte{q.slot, 0x01} }
+
+// queueKey - get the key for the queue'd record at position 'n'
+func (q Queue) queueKey(n uint64) []byte {
+	b := make([]byte, 9)
+	b[0] = q.slot //add prepended byte
+	binary.BigEndian.PutUint64(b[1:], uint64(n))
+	return b
+}
 
 // NewQueue - create a new generic queue under the designate slot
 func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
@@ -30,16 +38,15 @@ func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
 	}
 
 	// Test to make sure that the Queue doesn't already exist
-	headBytes := store.Get(q.headKey())
+	headBytes := store.Get(q.headPositionKey())
 	if headBytes != nil {
-		return q, fmt.Errorf("cannot create a Queue under the name %v, Queue already exists")
+		return q, fmt.Errorf("cannot create a Queue under the slot %v, Queue already exists", slot)
 	}
 
 	// Set the position bytes
 	positionBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(positionBytes, 0)
-	q.store.Set(q.headKey(), positionBytes)
-	q.store.Set(q.tailKey(), positionBytes)
+	q.store.Set(q.headPositionKey(), positionBytes)
+	q.store.Set(q.tailPositionKey(), positionBytes)
 
 	return q, nil
 }
@@ -52,40 +59,33 @@ func LoadQueue(slot byte, store state.SimpleDB) (Queue, error) {
 		store: store,
 	}
 
-	headBytes := store.Get(q.headKey())
+	headBytes := store.Get(q.headPositionKey())
 	if headBytes == nil {
-		return q, fmt.Errorf("cannot load Queue under the name %v, head does not exists")
+		return q, fmt.Errorf("cannot load Queue under the slot %v, head does not exists", slot)
 	}
 	q.head = binary.BigEndian.Uint64(headBytes)
 
-	tailBytes := store.Get(q.tailKey())
+	tailBytes := store.Get(q.tailPositionKey())
 	if tailBytes == nil {
-		return q, fmt.Errorf("cannot load Queue under the name %v, head does not exists")
+		return q, fmt.Errorf("cannot load Queue under the slot %v, tail does not exists", slot)
 	}
 	q.tail = binary.BigEndian.Uint64(tailBytes)
 
 	return q, nil
 }
 
-// getQueueKey - get the key for the queue'd record at position 'n'
-func (q Queue) getQueueKey(n uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(n))
-	return append([]byte{q.slot}, b...) //prepend slot byte
-}
-
 func (q *Queue) incrementHead() {
 	q.head++
 	headBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(headBytes, q.head)
-	q.store.Set(q.headKey(), headBytes)
+	q.store.Set(q.headPositionKey(), headBytes)
 }
 
 func (q *Queue) incrementTail() {
 	q.tail++
 	tailBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(tailBytes, q.tail)
-	q.store.Set(q.tailKey(), tailBytes)
+	q.store.Set(q.tailPositionKey(), tailBytes)
 }
 
 func (q Queue) length() uint64 {
@@ -94,7 +94,7 @@ func (q Queue) length() uint64 {
 
 // Push - Add to the beginning/tail of the queue
 func (q *Queue) Push(bytes []byte) {
-	pushKey := q.getQueueKey(q.tail)
+	pushKey := q.queueKey(q.tail)
 	q.store.Set(pushKey, bytes)
 	q.incrementTail()
 }
@@ -104,7 +104,7 @@ func (q *Queue) Pop() {
 	if q.length() == 0 {
 		return
 	}
-	popKey := q.getQueueKey(q.head)
+	popKey := q.queueKey(q.head)
 	q.store.Remove(popKey)
 	q.incrementHead()
 }
@@ -114,7 +114,7 @@ func (q Queue) Peek() []byte {
 	if q.length() == 0 {
 		return nil
 	}
-	peekKey := q.getQueueKey(q.head)
+	peekKey := q.queueKey(q.head)
 	return q.store.Get(peekKey)
 }
 
@@ -125,7 +125,7 @@ func (q Queue) GetAll() [][]byte {
 	}
 	var res [][]byte
 	for i := q.tail; i <= q.head; i++ {
-		key := q.getQueueKey(i)
+		key := q.queueKey(i)
 		res = append(res, q.store.Get(key))
 	}
 	return res
