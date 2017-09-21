@@ -265,7 +265,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 func getSingleSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 1 {
-		return sender, abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
+		return sender, resMissingSignature
 	}
 	return senders[0], abci.OK
 }
@@ -280,11 +280,11 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	// Get the delegatee bond account
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("error loading delegatees: " + err.Error()) //should never occur
+		return resErrLoadingDelegatees(err)
 	}
 	i, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegateeBond == nil {
-		return abci.ErrBaseInvalidOutput.AppendLog("Cannot bond to non-nominated account")
+		return resBondNotNominated
 	}
 
 	// Move coins from the delegator account to the delegatee lock account
@@ -296,7 +296,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	// Get or create delegator bonds
 	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("error loading delegators: " + err.Error()) //should never occur
+		return resErrLoadingDelegators(err)
 	}
 	if len(delegatorBonds) == 0 {
 		delegatorBonds = DelegatorBonds{
@@ -329,7 +329,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.R
 	getSender := func() (sender sdk.Actor, res abci.Result) {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) != 0 {
-			res = abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
+			res = resMissingSignature
 			return
 		}
 		sender = senders[0]
@@ -353,26 +353,23 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.Simp
 	//get delegator bond
 	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
-	}
-	if delegatorBonds == nil {
-		return abci.ErrBaseUnknownAddress.AppendLog("No bond account for this (address, validator) pair")
+		return resErrLoadingDelegators(err)
 	}
 	_, delegatorBond := delegatorBonds.Get(tx.Delegatee)
 	if delegatorBond == nil {
-		return abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain delegatee bond")
+		return resNoDelegatorForAddress
 	}
 
 	//get delegatee bond
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
+		return resErrLoadingDelegatees(err)
 	}
 	bvIndex, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 
 	// subtract bond tokens from delegatorBond
 	if delegatorBond.BondTokens.LT(bondAmt) {
-		return abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
+		return resInsufficientFunds
 	}
 	delegatorBond.BondTokens = delegatorBond.BondTokens.Sub(bondAmt)
 
@@ -392,7 +389,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.Simp
 
 	// subtract tokens from delegateeBonds
 	if delegatorBond == nil {
-		return abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
+		return resNoDelegateeForAddress
 	}
 	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Sub(bondAmt)
 	if delegateeBond.TotalBondTokens.Equal(Zero) {
@@ -434,11 +431,11 @@ func fullyUnbondDelegatee(delegateeBond *DelegateeBond, store state.SimpleDB, he
 
 		delegator, err := getDelegatorFromKey(delegatorRec.Key)
 		if err != nil {
-			return abci.ErrBaseEncodingError.AppendLog(fmt.Sprintf("error loading delegator with key: %v", delegatorRec.Key)) //should never occur
+			return resErrLoadingDelegators(delegatorRec.Key) //should never occur
 		}
 		delegatorBonds, err := loadDelegatorBonds(store, delegator)
 		if err != nil {
-			return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
+			return resErrLoadingDelegators(err)
 		}
 		for _, delegatorBond := range delegatorBonds {
 			if delegatorBond.Delegatee.Equals(delegateeBond.Delegatee) {
@@ -464,12 +461,12 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	bondCoins := func(bondAccount sdk.Actor, amount coin.Coins) abci.Result {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) == 0 {
-			return abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
+			return resMissingSignature
 		}
 		send := coin.NewSendOneTx(senders[0], bondAccount, amount)
 		_, err := dispatch.DeliverTx(ctx, store, send)
 		if err != nil {
-			return abci.ErrBaseInsufficientFunds.AppendLog(err.Error())
+			return resInsufficientFunds
 		}
 		return abci.OK
 	}
@@ -503,7 +500,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 	// Append and store to DelegateeBonds
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
+		return resErrLoadingDelegatees(err)
 	}
 	delegateeBonds = append(delegateeBonds, delegateeBond)
 	saveDelegateeBonds(store, delegateeBonds)
@@ -524,17 +521,17 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	// Retrieve the record to modify
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
+		return resErrLoadingDelegatees(err)
 	}
 	record, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegateeBond == nil {
-		return abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
+		return resNoDelegateeForAddress
 	}
 
 	// Determine that the amount of change proposed is permissible according to the queue change amount
 	queue, err := LoadQueue(queueCommissionTypeByte, store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("error loading queue" + err.Error()) //should never occur
+		return resErrLoadingQueue(err) //should never occur
 	}
 
 	// First determine the sum of the changes in the queue
