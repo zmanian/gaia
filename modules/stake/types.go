@@ -19,7 +19,7 @@ import (
 type DelegateeBond struct {
 	Delegatee       sdk.Actor
 	Commission      Decimal
-	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in millionths of coins)
+	ExchangeRate    Decimal   // Exchange rate for this validator's bond tokens (in Coin/Token)
 	TotalBondTokens Decimal   // Total number of bond tokens for the delegatee
 	Account         sdk.Actor // Account where the bonded coins are held. Controlled by the app
 	VotingPower     Decimal   // Last calculated voting power based on bond value
