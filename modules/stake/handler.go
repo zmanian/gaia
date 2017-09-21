@@ -248,13 +248,14 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 	}
 
 	sendCoins := func(receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
+
 		// Move coins from the deletator account to the delegatee lock account
 		send := coin.NewSendOneTx(sender, receiver, amount)
 
 		// If the deduction fails (too high), abort the command
 		_, err := dispatch.DeliverTx(ctx, store, send)
 		if err != nil {
-			return abci.ErrInternalError.AppendLog(err.Error())
+			return abci.ErrInsufficientFunds.AppendLog(err.Error())
 		}
 		return
 	}
@@ -264,7 +265,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 func getSingleSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 1 {
-		return sender, abci.ErrInternalError.AppendLog("Missing signature")
+		return sender, abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
 	}
 	return senders[0], abci.OK
 }
@@ -278,19 +279,19 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 
 	switch {
 	case bondCoin.Denom != bondDenom:
-		return abci.ErrInternalError.AppendLog("Invalid coin denomination")
+		return abci.ErrBaseInvalidInput.AppendLog("Invalid coin denomination")
 	case bondAmt.LTE(Zero):
-		return abci.ErrInternalError.AppendLog("Amount must be > 0")
+		return abci.ErrBaseInvalidInput.AppendLog("Amount must be > 0")
 	}
 
 	// Get the delegatee bond account
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("error loading delegatees: " + err.Error()) //should never occur
 	}
 	i, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegateeBond == nil {
-		return abci.ErrInternalError.AppendLog("Cannot bond to non-nominated account")
+		return abci.ErrBaseInvalidOutput.AppendLog("Cannot bond to non-nominated account")
 	}
 
 	// Move coins from the delegator account to the delegatee lock account
@@ -302,7 +303,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	// Get or create delegator bonds
 	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("error loading delegators: " + err.Error()) //should never occur
 	}
 	if len(delegatorBonds) == 0 {
 		delegatorBonds = DelegatorBonds{
@@ -332,11 +333,10 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 
 func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.Result) {
 
-	getSender := func() (sender sdk.Actor, err error) {
+	getSender := func() (sender sdk.Actor, res abci.Result) {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) != 0 {
-			err = fmt.Errorf("Missing signature")
-			return
+			return abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
 		}
 		sender = senders[0]
 		return
@@ -346,37 +346,37 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.R
 }
 
 //TODO add logic for when the validator unbonds
-func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, tx TxUnbond,
+func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
 	bondAmt := NewDecimal(tx.Amount.Amount, 1)
 
 	if bondAmt.LTE(Zero) {
-		return abci.ErrInternalError.AppendLog("Unbond amount must be > 0")
+		return abci.ErrBaseInvalidInput.AppendLog("Unbond amount must be > 0")
 	}
 
-	sender, err := getSender()
-	if err != nil {
-		return abci.ErrUnauthorized.AppendLog(err.Error())
+	sender, res := getSender()
+	if res.IsErr() {
+		return res
 	}
 
 	//get delegator bond
 	delegatorBonds, err := loadDelegatorBonds(store, sender)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
 	}
 	if delegatorBonds == nil {
 		return abci.ErrBaseUnknownAddress.AppendLog("No bond account for this (address, validator) pair")
 	}
 	_, delegatorBond := delegatorBonds.Get(tx.Delegatee)
 	if delegatorBond == nil {
-		return abci.ErrInternalError.AppendLog("Delegator does not contain delegatee bond")
+		return abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain delegatee bond")
 	}
 
 	//get delegatee bond
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
 	}
 	bvIndex, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 
@@ -402,7 +402,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 
 	// subtract tokens from delegateeBonds
 	if delegatorBond == nil {
-		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
+		return abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
 	}
 	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Sub(bondAmt)
 	if delegateeBond.TotalBondTokens.Equal(Zero) {
@@ -426,7 +426,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, error), store state.SimpleDB, 
 	}
 	queue, err := LoadQueue(queueUnbondTypeByte, store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrInternalError.AppendLog(err.Error()) //should never occur
 	}
 	bytes := wire.BinaryBytes(queueElem)
 	queue.Push(bytes)
@@ -444,11 +444,11 @@ func fullyUnbondDelegatee(delegateeBond *DelegateeBond, store state.SimpleDB, he
 
 		delegator, err := getDelegatorFromKey(delegatorRec.Key)
 		if err != nil {
-			return abci.ErrInternalError.AppendLog(err.Error())
+			return abci.ErrBaseEncodingError.AppendLog(fmt.Sprintf("error loading delegator with key: %v", delegatorRec.Key)) //should never occur
 		}
 		delegatorBonds, err := loadDelegatorBonds(store, delegator)
 		if err != nil {
-			return abci.ErrInternalError.AppendLog(err.Error())
+			return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
 		}
 		for _, delegatorBond := range delegatorBonds {
 			if delegatorBond.Delegatee.Equals(delegateeBond.Delegatee) {
@@ -474,12 +474,12 @@ func runTxNominate(ctx sdk.Context, store state.SimpleDB, tx TxNominate,
 	bondCoins := func(bondAccount sdk.Actor, amount coin.Coins) abci.Result {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) == 0 {
-			return abci.ErrInternalError.AppendLog("Missing signature")
+			return abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
 		}
 		send := coin.NewSendOneTx(senders[0], bondAccount, amount)
 		_, err := dispatch.DeliverTx(ctx, store, send)
 		if err != nil {
-			return abci.ErrInternalError.AppendLog(err.Error())
+			return abci.ErrBaseInsufficientFunds.AppendLog(err.Error())
 		}
 		return abci.OK
 	}
@@ -513,7 +513,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 	// Append and store to DelegateeBonds
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
 	}
 	delegateeBonds = append(delegateeBonds, delegateeBond)
 	saveDelegateeBonds(store, delegateeBonds)
@@ -534,17 +534,17 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	// Retrieve the record to modify
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
 	}
 	record, delegateeBond := delegateeBonds.Get(tx.Delegatee)
 	if delegateeBond == nil {
-		return abci.ErrInternalError.AppendLog("Delegatee does not exist for that address")
+		return abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
 	}
 
 	// Determine that the amount of change proposed is permissible according to the queue change amount
 	queue, err := LoadQueue(queueCommissionTypeByte, store)
 	if err != nil {
-		return abci.ErrInternalError.AppendLog(err.Error())
+		return abci.ErrBaseEncodingError.AppendLog("error loading queue", err.Error()) //should never occur
 	}
 
 	// First determine the sum of the changes in the queue
@@ -560,7 +560,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 		var modComm QueueElemModComm
 		err = wire.ReadBinaryBytes(modCommBytes, modComm)
 		if err != nil {
-			return abci.ErrInternalError.AppendLog(err.Error()) //should never occur under normal operation
+			return abci.ErrBaseEncodingError.AppendLog(err.Error()) //should never occur under normal operation
 		}
 		if modComm.Delegatee.Equals(tx.Delegatee) {
 			sumModCommQueue.Add(modComm.CommChange)
@@ -628,7 +628,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 		_, delegateeBond := delegateeBonds.Get(unbond.Delegatee)
 		if delegateeBond == nil {
 			// This error should never really happen
-			return abci.ErrInternalError.AppendLog("Attempted to retrieve a non-existent delegatee during validator reward processing")
+			return fmt.Errorf("Attempted to retrieve a non-existent delegatee during validator reward processing")
 		}
 		coinAmount := unbond.BondTokens.Mul(delegateeBond.ExchangeRate)
 		payout := coin.Coins{{bondDenom, coinAmount.IntPart()}} //TODO update coins to decimal
