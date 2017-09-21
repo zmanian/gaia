@@ -1,6 +1,8 @@
 package stake
 
 import (
+	"fmt"
+
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 )
@@ -73,10 +75,21 @@ func (tx BondUpdate) ValidateBasic() error {
 	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
 	}
+
 	coins := coin.Coins{tx.Amount}
 	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
+
+	bondCoin := tx.Amount
+	bondAmt := NewDecimal(bondCoin.Amount, 1)
+	if bondCoin.Denom != bondDenom {
+		return fmt.Errorf("Invalid coin denomination")
+	}
+	if bondAmt.LTE(Zero) {
+		return fmt.Errorf("Amount must be > 0")
+	}
+
 	return nil
 }
 

@@ -277,13 +277,6 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	bondCoin := tx.Amount
 	bondAmt := NewDecimal(bondCoin.Amount, 1)
 
-	switch {
-	case bondCoin.Denom != bondDenom:
-		return abci.ErrBaseInvalidInput.AppendLog("Invalid coin denomination")
-	case bondAmt.LTE(Zero):
-		return abci.ErrBaseInvalidInput.AppendLog("Amount must be > 0")
-	}
-
 	// Get the delegatee bond account
 	delegateeBonds, err := loadDelegateeBonds(store)
 	if err != nil {
@@ -336,7 +329,8 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.R
 	getSender := func() (sender sdk.Actor, res abci.Result) {
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) != 0 {
-			return abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
+			res = abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
+			return
 		}
 		sender = senders[0]
 		return
@@ -350,10 +344,6 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.Simp
 	height uint64) (res abci.Result) {
 
 	bondAmt := NewDecimal(tx.Amount.Amount, 1)
-
-	if bondAmt.LTE(Zero) {
-		return abci.ErrBaseInvalidInput.AppendLog("Unbond amount must be > 0")
-	}
 
 	sender, res := getSender()
 	if res.IsErr() {
@@ -452,8 +442,8 @@ func fullyUnbondDelegatee(delegateeBond *DelegateeBond, store state.SimpleDB, he
 		}
 		for _, delegatorBond := range delegatorBonds {
 			if delegatorBond.Delegatee.Equals(delegateeBond.Delegatee) {
-				getSender := func() (sdk.Actor, error) {
-					return delegator, nil
+				getSender := func() (sdk.Actor, abci.Result) {
+					return delegator, abci.OK
 				}
 				coinAmount := delegatorBond.BondTokens.Mul(delegateeBond.ExchangeRate)
 				tx := NewTxUnbond(delegateeBond.Delegatee, coin.Coin{bondDenom,
@@ -544,7 +534,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	// Determine that the amount of change proposed is permissible according to the queue change amount
 	queue, err := LoadQueue(queueCommissionTypeByte, store)
 	if err != nil {
-		return abci.ErrBaseEncodingError.AppendLog("error loading queue", err.Error()) //should never occur
+		return abci.ErrBaseEncodingError.AppendLog("error loading queue" + err.Error()) //should never occur
 	}
 
 	// First determine the sum of the changes in the queue
