@@ -75,7 +75,6 @@ func (tx BondUpdate) ValidateBasic() error {
 	if tx.Delegatee.Empty() {
 		return errValidatorEmpty
 	}
-
 	coins := coin.Coins{tx.Amount}
 	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()
@@ -89,7 +88,6 @@ func (tx BondUpdate) ValidateBasic() error {
 	if bondAmt.LTE(Zero) {
 		return fmt.Errorf("Amount must be > 0")
 	}
-
 	return nil
 }
 
