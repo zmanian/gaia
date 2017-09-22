@@ -431,7 +431,7 @@ func fullyUnbondDelegatee(delegateeBond *DelegateeBond, store state.SimpleDB, he
 
 		delegator, err := getDelegatorFromKey(delegatorRec.Key)
 		if err != nil {
-			return resErrLoadingDelegators(delegatorRec.Key) //should never occur
+			return resErrLoadingDelegator(delegatorRec.Key) //should never occur
 		}
 		delegatorBonds, err := loadDelegatorBonds(store, delegator)
 		if err != nil {

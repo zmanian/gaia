@@ -67,7 +67,7 @@ func (b DelegateeBonds) Sort() {
 	sort.Sort(b)
 }
 
-// UpdateVotingPower - voting power based on the bond value
+// UpdateVotingPower - voting power based on bond tokens and exchange rate
 func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 
 	// First update the voting power for all delegatees be sure to give no

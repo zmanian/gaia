@@ -28,19 +28,19 @@ var (
 	invalidInput = abci.CodeType_BaseInvalidInput
 )
 
-func resErrLoadingDelegatees(err error) {
+func resErrLoadingDelegatees(err error) abci.Result {
 	return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
 }
 
-func resErrLoadingDelegators(err error) {
+func resErrLoadingDelegators(err error) abci.Result {
 	return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
 }
 
-func resErrLoadingDelegators(key []byte) {
+func resErrLoadingDelegator(key []byte) abci.Result {
 	return abci.ErrBaseEncodingError.AppendLog(fmt.Sprintf("error loading delegator with key: %v", key))
 }
 
-func resErrLoadingQueue(err error) {
+func resErrLoadingQueue(err error) abci.Result {
 	return abci.ErrBaseEncodingError.AppendLog("error loading queue" + err.Error()) //should never occur
 }
 

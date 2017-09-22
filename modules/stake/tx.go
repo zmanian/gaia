@@ -120,17 +120,16 @@ func (tx TxNominate) ValidateBasic() error {
 	if tx.Nominee.Empty() {
 		return errValidatorEmpty
 	}
-	coins := coin.Coins{tx.Amount}
-	if !coins.IsValidNonnegative() {
-		return coin.ErrInvalidCoins()
-	}
 	if tx.Commission.LT(NewDecimal(0, 1)) {
 		return errCommissionNegative
 	}
 	if tx.Commission.GT(NewDecimal(1, 1)) {
 		return errCommissionHuge
 	}
-	return nil
+
+	//validate as a bond update as well
+	ba := BondUpdate{tx.Nominee, tx.Amount}
+	return ba.ValidateBasic()
 }
 
 /////////////////////////////////////////////////////////////////
