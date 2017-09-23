@@ -36,7 +36,7 @@ func (b DelegateeBond) Validator() *abci.Validator {
 //--------------------------------------------------------------------------------
 
 // DelegateeBonds - the set of all DelegateeBonds
-type DelegateeBonds []DelegateeBond
+type DelegateeBonds []*DelegateeBond
 
 var _ sort.Interface = DelegateeBonds{} //enforce the sort interface at compile time
 
@@ -84,7 +84,7 @@ func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 	// Now sort and truncate the power
 	b.Sort()
 	for i, bv := range b {
-		if i <= maxVal {
+		if i < maxVal {
 			totalPower = totalPower.Add(bv.VotingPower)
 		} else {
 			bv.VotingPower = Zero
@@ -97,7 +97,7 @@ func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 // DelegateeBonds. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (b DelegateeBonds) GetValidators(maxVal int) []*abci.Validator {
+func (b DelegateeBonds) GetValidators() []*abci.Validator {
 	validators := make([]*abci.Validator, 0, maxVal)
 	for _, bv := range b {
 		if bv.VotingPower.Equal(Zero) { //exit as soon as the first Voting power set to zero is found
@@ -109,10 +109,10 @@ func (b DelegateeBonds) GetValidators(maxVal int) []*abci.Validator {
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator, maxVal int) (diff []*abci.Validator) {
+func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) (diff []*abci.Validator) {
 
 	//Get the new validator set
-	new := b.GetValidators(maxVal)
+	new := b.GetValidators()
 
 	//calculate any differences from the previous to the new validator set
 	diff = make([]*abci.Validator, 0, maxVal)
@@ -142,7 +142,7 @@ func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
 func (b DelegateeBonds) Get(delegatee sdk.Actor) (int, *DelegateeBond) {
 	for i, bv := range b {
 		if bv.Delegatee.Equals(delegatee) {
-			return i, &bv
+			return i, bv
 		}
 	}
 	return 0, nil

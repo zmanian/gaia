@@ -1,5 +1,5 @@
 hash: f1b68b936a5e958f5d05f1b0e526111c9fd2f30f2b1f8dfc23726a8a2630f65a
-updated: 2017-09-19T20:20:14.353039041-04:00
+updated: 2017-09-22T21:12:13.72664885-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -107,8 +107,8 @@ imports:
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/rcrowley/go-metrics
   version: 1f30fe9094a513ce4c700b9a54458bbb0c96996c
-- name: github.com/rigelrozanski/decimal
-  version: 87ec586884dacdd3735759e971794ba6ed7f252f
+- name: github.com/shopspring/decimal
+  version: aed1bfe463fa3c9cc268d60dcc1491db613bff7e
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:

@@ -42,7 +42,7 @@ func TestState(t *testing.T) {
 	var delegatorNilBonds DelegatorBonds
 
 	delegateeBonds := DelegateeBonds{
-		DelegateeBond{
+		&DelegateeBond{
 			Delegatee:       delegatee1,
 			Commission:      NewDecimal(7, -2),
 			ExchangeRate:    NewDecimal(8, -1),

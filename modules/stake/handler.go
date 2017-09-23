@@ -189,9 +189,9 @@ func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB,
 	if err != nil {
 		return
 	}
-	startVal := delegateeBonds.GetValidators(maxVal) //get old validators before voting power updated
+	startVal := delegateeBonds.GetValidators() //get old validators before voting power updated
 	totalVotingPower := delegateeBonds.UpdateVotingPower()
-	diffVal = delegateeBonds.ValidatorsDiff(startVal, maxVal)
+	diffVal = delegateeBonds.ValidatorsDiff(startVal)
 
 	// Process validator set rewards
 	creditCoins := func(receiver sdk.Actor, amount coin.Coins) (err error) {
@@ -502,7 +502,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 	if err != nil {
 		return resErrLoadingDelegatees(err)
 	}
-	delegateeBonds = append(delegateeBonds, delegateeBond)
+	delegateeBonds = append(delegateeBonds, &delegateeBond)
 	saveDelegateeBonds(store, delegateeBonds)
 
 	// Also save a delegator account where the nominator
