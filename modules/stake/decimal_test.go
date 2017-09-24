@@ -2,6 +2,8 @@ package stake
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewDecimalFromString(t *testing.T) {
@@ -30,6 +32,50 @@ func TestNewDecimalFromString(t *testing.T) {
 			if !got.Equal(tt.want) {
 				t.Errorf("NewDecimalFromString(%v) = %v, want %v", tt.args.value, got, tt.want)
 			}
+		})
+	}
+}
+
+func TestDecimal_Round(t *testing.T) {
+	type fields struct {
+		Value int64
+		Exp   int32
+	}
+	type args struct {
+		places int32
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   Decimal
+	}{
+		{"0.06 round 1", fields{6, -2}, args{1}, NewDecimal(1, -1)},
+		{"0.04 round 1", fields{4, -2}, args{1}, NewDecimal(0, 0)},
+		{"0.05 round 1", fields{5, -2}, args{1}, NewDecimal(0, 0)},
+		{"0.15 round 1", fields{15, -2}, args{1}, NewDecimal(2, -1)},
+		{"0.25 round 1", fields{25, -2}, args{1}, NewDecimal(2, -1)},
+		{"1.25 round 1", fields{115, -2}, args{1}, NewDecimal(12, -1)},
+		//{"0.06 round 10", fields{6, -2}, args{10}, NewDecimal(6, -2)},
+		//{"0.06 round 18", fields{6, -2}, args{18}, NewDecimal(6, -2)},
+		//{"500 round 16", fields{5, 2}, args{16}, NewDecimal(5, 2)},
+		//{"500 round 17", fields{5, 2}, args{17}, NewDecimal(5, 2)},
+		//{"500 round 18", fields{5, 2}, args{18}, NewDecimal(5, 2)},
+		//{"500 round 19", fields{5, 2}, args{19}, NewDecimal(5, 2)},
+		//{"500 round 20", fields{5, 2}, args{20}, NewDecimal(5, 2)},
+		//{"50 round 16", fields{5, 1}, args{16}, NewDecimal(5, 1)},
+		//{"50 round 17", fields{5, 1}, args{17}, NewDecimal(5, 1)},
+		//{"50 round 18", fields{5, 1}, args{18}, NewDecimal(5, 1)},
+		//{"50 round 19", fields{5, 1}, args{19}, NewDecimal(5, 1)},
+		//{"50 round 20", fields{5, 1}, args{20}, NewDecimal(5, 1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := Decimal{
+				Value: tt.fields.Value,
+				Exp:   tt.fields.Exp,
+			}
+			assert.True(t, d.Round(tt.args.places).Equal(tt.want), tt.name)
 		})
 	}
 }

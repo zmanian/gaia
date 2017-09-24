@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk"
 )
 
 // TestState - test the delegatee and delegator bonds store
 func TestTypes(t *testing.T) {
-	//assert, require := assert.New(t), require.New(t)
-	assert := assert.New(t)
+	assert, require := assert.New(t), require.New(t)
 
 	actor1 := sdk.Actor{"testChain", "testapp", []byte("address1")}
 	actor2 := sdk.Actor{"testChain", "testapp", []byte("address2")}
@@ -57,7 +57,7 @@ func TestTypes(t *testing.T) {
 
 	//get the base validators set which will contain all the delegatees
 	validators0 := delegatees.GetValidators()
-	assert.Equal(3, len(validators0))
+	require.Equal(3, len(validators0))
 
 	//test to see if the minValBond is functioning
 	minValBond = NewDecimal(10000, 0)
@@ -66,10 +66,8 @@ func TestTypes(t *testing.T) {
 	minValBond = NewDecimal(0, 0)
 	delegatees.UpdateVotingPower()
 	assert.Equal(3, len(delegatees.GetValidators()), "%v", delegatees.GetValidators())
-	minValBond = NewDecimal(0, 0)
+	minValBond = NewDecimal(50, 0)
 	delegatees.UpdateVotingPower()
-
-	assert.Equal(NewDecimal(300, 0), delegatees[0].TotalBondTokens.Mul(delegatees[0].ExchangeRate))
 	assert.Equal(2, len(delegatees.GetValidators()), "%v, %v, %v,", delegatees[0], delegatees[1], delegatees[2])
 
 	//test to see if the maxVal is functioning
@@ -88,44 +86,29 @@ func TestTypes(t *testing.T) {
 
 	//get/test the existing validator set
 	validators1 := delegatees.GetValidators()
-	assert.Equal(2, len(validators1))
-	assert.True(bytes.Equal(validators1[0].PubKey, actor3.Address))
-	assert.True(bytes.Equal(validators1[1].PubKey, actor2.Address))
+	require.Equal(2, len(validators1))
+	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address))
+	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address))
 
 	//change the exchange rate and update the voting power
-	delegatees[0].ExchangeRate = NewDecimal(1000, 0)
-	assert.True(delegatees.UpdateVotingPower().Equal(NewDecimal(1300, 0)))
+	delegatee1.ExchangeRate = NewDecimal(1000, 0)
+	delegatees.UpdateVotingPower()
+	assert.True(delegatees[0].VotingPower.Equal(NewDecimal(10000, 0)), "bad vp update, expected %v, got %v",
+		NewDecimal(1000, 0), delegatees[0].VotingPower)
 
 	// resort
 	delegatees.Sort()
 
 	// get the new validator set
 	validators2 := delegatees.GetValidators()
-	assert.Equal(2, len(validators2))
+	require.Equal(2, len(validators2))
 	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address))
-	assert.True(bytes.Equal(validators2[1].PubKey, actor3.Address))
+	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address))
 
 	// calculate the difference in the validator set from the origional set
-	diff := delegatees.ValidatorsDiff(validators1)
-	assert.Equal(2, len(diff))
+	diff := ValidatorsDiff(validators1, validators2)
+	require.Equal(2, len(diff), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
+		diff, validators1, validators2)
 	assert.True(diff[0].Power == 0)
-	assert.True(diff[1].Power == validators2[2].Power)
-
-	//// test get and remove one of the validators
-	//func (b DelegateeBonds) Get(delegatee sdk.Actor) (int, *DelegateeBond) {
-	//func (b DelegateeBonds) Remove(i int) (DelegateeBonds, error) {
-	////get the final validator set
-
-	////init a few delegator bonds
-	//// Get them
-	//// Remove one
-	//// attempt to get a removed delegator
-
-	//type DelegatorBond struct {
-	//Delegatee  sdk.Actor
-	//BondTokens Decimal // amount of bond tokens
-	//}
-
-	//func (b DelegatorBonds) Get(delegatee sdk.Actor) (int, *DelegatorBond) {
-	//func (b DelegatorBonds) Remove(i int) (DelegatorBonds, error) {
+	assert.True(diff[1].Power == validators2[0].Power)
 }

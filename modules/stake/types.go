@@ -109,33 +109,40 @@ func (b DelegateeBonds) GetValidators() []*abci.Validator {
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func (b DelegateeBonds) ValidatorsDiff(previous []*abci.Validator) (diff []*abci.Validator) {
-
-	//Get the new validator set
-	new := b.GetValidators()
+func ValidatorsDiff(previous, new []*abci.Validator) (diff []*abci.Validator) {
 
 	//calculate any differences from the previous to the new validator set
+	// first loop through the previous validator set, and then catch any
+	// missed records in the new validator set
 	diff = make([]*abci.Validator, 0, maxVal)
-	for _, prev := range previous {
-
-		//test for a difference between the validator power of validator
-		currentPower := getValidatorPower(new, prev.PubKey)
-		if currentPower != prev.Power {
-			diff = append(diff, &abci.Validator{prev.PubKey, currentPower})
+	for _, prevVal := range previous {
+		found := false
+		for _, newVal := range new {
+			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
+				found = true
+				if newVal.Power != prevVal.Power {
+					diff = append(diff, &abci.Validator{newVal.PubKey, newVal.Power})
+					break
+				}
+			}
+		}
+		if !found {
+			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
+		}
+	}
+	for _, newVal := range new {
+		found := false
+		for _, prevVal := range previous {
+			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			diff = append(diff, &abci.Validator{newVal.PubKey, newVal.Power})
 		}
 	}
 	return
-}
-
-// TODO remove this code, could be made much more efficient
-// getValidatorPower - return the validator power with the matching pubKey from the validator list
-func getValidatorPower(set []*abci.Validator, pubKey []byte) uint64 {
-	for _, validator := range set {
-		if bytes.Equal(validator.PubKey, pubKey) {
-			return validator.Power
-		}
-	}
-	return 0 // no power if not found
 }
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds

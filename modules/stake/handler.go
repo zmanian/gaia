@@ -189,9 +189,10 @@ func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB,
 	if err != nil {
 		return
 	}
-	startVal := delegateeBonds.GetValidators() //get old validators before voting power updated
+	startVal := delegateeBonds.GetValidators()
 	totalVotingPower := delegateeBonds.UpdateVotingPower()
-	diffVal = delegateeBonds.ValidatorsDiff(startVal)
+	newVal := delegateeBonds.GetValidators()
+	diffVal = ValidatorsDiff(startVal, newVal)
 
 	// Process validator set rewards
 	creditCoins := func(receiver sdk.Actor, amount coin.Coins) (err error) {
