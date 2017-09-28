@@ -276,7 +276,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 
 	// Get amount of coins to bond
 	bondCoin := tx.Amount
-	bondAmt := NewDecimal(bondCoin.Amount, 1)
+	bondAmt := NewDecimal(bondCoin.Amount, 0)
 
 	// Get the delegatee bond account
 	delegateeBonds, err := loadDelegateeBonds(store)
@@ -301,7 +301,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	}
 	if len(delegatorBonds) == 0 {
 		delegatorBonds = DelegatorBonds{
-			DelegatorBond{
+			&DelegatorBond{
 				Delegatee:  tx.Delegatee,
 				BondTokens: Zero,
 			},
@@ -340,11 +340,10 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond) (res abci.R
 	return runTxUnbondGuts(getSender, store, tx, ctx.BlockHeight())
 }
 
-//TODO add logic for when the validator unbonds
 func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.SimpleDB, tx TxUnbond,
 	height uint64) (res abci.Result) {
 
-	bondAmt := NewDecimal(tx.Amount.Amount, 1)
+	bondAmt := NewDecimal(tx.Amount.Amount, 0)
 
 	sender, res := getSender()
 	if res.IsErr() {
@@ -367,6 +366,9 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.Simp
 		return resErrLoadingDelegatees(err)
 	}
 	bvIndex, delegateeBond := delegateeBonds.Get(tx.Delegatee)
+	if delegateeBond == nil {
+		return resNoDelegateeForAddress
+	}
 
 	// subtract bond tokens from delegatorBond
 	if delegatorBond.BondTokens.LT(bondAmt) {
@@ -389,9 +391,6 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result), store state.Simp
 	}
 
 	// subtract tokens from delegateeBonds
-	if delegatorBond == nil {
-		return resNoDelegateeForAddress
-	}
 	delegateeBond.TotalBondTokens = delegateeBond.TotalBondTokens.Sub(bondAmt)
 	if delegateeBond.TotalBondTokens.Equal(Zero) {
 		delegateeBonds.Remove(bvIndex)
@@ -545,7 +544,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	valuesBytes := queue.GetAll()
 	for _, modCommBytes := range valuesBytes {
 
-		var modComm QueueElemModComm
+		var modComm QueueElemCommChange
 		err = wire.ReadBinaryBytes(modCommBytes, modComm)
 		if err != nil {
 			return abci.ErrBaseEncodingError.AppendLog(err.Error()) //should never occur under normal operation
@@ -569,7 +568,7 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	saveDelegateeBonds(store, delegateeBonds)
 
 	// Add the commission modification the queue
-	queueElem := QueueElemModComm{
+	queueElem := QueueElemCommChange{
 		QueueElem: QueueElem{
 			Delegatee:    tx.Delegatee,
 			HeightAtInit: height,

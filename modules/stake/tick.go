@@ -24,7 +24,10 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 	//Get the peek unbond record from the queue
 	var unbond QueueElemUnbond
 	unbondBytes := queue.Peek()
-	err = wire.ReadBinaryBytes(unbondBytes, unbond)
+	if unbondBytes == nil { //exit if queue empty
+		return nil
+	}
+	err = wire.ReadBinaryBytes(unbondBytes, &unbond)
 	if err != nil {
 		return err
 	}
@@ -35,9 +38,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 		return err
 	}
 
-	maxHeightToRelease := height - periodUnbonding
-
-	for !unbond.Delegatee.Empty() && unbond.HeightAtInit <= maxHeightToRelease {
+	for !unbond.Delegatee.Empty() && unbond.HeightAtInit+periodUnbonding <= height {
 		queue.Pop()
 
 		// send unbonded coins to queue account, based on current exchange rate
@@ -56,7 +57,10 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 
 		// get next unbond record
 		unbondBytes := queue.Peek()
-		err = wire.ReadBinaryBytes(unbondBytes, unbond)
+		if unbondBytes == nil { //exit if queue empty
+			return nil
+		}
+		err = wire.ReadBinaryBytes(unbondBytes, &unbond)
 		if err != nil {
 			return err
 		}
@@ -77,9 +81,9 @@ func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 	}
 
 	//Get the peek record from the queue
-	var commission QueueElemModComm
+	var commission QueueElemCommChange
 	bytes := queue.Peek()
-	err = wire.ReadBinaryBytes(bytes, commission)
+	err = wire.ReadBinaryBytes(bytes, &commission)
 	if err != nil {
 		return err
 	}
@@ -89,7 +93,7 @@ func processQueueCommHistory(store state.SimpleDB, height uint64) error {
 
 		// check the next record in the queue record
 		bytes := queue.Peek()
-		err = wire.ReadBinaryBytes(bytes, commission)
+		err = wire.ReadBinaryBytes(bytes, &commission)
 		if err != nil {
 			return err
 		}

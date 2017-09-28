@@ -14,7 +14,6 @@ var (
 	errBadBondingAmount    = fmt.Errorf("Amount must be > 0")
 	errBadBondingValidator = fmt.Errorf("Cannot bond to non-nominated account")
 	errNoBondingAcct       = fmt.Errorf("No bond account for this (address, validator) pair")
-	errNotEnoughTokens     = fmt.Errorf("Insufficient bond tokens")
 	errCommissionNegative  = fmt.Errorf("Commission must be positive")
 	errCommissionHuge      = fmt.Errorf("Commission cannot be more than 100%")
 
@@ -60,7 +59,4 @@ func ErrBadBondingValidator() errors.TMError {
 }
 func ErrNoBondingAcct() errors.TMError {
 	return errors.WithCode(errNoBondingAcct, invalidInput)
-}
-func ErrNotEnoughTokens() errors.TMError {
-	return errors.WithCode(errNotEnoughTokens, invalidInput)
 }

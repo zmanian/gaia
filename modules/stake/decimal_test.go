@@ -1,5 +1,7 @@
 package stake
 
+// NOTE this test file is incomplete as use of decimal.go is going to be overhauled
+
 import (
 	"testing"
 

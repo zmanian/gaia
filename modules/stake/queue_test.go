@@ -17,11 +17,7 @@ func TestQueue(t *testing.T) {
 
 	//records for the queue
 	rec1, rec2, rec3 := []byte("record1"), []byte("record2"), []byte("record3")
-	var slot1, slot2 byte = 0x01, 0x02
-
-	// Load a non-existent queue, should fail
-	_, err := LoadQueue(slot1, store)
-	require.NotNil(err)
+	var slot1 byte = 0x01
 
 	// Create new Queue, make sure empty
 	queueNew, err := NewQueue(slot1, store)
@@ -31,10 +27,6 @@ func TestQueue(t *testing.T) {
 	// Load the new queue
 	queueLoad, err := LoadQueue(slot1, store)
 	require.Nil(err)
-
-	// Make sure nothing has been added to another slot
-	_, err = LoadQueue(slot2, store)
-	require.NotNil(err)
 
 	// Push a record to the queue
 	queueLoad.Push(rec1)

@@ -177,7 +177,7 @@ type DelegatorBond struct {
 }
 
 // DelegatorBonds - all delegator bonds existing with multiple delegatees
-type DelegatorBonds []DelegatorBond
+type DelegatorBonds []*DelegatorBond
 
 // Get - get a DelegateeBond for a specific validator from the DelegateeBonds
 func (b DelegatorBonds) Get(delegatee sdk.Actor) (int, *DelegatorBond) {
@@ -185,7 +185,7 @@ func (b DelegatorBonds) Get(delegatee sdk.Actor) (int, *DelegatorBond) {
 		if bytes.Equal(bv.Delegatee.Address, delegatee.Address) &&
 			bv.Delegatee.ChainID == delegatee.ChainID &&
 			bv.Delegatee.App == delegatee.App {
-			return i, &bv
+			return i, bv
 		}
 	}
 	return 0, nil
@@ -218,8 +218,8 @@ type QueueElemUnbond struct {
 	BondTokens Decimal   // amount of bond tokens which are unbonding
 }
 
-// QueueElemModComm - the commission queue element
-type QueueElemModComm struct {
+// QueueElemCommChange - the commission queue element
+type QueueElemCommChange struct {
 	QueueElem
 	CommChange Decimal // Proposed change in commission
 }

@@ -61,7 +61,10 @@ func LoadQueue(slot byte, store state.SimpleDB) (Queue, error) {
 
 	headBytes := store.Get(q.headPositionKey())
 	if headBytes == nil {
-		return q, fmt.Errorf("cannot load Queue under the slot %v, head does not exists", slot)
+		//Create a new queue if the head information doesn't exist
+		return NewQueue(slot, store)
+
+		//return q, fmt.Errorf("cannot load Queue under the slot %v, head does not exists", slot)
 	}
 	q.head = binary.BigEndian.Uint64(headBytes)
 
