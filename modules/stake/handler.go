@@ -179,7 +179,11 @@ func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB,
 	}
 
 	//process the historical commission changes queue
-	err = processQueueCommHistory(store, height)
+	queue, err := LoadQueue(queueCommissionTypeByte, store)
+	if err != nil {
+		return
+	}
+	err = processQueueCommHistory(queue, height)
 	if err != nil {
 		return
 	}
@@ -540,18 +544,9 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	// have an array of all the commission change queues and process them individually in Tick
 	// which would allow us to only grab one queue for here
 
-	sumModCommQueue := Zero
-	valuesBytes := queue.GetAll()
-	for _, modCommBytes := range valuesBytes {
-
-		var modComm QueueElemCommChange
-		err = wire.ReadBinaryBytes(modCommBytes, modComm)
-		if err != nil {
-			return abci.ErrBaseEncodingError.AppendLog(err.Error()) //should never occur under normal operation
-		}
-		if modComm.Delegatee.Equals(tx.Delegatee) {
-			sumModCommQueue.Add(modComm.CommChange)
-		}
+	sumModCommQueue, res := getQueueSum(queue, tx.Delegatee)
+	if !res.IsOK() {
+		return res
 	}
 
 	commChange := tx.Commission.Sub(delegateeBond.Commission)
@@ -579,4 +574,26 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 	queue.Push(bytes)
 
 	return abci.OK
+}
+
+func getQueueSum(queue *Queue, delegatee sdk.Actor) (Decimal, abci.Result) {
+	sumModCommQueue := Zero
+	valuesBytes := queue.GetAll()
+	//panic(fmt.Sprintf("%v", valuesBytes))
+	for _, modCommBytes := range valuesBytes {
+		var modComm QueueElemCommChange
+		err := wire.ReadBinaryBytes(modCommBytes, &modComm)
+		//if modCommBytes == nil {
+		//panic(i)
+		//}
+		if err != nil {
+			return Zero,
+				abci.ErrBaseEncodingError.AppendLog(err.Error()) //should never occur under normal operation
+		}
+		if modComm.Delegatee.Equals(delegatee) {
+			sumModCommQueue = sumModCommQueue.Add(modComm.CommChange)
+		}
+	}
+	//panic(fmt.Sprintf("%v", sumModCommQueue))
+	return sumModCommQueue, abci.OK
 }

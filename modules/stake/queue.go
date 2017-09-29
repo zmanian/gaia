@@ -24,13 +24,13 @@ func (q Queue) tailPositionKey() []byte { return []byte{q.slot, 0x01} }
 func (q Queue) queueKey(n uint64) []byte {
 	b := make([]byte, 9)
 	b[0] = q.slot //add prepended byte
-	binary.BigEndian.PutUint64(b[1:], uint64(n))
+	binary.BigEndian.PutUint64(b[1:], n)
 	return b
 }
 
 // NewQueue - create a new generic queue under the designate slot
-func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
-	q := Queue{
+func NewQueue(slot byte, store state.SimpleDB) (*Queue, error) {
+	q := &Queue{
 		slot:  slot,
 		store: store,
 		tail:  0,
@@ -52,11 +52,13 @@ func NewQueue(slot byte, store state.SimpleDB) (Queue, error) {
 }
 
 // LoadQueue - load an existing queue for the slot
-func LoadQueue(slot byte, store state.SimpleDB) (Queue, error) {
+func LoadQueue(slot byte, store state.SimpleDB) (*Queue, error) {
 
-	q := Queue{
+	q := &Queue{
 		slot:  slot,
 		store: store,
+		tail:  0,
+		head:  0,
 	}
 
 	headBytes := store.Get(q.headPositionKey())
@@ -92,7 +94,7 @@ func (q *Queue) incrementTail() {
 }
 
 func (q Queue) length() uint64 {
-	return q.tail - q.head
+	return (q.tail - q.head)
 }
 
 // Push - Add to the beginning/tail of the queue
@@ -123,13 +125,17 @@ func (q Queue) Peek() []byte {
 
 // GetAll - Return an array of all the elements inside the queue
 func (q Queue) GetAll() [][]byte {
+	//panic(fmt.Sprintf("length %v, head %v, tail %v", q.length() == 0, q.head, q.tail))
 	if q.length() == 0 {
 		return nil
 	}
 	var res [][]byte
-	for i := q.tail; i <= q.head; i++ {
+	for i := q.head; i < q.tail; i++ {
 		key := q.queueKey(i)
 		res = append(res, q.store.Get(key))
+		//panic(fmt.Sprintf("%v", q.store.Get(key)))
+		//panic(fmt.Sprintf("%v", q.Peek()))
 	}
+	//panic(fmt.Sprintf("%v", res))
 	return res
 }

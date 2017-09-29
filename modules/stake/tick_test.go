@@ -10,9 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/abci/types"
+	wire "github.com/tendermint/go-wire"
 )
 
-func Test_processQueueUnbond(t *testing.T) {
+func TestProcessQueueUnbond(t *testing.T) {
 
 	//set the unbonding period for testing
 	periodUnbonding = 10
@@ -54,6 +55,10 @@ func Test_processQueueUnbond(t *testing.T) {
 	}}
 	res := runTxUnbondGuts(func() (sdk.Actor, abci.Result) { return actorDelegator, abci.OK }, store, tx, 0)
 	require.True(t, res.IsOK(), "%v", res)
+	res = runTxUnbondGuts(func() (sdk.Actor, abci.Result) { return actorDelegator, abci.OK }, store, tx, 15)
+	require.True(t, res.IsOK(), "%v", res)
+	res = runTxUnbondGuts(func() (sdk.Actor, abci.Result) { return actorDelegator, abci.OK }, store, tx, 50)
+	require.True(t, res.IsOK(), "%v", res)
 
 	type args struct {
 		sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) error
@@ -67,10 +72,17 @@ func Test_processQueueUnbond(t *testing.T) {
 		wantDelegatorBal int64
 		wantBondedBal    int64
 	}{
-		{"before unbonding period", args{dummySend, store, 5}, false, 1000, 1000},
-		{"just before unbonding period", args{dummySend, store, 9}, false, 1000, 1000},
-		{"at unbonding period", args{dummySend, store, 10}, false, 1010, 990},
-		{"after unbonding period but not queue", args{dummySend, store, 11}, false, 1010, 990},
+		{"before unbonding period 1", args{dummySend, store, 5}, false, 1000, 1000},
+		{"just before unbonding period 1", args{dummySend, store, 9}, false, 1000, 1000},
+		{"at unbonding period 1", args{dummySend, store, 10}, false, 1010, 990},
+		{"after unbonding period 1", args{dummySend, store, 11}, false, 1010, 990},
+		{"before unbonding period 2", args{dummySend, store, 24}, false, 1010, 990},
+		{"at unbonding period 2", args{dummySend, store, 25}, false, 1020, 980},
+		{"after unbonding period 2", args{dummySend, store, 26}, false, 1020, 980},
+		{"misc", args{dummySend, store, 40}, false, 1020, 980},
+		{"before unbonding period 3", args{dummySend, store, 59}, false, 1020, 980},
+		{"at unbonding period 3", args{dummySend, store, 60}, false, 1030, 970},
+		{"after unbonding period 3 with empty queue", args{dummySend, store, 61}, false, 1030, 970},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,35 +94,76 @@ func Test_processQueueUnbond(t *testing.T) {
 				err = fmt.Errorf("unexpected receiver balance")
 			}
 			assert.Equal(t, tt.wantErr, err != nil,
-				"name: %v, error: %v, sendCoins:%v, height: %v, wantDelegatorBal %v but %v, wantBondedBal %v got %v",
+				"name: %v, error: %v, sendCoins:%v, height: %v,"+
+					"wantDelegatorBal %v got %v, wantBondedBal %v got %v",
 				tt.name, err, tt.args.sendCoins, tt.args.height,
 				tt.wantDelegatorBal, dummyAccs["delegator"], tt.wantBondedBal, dummyAccs["bonded"])
 		})
 	}
 }
 
-func Test_processQueueCommHistory(t *testing.T) {
+func TestProcessQueueCommHistory(t *testing.T) {
+
+	// maximum total commission permitted across the queued commission history
+	periodCommHistory = 10
+
+	//set a store with a delegatee account
+	store := state.NewMemKVStore()
+	actorDelegatee := sdk.Actor{"testChain", "testapp", []byte("delegatee")}
+
+	//Add some records to the unbonding queue
+	queue, err := LoadQueue(queueCommissionTypeByte, store)
+	require.Nil(t, err)
+	addToQueue := func(commChange Decimal, height uint64) {
+		queueElem := QueueElemCommChange{
+			QueueElem:  QueueElem{actorDelegatee, height},
+			CommChange: commChange,
+		}
+		bytes := wire.BinaryBytes(queueElem)
+		queue.Push(bytes)
+		//require.Equal(t, queue.Peek(), bytes)
+	}
+	addToQueue(NewDecimal(1, -1), 1)
+	addToQueue(NewDecimal(2, -1), 2)
+	addToQueue(NewDecimal(25, -2), 3)
+	addToQueue(NewDecimal(-10, -2), 4)
+
 	type args struct {
 		store  state.SimpleDB
 		height uint64
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name           string
+		args           args
+		wantErr        bool
+		wantModHistory Decimal
 	}{
-	// TODO: Add test cases.
+		{"height 9, none popped", args{store, 9}, false, NewDecimal(45, -2)},
+		{"height 10, none popped", args{store, 10}, false, NewDecimal(45, -2)},
+		{"height 11, no changes", args{store, 11}, false, NewDecimal(35, -2)},
+		{"height 12, no changes", args{store, 12}, false, NewDecimal(15, -2)},
+		{"height 13, no changes", args{store, 13}, false, NewDecimal(-10, -2)},
+		{"height 14, no changes", args{store, 14}, false, NewDecimal(0, 0)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := processQueueCommHistory(tt.args.store, tt.args.height); (err != nil) != tt.wantErr {
-				t.Errorf("processQueueCommHistory(%v, %v) error = %v, wantErr %v", tt.args.store, tt.args.height, err, tt.wantErr)
+			err := processQueueCommHistory(queue, tt.args.height)
+			//panic(fmt.Sprintf("%v", queue.Peek()))
+			sum, res := getQueueSum(queue, actorDelegatee)
+			if !res.IsOK() {
+				err = res
 			}
+			if err == nil && !sum.Equal(tt.wantModHistory) {
+				err = fmt.Errorf("unexpected sender balance")
+			}
+			assert.Equal(t, tt.wantErr, err != nil,
+				"name: %v, error: %v, height: %v, wantModHistory %v got %v",
+				tt.name, err, tt.args.height, tt.wantModHistory, sum)
 		})
 	}
 }
 
-func Test_processValidatorRewards(t *testing.T) {
+func TestProcessValidatorRewards(t *testing.T) {
 	type args struct {
 		creditAcc        func(receiver sdk.Actor, amount coin.Coins) error
 		store            state.SimpleDB

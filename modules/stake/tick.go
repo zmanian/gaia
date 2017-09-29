@@ -74,30 +74,41 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 // is changed instantaniously when modified, this queue allows for an
 // accurate accounting of the recent commission history modifications to
 // be held.
-func processQueueCommHistory(store state.SimpleDB, height uint64) error {
-	queue, err := LoadQueue(queueCommissionTypeByte, store)
-	if err != nil {
-		return err
-	}
+//func processQueueCommHistory(store state.SimpleDB, height uint64) error {
+func processQueueCommHistory(queue *Queue, height uint64) error {
+	//queue, err := LoadQueue(queueCommissionTypeByte, store)
+	//if err != nil {
+	//return err
+	//}
 
 	//Get the peek record from the queue
 	var commission QueueElemCommChange
 	bytes := queue.Peek()
-	err = wire.ReadBinaryBytes(bytes, &commission)
+	if bytes == nil { //exit if queue empty
+		return nil
+	}
+	err := wire.ReadBinaryBytes(bytes, &commission)
 	if err != nil {
 		return err
 	}
 
-	for !commission.Delegatee.Empty() && height-commission.HeightAtInit > periodCommHistory {
+	i := 0
+	for !commission.Delegatee.Empty() && commission.HeightAtInit+periodUnbonding <= height {
+		i++
 		queue.Pop()
 
 		// check the next record in the queue record
 		bytes := queue.Peek()
+		if bytes == nil { //exit if queue empty
+			return nil
+		}
 		err = wire.ReadBinaryBytes(bytes, &commission)
 		if err != nil {
 			return err
 		}
 	}
+	//panic(fmt.Sprintf("debug %v\n", queue.length()))
+	//panic(fmt.Sprintf("debug %v\n", queue.Peek()))
 	return nil
 }
 
