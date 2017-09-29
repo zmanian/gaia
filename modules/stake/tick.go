@@ -155,12 +155,17 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		// on paper yourself, but the general proof to
 		// arrive at the commTok2Val eqn is:
 		//
-		//   rate*(totalOldTok + newTok) = totalNewCoin
-		//   rate*(totalOldTok) = totalNewCoin - commissionCoins
+		//   oldTok = oldDelTok + oldValTok
+		//   newCoins = totalNewCoin - totalOldCoin
+		//   commissionCoins = (newCoins) * OldDelTok/OldTok * CommissionRate
+		//
+		//   ExRate*(oldTok + newTok) = totalNewCoin
+		//   ExRate*(oldDelTok) = totalNewCoin * oldDelTok/oldTok - commissionCoins
+		//
 		//   :.
-		//   newTok = ((totalNewCoin * TotalOldTok)
-		//             /(totalNewCoin - commissionCoins))
-		//             - totalOldTok
+		//   newTok = (totalNewCoin) /
+		//             (totalNewCoin/OldTok - commissionCoins/oldDelTok))
+		//             - oldTok
 
 		//start by loading the bond account of the validator to itself
 		delegators, err := loadDelegatorBonds(store, validator.Delegatee)
@@ -169,16 +174,18 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		}
 		j, valSelfBond := delegators.Get(validator.Delegatee)
 
-		coins1 := validator.TotalBondTokens                                     // total bonded coins before rewards
-		coins2 := coins1.Add(rewardCoins)                                       // total bonded coins after rewards
-		tok1 := validator.TotalBondTokens                                       // total tokens before rewards
-		tok1Val := valSelfBond.BondTokens                                       // total tokens before rewards owned by the validator
-		preRewardsDel := rewardCoins.Mul((tok1.Sub(tok1Val)).Div(tok1))         // pre-commission reward coins for delegators
-		commCoin := preRewardsDel.Mul(validator.Commission)                     // commission coins taken on the preRewardsDel
-		commTok2Val := ((coins2.Mul(tok1)).Div(coins2.Mul(commCoin))).Sub(tok1) // new tokens to be added to the validator bond account for commission
+		coins1 := validator.TotalBondTokens.Mul(validator.ExchangeRate)      // total bonded coins before rewards
+		coins2 := coins1.Add(rewardCoins)                                    // total bonded coins after rewards
+		coinsNew := coins2.Sub(coins1)                                       // total bonded coins after rewards
+		tok := validator.TotalBondTokens                                     // total tokens before rewards
+		tokVal := valSelfBond.BondTokens                                     // total tokens before rewards owned by the validator
+		tokDel := tok.Sub(tokVal)                                            // total tokens before rewards owned by the delegators
+		commCoins := coinsNew.Mul(tokDel.Div(tok)).Mul(validator.Commission) // commission coins
+		commTok := (coins2.Div(
+			coins2.Div(tok).Sub(commCoins.Div(tokDel)))).Sub(tok) // new tokens to be added to the validator bond account for commission
 
 		//Add the new tokens to the validators self bond delegator account
-		delegators[j].BondTokens = delegators[j].BondTokens.Add(commTok2Val)
+		delegators[j].BondTokens = delegators[j].BondTokens.Add(commTok)
 
 		//save the updated delegator bond account for the validator
 		saveDelegatorBonds(store, validator.Delegatee, delegators)
@@ -194,7 +201,7 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		// FinalExchangeRate = FinalCoins/FinalTotalBondTokens
 		// EndExchangeRate = FinalCoins/FinalTotalBondTokens
 		// EndExchangeRate = (StartCoins + RewardCoins)/FinalTotalBondTokens
-		finalTotalBondTokens := delegateeBonds[i].TotalBondTokens.Add(commTok2Val)
+		finalTotalBondTokens := delegateeBonds[i].TotalBondTokens.Add(commTok)
 		startCoins := delegateeBonds[i].ExchangeRate.Mul(delegateeBonds[i].TotalBondTokens)
 		delegateeBonds[i].ExchangeRate = (startCoins.Add(rewardCoins)).Div(finalTotalBondTokens)
 

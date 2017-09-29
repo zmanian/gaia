@@ -61,9 +61,7 @@ func TestProcessQueueUnbond(t *testing.T) {
 	require.True(t, res.IsOK(), "%v", res)
 
 	type args struct {
-		sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) error
-		store     state.SimpleDB
-		height    uint64
+		height uint64
 	}
 	tests := []struct {
 		name             string
@@ -72,32 +70,26 @@ func TestProcessQueueUnbond(t *testing.T) {
 		wantDelegatorBal int64
 		wantBondedBal    int64
 	}{
-		{"before unbonding period 1", args{dummySend, store, 5}, false, 1000, 1000},
-		{"just before unbonding period 1", args{dummySend, store, 9}, false, 1000, 1000},
-		{"at unbonding period 1", args{dummySend, store, 10}, false, 1010, 990},
-		{"after unbonding period 1", args{dummySend, store, 11}, false, 1010, 990},
-		{"before unbonding period 2", args{dummySend, store, 24}, false, 1010, 990},
-		{"at unbonding period 2", args{dummySend, store, 25}, false, 1020, 980},
-		{"after unbonding period 2", args{dummySend, store, 26}, false, 1020, 980},
-		{"misc", args{dummySend, store, 40}, false, 1020, 980},
-		{"before unbonding period 3", args{dummySend, store, 59}, false, 1020, 980},
-		{"at unbonding period 3", args{dummySend, store, 60}, false, 1030, 970},
-		{"after unbonding period 3 with empty queue", args{dummySend, store, 61}, false, 1030, 970},
+		{"before unbonding period 1", args{5}, false, 1000, 1000},
+		{"just before unbonding period 1", args{9}, false, 1000, 1000},
+		{"at unbonding period 1", args{10}, false, 1010, 990},
+		{"after unbonding period 1", args{11}, false, 1010, 990},
+		{"before unbonding period 2", args{24}, false, 1010, 990},
+		{"at unbonding period 2", args{25}, false, 1020, 980},
+		{"after unbonding period 2", args{26}, false, 1020, 980},
+		{"misc", args{40}, false, 1020, 980},
+		{"before unbonding period 3", args{59}, false, 1020, 980},
+		{"at unbonding period 3", args{60}, false, 1030, 970},
+		{"after unbonding period 3 with empty queue", args{61}, false, 1030, 970},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := processQueueUnbond(tt.args.sendCoins, tt.args.store, tt.args.height)
-			if err == nil && dummyAccs["delegator"] != tt.wantDelegatorBal {
-				err = fmt.Errorf("unexpected sender balance")
-			}
-			if err == nil && dummyAccs["bonded"] != tt.wantBondedBal {
-				err = fmt.Errorf("unexpected receiver balance")
-			}
+			err := processQueueUnbond(dummySend, store, tt.args.height)
 			assert.Equal(t, tt.wantErr, err != nil,
-				"name: %v, error: %v, sendCoins:%v, height: %v,"+
-					"wantDelegatorBal %v got %v, wantBondedBal %v got %v",
-				tt.name, err, tt.args.sendCoins, tt.args.height,
-				tt.wantDelegatorBal, dummyAccs["delegator"], tt.wantBondedBal, dummyAccs["bonded"])
+				"name: %v, error: %v, height: %v,",
+				tt.name, err, tt.args.height)
+			assert.Equal(t, tt.wantDelegatorBal, dummyAccs["delegator"])
+			assert.Equal(t, tt.wantBondedBal, dummyAccs["bonded"])
 		})
 	}
 }
@@ -148,7 +140,6 @@ func TestProcessQueueCommHistory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := processQueueCommHistory(queue, tt.args.height)
-			//panic(fmt.Sprintf("%v", queue.Peek()))
 			sum, res := getQueueSum(queue, actorDelegatee)
 			if !res.IsOK() {
 				err = res
@@ -164,24 +155,85 @@ func TestProcessQueueCommHistory(t *testing.T) {
 }
 
 func TestProcessValidatorRewards(t *testing.T) {
+
+	//Set a high inflation for the tests
+	inflationPerReward = NewDecimal(1, -1)
+	minValBond = NewDecimal(0, 0) // minumum number of bonded coins to be a validator
+
+	//Setup a simple way to evaluate crediting
+	dummyAccs := make(map[string]int64)
+	dummyAccs["bonded"] = 20000
+	creditAcc := func(receiver sdk.Actor, amount coin.Coins) error {
+		dummyAccs[string(receiver.Address)] += amount[0].Amount
+		return nil
+	}
+
+	//setup the store with a delegatee and delegator
+	store := state.NewMemKVStore()
+	actorDelegatee := sdk.Actor{"testChain", "testapp", []byte("delegatee")}
+	actorDelegator := sdk.Actor{"testChain", "testapp", []byte("delegator")}
+	actorBonded := sdk.Actor{"testChain", "testapp", []byte("bonded")}
+	delegatees := DelegateeBonds{&DelegateeBond{
+		Delegatee:       actorDelegatee,
+		Commission:      NewDecimal(1, -1),
+		ExchangeRate:    NewDecimal(1, 0),
+		TotalBondTokens: NewDecimal(20000, 0),
+		Account:         actorBonded,
+		VotingPower:     NewDecimal(20000, 0),
+	}}
+	saveDelegateeBonds(store, delegatees)
+	delegators := DelegatorBonds{&DelegatorBond{
+		Delegatee:  actorDelegatee,
+		BondTokens: NewDecimal(10000, 0),
+	}}
+	saveDelegatorBonds(store, actorDelegator, delegators) //delegator's bond to delegatee
+	saveDelegatorBonds(store, actorDelegatee, delegators) //delegatee's self-bond
+
+	//also save the total atom supply
+	saveAtomSupply(store, NewDecimal(dummyAccs["bonded"], 0))
+
 	type args struct {
-		creditAcc        func(receiver sdk.Actor, amount coin.Coins) error
-		store            state.SimpleDB
-		height           uint64
-		totalVotingPower Decimal
+		height uint64
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name                   string
+		args                   args
+		wantErr                bool
+		wantDelegatorBondCoins Decimal
+		wantDelegateeBondCoins Decimal
+		wantBondedBal          int64
 	}{
-	// TODO: Add test cases.
+		{"Blockrewards once", args{1}, false, NewDecimal(10900, 0), NewDecimal(11100, 0), 22000},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := processValidatorRewards(tt.args.creditAcc, tt.args.store, tt.args.height, tt.args.totalVotingPower); (err != nil) != tt.wantErr {
-				t.Errorf("processValidatorRewards(%v, %v, %v, %v) error = %v, wantErr %v", tt.args.creditAcc, tt.args.store, tt.args.height, tt.args.totalVotingPower, err, tt.wantErr)
-			}
+
+			delegateeBonds, err := loadDelegateeBonds(store)
+			require.Nil(t, err)
+			totalVotingPower := delegateeBonds.UpdateVotingPower()
+
+			err = processValidatorRewards(creditAcc, store,
+				tt.args.height, totalVotingPower)
+			assert.Equal(t, tt.wantErr, err != nil,
+				"name: %v, error: %v, height: %v,",
+				tt.name, err, tt.args.height)
+
+			delegatorBonds, err := loadDelegatorBonds(store, actorDelegator)
+			require.Nil(t, err)
+			require.Equal(t, len(delegatorBonds), 1)
+			delegateeSelfBonds, err := loadDelegatorBonds(store, actorDelegatee)
+			require.Nil(t, err)
+			require.Equal(t, len(delegateeSelfBonds), 1)
+
+			delegateeBonds, err = loadDelegateeBonds(store)
+			require.Nil(t, err)
+			rate := delegateeBonds[0].ExchangeRate
+
+			assert.True(t, tt.wantDelegatorBondCoins.Equal(delegatorBonds[0].BondTokens.Mul(rate)), "%v, %v, %v",
+				tt.wantDelegatorBondCoins, delegatorBonds[0].BondTokens, rate)
+			assert.True(t, tt.wantDelegateeBondCoins.Equal(delegateeSelfBonds[0].BondTokens.Mul(rate)), "%v, %v, %v",
+				tt.wantDelegateeBondCoins, delegateeSelfBonds[0].BondTokens, rate)
+			assert.Equal(t, tt.wantBondedBal, dummyAccs["bonded"])
 		})
 	}
 }

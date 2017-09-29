@@ -579,13 +579,9 @@ func runTxModCommGuts(store state.SimpleDB, tx TxModComm, height uint64) (res ab
 func getQueueSum(queue *Queue, delegatee sdk.Actor) (Decimal, abci.Result) {
 	sumModCommQueue := Zero
 	valuesBytes := queue.GetAll()
-	//panic(fmt.Sprintf("%v", valuesBytes))
 	for _, modCommBytes := range valuesBytes {
 		var modComm QueueElemCommChange
 		err := wire.ReadBinaryBytes(modCommBytes, &modComm)
-		//if modCommBytes == nil {
-		//panic(i)
-		//}
 		if err != nil {
 			return Zero,
 				abci.ErrBaseEncodingError.AppendLog(err.Error()) //should never occur under normal operation
@@ -594,6 +590,5 @@ func getQueueSum(queue *Queue, delegatee sdk.Actor) (Decimal, abci.Result) {
 			sumModCommQueue = sumModCommQueue.Add(modComm.CommChange)
 		}
 	}
-	//panic(fmt.Sprintf("%v", sumModCommQueue))
 	return sumModCommQueue, abci.OK
 }
