@@ -8,11 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/state"
 )
 
 // TestState - test the delegatee and delegator bonds store
 func TestTypes(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
+	store := state.NewMemKVStore()
 
 	actor1 := sdk.Actor{"testChain", "testapp", []byte("address1")}
 	actor2 := sdk.Actor{"testChain", "testapp", []byte("address2")}
@@ -61,28 +63,28 @@ func TestTypes(t *testing.T) {
 
 	//test to see if the minValBond is functioning
 	minValBond = NewDecimal(10000, 0)
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(0, len(delegatees.GetValidators()), "%v", delegatees.GetValidators())
 	minValBond = NewDecimal(0, 0)
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(3, len(delegatees.GetValidators()), "%v", delegatees.GetValidators())
 	minValBond = NewDecimal(50, 0)
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(2, len(delegatees.GetValidators()), "%v, %v, %v,", delegatees[0], delegatees[1], delegatees[2])
 
 	//test to see if the maxVal is functioning
 	maxVal = 0
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(0, len(delegatees.GetValidators()))
 	maxVal = 1
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(1, len(delegatees.GetValidators()))
 	maxVal = 2
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.Equal(2, len(delegatees.GetValidators()))
 
 	//test getting the total voting power
-	assert.True(delegatees.UpdateVotingPower().Equal(NewDecimal(423, 0)))
+	assert.True(delegatees.UpdateVotingPower(store).Equal(NewDecimal(423, 0)))
 
 	//get/test the existing validator set
 	validators1 := delegatees.GetValidators()
@@ -92,7 +94,7 @@ func TestTypes(t *testing.T) {
 
 	//change the exchange rate and update the voting power
 	delegatee1.ExchangeRate = NewDecimal(1000, 0)
-	delegatees.UpdateVotingPower()
+	delegatees.UpdateVotingPower(store)
 	assert.True(delegatees[0].VotingPower.Equal(NewDecimal(10000, 0)), "bad vp update, expected %v, got %v",
 		NewDecimal(1000, 0), delegatees[0].VotingPower)
 

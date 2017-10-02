@@ -204,13 +204,14 @@ func TestProcessValidatorRewards(t *testing.T) {
 		wantBondedBal          int64
 	}{
 		{"Blockrewards once", args{1}, false, NewDecimal(10900, 0), NewDecimal(11100, 0), 22000},
+		{"compounded block rewards", args{2}, false, NewDecimal(11881, 0), NewDecimal(12319, 0), 24200},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			delegateeBonds, err := loadDelegateeBonds(store)
 			require.Nil(t, err)
-			totalVotingPower := delegateeBonds.UpdateVotingPower()
+			totalVotingPower := delegateeBonds.UpdateVotingPower(store)
 
 			err = processValidatorRewards(creditAcc, store,
 				tt.args.height, totalVotingPower)

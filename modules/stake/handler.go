@@ -194,7 +194,7 @@ func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB,
 		return
 	}
 	startVal := delegateeBonds.GetValidators()
-	totalVotingPower := delegateeBonds.UpdateVotingPower()
+	totalVotingPower := delegateeBonds.UpdateVotingPower(store)
 	newVal := delegateeBonds.GetValidators()
 	diffVal = ValidatorsDiff(startVal, newVal)
 

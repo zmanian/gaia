@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/state"
 	abci "github.com/tendermint/abci/types"
 )
 
@@ -68,7 +69,8 @@ func (b DelegateeBonds) Sort() {
 }
 
 // UpdateVotingPower - voting power based on bond tokens and exchange rate
-func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
+// TODO make not a function of DelegateeBonds as delegateebonds can be loaded from the store
+func (b DelegateeBonds) UpdateVotingPower(store state.SimpleDB) (totalPower Decimal) {
 
 	// First update the voting power for all delegatees be sure to give no
 	// power to validators without the minimum atoms required to be a validator
@@ -90,6 +92,7 @@ func (b DelegateeBonds) UpdateVotingPower() (totalPower Decimal) {
 			bv.VotingPower = Zero
 		}
 	}
+	saveDelegateeBonds(store, b)
 	return
 }
 

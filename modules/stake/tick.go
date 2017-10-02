@@ -141,6 +141,9 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		}
 
 		rewardCoins := vp.Mul(rewardPerPower)
+		//if height == 2 {
+		//panic(fmt.Sprintf("debug %v, %v, %v, %v\n", vp, totalAtoms, rewardPerPower, rewardCoins))
+		//}
 		totalAtoms = totalAtoms.Add(rewardCoins)
 		credit := coin.Coins{{bondDenom, rewardCoins.IntPart()}} //TODO make Decimal
 		err = creditAcc(validator.Account, credit)
@@ -204,7 +207,9 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		finalTotalBondTokens := delegateeBonds[i].TotalBondTokens.Add(commTok)
 		startCoins := delegateeBonds[i].ExchangeRate.Mul(delegateeBonds[i].TotalBondTokens)
 		delegateeBonds[i].ExchangeRate = (startCoins.Add(rewardCoins)).Div(finalTotalBondTokens)
-
+		//if height == 2 {
+		//panic(fmt.Sprintf("debug %v\n", delegateeBonds[i].ExchangeRate))
+		//}
 		//Also update the TotalBondTokens
 		delegateeBonds[i].TotalBondTokens = finalTotalBondTokens
 	}
