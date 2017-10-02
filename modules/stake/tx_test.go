@@ -20,7 +20,6 @@ var (
 	coinNegNotAtoms  = coin.Coin{"foo", -10000}
 )
 
-// TestBondUpdateValidateBasic - sdfds
 func TestBondUpdateValidateBasic(t *testing.T) {
 	type fields struct {
 		Validator sdk.Actor

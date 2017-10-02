@@ -11,7 +11,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-// TestState - test the validator and delegator bonds store
 func TestTypes(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
@@ -31,7 +30,7 @@ func TestTypes(t *testing.T) {
 	}
 	validator2 := &ValidatorBond{
 		Validator:    actor2,
-		BondedTokens: 3,
+		BondedTokens: 300,
 		HoldAccount:  holdActor2,
 		VotingPower:  300,
 	}
@@ -69,19 +68,22 @@ func TestTypes(t *testing.T) {
 	//get/test the existing validator set
 	validators1 := validators.GetValidators()
 	require.Equal(2, len(validators1))
-	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address))
-	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address))
+	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address),
+		"%v, %v", validators1[0].PubKey, actor2.Address)
+	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address),
+		"%v, %v", validators1[1].PubKey, actor3.Address)
 
-	// resort
-	validators.Sort()
-
-	// get the new validator set
+	// Change some of the bonded tokens, get the new validator set
+	validator1.BondedTokens = 1000
+	validators.UpdateVotingPower(store)
 	validators2 := validators.GetValidators()
 	require.Equal(2, len(validators2))
-	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address))
-	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address))
+	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address),
+		"%v, %v", validators2[0].PubKey, actor1.Address)
+	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address),
+		"%v, %v", validators2[1].PubKey, actor2.Address)
 
-	// calculate the difference in the validator set from the origional set
+	// calculate the difference in the validator set from the original set
 	diff := ValidatorsDiff(validators1, validators2)
 	require.Equal(2, len(diff), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
 		diff, validators1, validators2)

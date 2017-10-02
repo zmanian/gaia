@@ -10,7 +10,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-// TestState - test the validator functionality in the store
 func TestState(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
