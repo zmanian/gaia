@@ -4,11 +4,11 @@ _Out of nothingness came somethingness_
 
 Note the following name conventions:
  - Delegator: an atom holder who delegates their atoms
- - Delegatee: a self-nominated party who accepts deligated atoms
+ - Validator: a self-nominated party who accepts deligated atoms
  - Validator: an atom holder whose validates transactions on the cosmos hub,
-   can also be a delegatee
+   can also be a validator
 
-Here a validator can be a Delegatee if they are in the top 100 atom holders who
+Here a validator can be a Validator if they are in the top 100 atom holders who
 have self-nominated for validator status.
 
 The Cosmos Hub will come into existence through three main phases: 
@@ -32,7 +32,7 @@ The Cosmos Hub will come into existence through three main phases:
      warning
    - Unbonding period of ~ 30 days
 
-During the Inflation and Cooling period, as new delegatees cross the minimum
+During the Inflation and Cooling period, as new validators cross the minimum
 threshold to be a validator, they will be added to the validator set which will
 continue to validate this early period of Cosmos even before transacting has
 been enabled
@@ -48,18 +48,18 @@ pass heartbeat height information instead?
 
 Problem: when staking to a non-validator node,
 because there is no assigned voting power there cannot be rewards, this
-disincentives delegatees from delegating to new up-and-coming validators. This
+disincentives validators from delegating to new up-and-coming validators. This
 effectively will enforce the existing validator set, stagnating it Possible
 solutions:
 - Allow for validator up-n-comers to stake their pool to an working validator,
   thus contributing to a voting power and receiving rewards for their pool -
 the up-and-comer should not be able to charge their commission at this time
-(aka so the delegatees are not charged double commission, which is a
+(aka so the validators are not charged double commission, which is a
 disincentive for delegating to an up-n-comer). At such a point that the
 up-n-comer can be a real validator they should be permitted to unbond, and
 start charging their own fees as an operational validator
-- Allow for delegatees to signal for an up-and-comer validator meaning that
-  each delegatee can keep their coins bonded to a working validator while also 
+- Allow for validators to signal for an up-and-comer validator meaning that
+  each validator can keep their coins bonded to a working validator while also 
 signalling that they want to switch some amount of bonded tokens to an
 up-and-comer validator. Once the signalling reached an amount which puts the
 up-and-comer in the  working validator set, all signalling tokens would

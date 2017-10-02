@@ -2,7 +2,6 @@ package commands
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -21,55 +20,32 @@ import (
 
 //nolint
 const (
-	FlagAmount     = "amount"
-	FlagValidator  = "validator"
-	FlagCommission = "commission"
+	FlagAmount    = "amount"
+	FlagValidator = ""
 )
 
 //nolint
 var (
 	CmdBond = &cobra.Command{
 		Use:   "bond",
-		Short: "bond some coins to give voting power to a delegatee/validator",
+		Short: "bond some coins to give voting power to a validator/validator",
 		RunE:  cmdBond,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "unbond",
-		Short: "unbond your coins from a delegatee/validator",
+		Short: "unbond your coins from a validator/validator",
 		RunE:  cmdUnbond,
-	}
-	CmdNominate = &cobra.Command{
-		Use:   "nominate",
-		Short: "nominate yourself to become a delegatee/validator",
-		RunE:  cmdNominate,
-	}
-	CmdModComm = &cobra.Command{
-		Use:   "modify-commission",
-		Short: "modify your commission rate if you are a delegatee/validator",
-		RunE:  cmdModComm,
 	}
 )
 
 func init() {
-
 	//Add Flags
 	fsDelegation := flag.NewFlagSet("", flag.ContinueOnError)
-	fsNominate := flag.NewFlagSet("", flag.ContinueOnError)
-	fsModComm := flag.NewFlagSet("", flag.ContinueOnError)
-
-	fsDelegation.String(FlagValidator, "", "Validator's public key")
-	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms") //TODO make string once decimal integrated with coin
-
-	fsNominate.AddFlagSet(fsDelegation)
-	fsNominate.String(FlagCommission, "0", "Validator's commission rate")
-
-	fsModComm.String(FlagValidator, "", "Validator's public key")
-	fsModComm.String(FlagCommission, "0", "Validator's commission rate")
+	fsDelegation.String(FlagValidator, "", "Validator Address") //TODO make string once decimal integrated with coin
+	fsDelegation.Int(FlagAmount, 0, "Amount of Atoms")          //TODO make string once decimal integrated with coin
 
 	CmdBond.Flags().AddFlagSet(fsDelegation)
 	CmdUnbond.Flags().AddFlagSet(fsDelegation)
-	CmdNominate.Flags().AddFlagSet(fsNominate)
-	CmdModComm.Flags().AddFlagSet(fsModComm)
 }
 
 func cmdBond(cmd *cobra.Command, args []string) error {
@@ -93,56 +69,6 @@ func cmdBonding(NewTx func(validator sdk.Actor, amount coin.Coin) sdk.Tx) error 
 
 	tx := NewTx(validator, amount)
 	return txcmd.DoTx(tx)
-}
-
-func cmdNominate(cmd *cobra.Command, args []string) error {
-
-	validator, err := getValidator()
-	if err != nil {
-		return err
-	}
-	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
-	if err != nil {
-		return err
-	}
-	commission, err := getCommission()
-	if err != nil {
-		return err
-	}
-
-	tx := stake.NewTxNominate(validator, amount, commission)
-	return txcmd.DoTx(tx)
-}
-
-func cmdModComm(cmd *cobra.Command, args []string) error {
-
-	validator, err := getValidator()
-	if err != nil {
-		return err
-	}
-	commission, err := getCommission()
-	if err != nil {
-		return err
-	}
-
-	tx := stake.NewTxModComm(validator, commission)
-	return txcmd.DoTx(tx)
-}
-
-////////////////////////////////////////////////////////////
-
-func getCommission() (commission stake.Decimal, err error) {
-	commissionStr := viper.GetString(FlagCommission)
-	commission, err = stake.NewDecimalFromString(commissionStr)
-	if err != nil {
-		err = fmt.Errorf("Error parsing commission, must be in decimal format (eg 0.05), Error: ", err.Error())
-		return
-	}
-	if commission.LT(stake.Zero) {
-		err = errors.Errorf("Must use positive commission")
-		return
-	}
-	return commission, nil
 }
 
 func getValidator() (validator sdk.Actor, err error) {

@@ -17,46 +17,26 @@ var (
 	errCommissionNegative  = fmt.Errorf("Commission must be positive")
 	errCommissionHuge      = fmt.Errorf("Commission cannot be more than 100%")
 
-	resBadDelegateeAddr      = abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
+	resBadValidatorAddr      = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
 	resMissingSignature      = abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
 	resBondNotNominated      = abci.ErrBaseInvalidOutput.AppendLog("Cannot bond to non-nominated account")
-	resNoDelegateeForAddress = abci.ErrBaseUnknownAddress.AppendLog("Delegatee does not exist for that address")
-	resNoDelegatorForAddress = abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain delegatee bond")
+	resNoValidatorForAddress = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
+	resNoDelegatorForAddress = abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain validator bond")
 	resInsufficientFunds     = abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
 
 	invalidInput = abci.CodeType_BaseInvalidInput
 )
 
-func resErrLoadingDelegatees(err error) abci.Result {
-	return abci.ErrBaseEncodingError.AppendLog("Error loading delegatees: " + err.Error()) //should never occur
+func resErrSendingCoins(err error) abci.Result {
+	return abci.ErrBaseInvalidInput.AppendLog("Error Sending Coins: " + err.Error()) //should never occur
 }
 
-func resErrLoadingDelegators(err error) abci.Result {
-	return abci.ErrBaseEncodingError.AppendLog("Error loading delegators: " + err.Error()) //should never occur
-}
-
-func resErrLoadingDelegator(key []byte) abci.Result {
-	return abci.ErrBaseEncodingError.AppendLog(fmt.Sprintf("error loading delegator with key: %v", key))
-}
-
-func resErrLoadingQueue(err error) abci.Result {
-	return abci.ErrBaseEncodingError.AppendLog("error loading queue" + err.Error()) //should never occur
+func resErrLoadingValidators(err error) abci.Result {
+	return abci.ErrBaseEncodingError.AppendLog("Error loading validators: " + err.Error()) //should never occur
 }
 
 ///////////////////////////////////////
 
 func ErrValidatorEmpty() errors.TMError {
 	return errors.WithCode(errValidatorEmpty, invalidInput)
-}
-func ErrBadBondingDenom() errors.TMError {
-	return errors.WithCode(errBadBondingDenom, invalidInput)
-}
-func ErrBadBondingAmount() errors.TMError {
-	return errors.WithCode(errBadBondingAmount, invalidInput)
-}
-func ErrBadBondingValidator() errors.TMError {
-	return errors.WithCode(errBadBondingValidator, invalidInput)
-}
-func ErrNoBondingAcct() errors.TMError {
-	return errors.WithCode(errNoBondingAcct, invalidInput)
 }

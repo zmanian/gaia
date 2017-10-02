@@ -72,8 +72,7 @@ func main() {
 		noncecmd.NonceQueryCmd,
 
 		// Staking commands
-		stkcmd.CmdQueryDelegatee,
-		stkcmd.CmdQueryDelegator,
+		stkcmd.CmdQueryValidator,
 	)
 
 	// set up the middleware
@@ -93,8 +92,6 @@ func main() {
 		// Staking commands
 		stkcmd.CmdBond,
 		stkcmd.CmdUnbond,
-		stkcmd.CmdNominate,
-		stkcmd.CmdModComm,
 	)
 
 	// Set up the various high-level commands to use

@@ -11,7 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-// TestState - test the delegatee and delegator bonds store
+// TestState - test the validator and delegator bonds store
 func TestTypes(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
@@ -23,86 +23,60 @@ func TestTypes(t *testing.T) {
 	holdActor2 := sdk.Actor{"testChain", "testapp", []byte("holdaccountAddr2")}
 	holdActor3 := sdk.Actor{"testChain", "testapp", []byte("holdaccountAddr3")}
 
-	delegatee1 := &DelegateeBond{
-		Delegatee:       actor1,
-		Commission:      NewDecimal(1, -4),
-		ExchangeRate:    NewDecimal(1, 0),
-		TotalBondTokens: NewDecimal(10, 0),
-		Account:         holdActor1,
-		VotingPower:     NewDecimal(10, 0),
+	validator1 := &ValidatorBond{
+		Validator:    actor1,
+		BondedTokens: 10,
+		HoldAccount:  holdActor1,
+		VotingPower:  10,
 	}
-	delegatee2 := &DelegateeBond{
-		Delegatee:       actor2,
-		Commission:      NewDecimal(2, -4),
-		ExchangeRate:    NewDecimal(100, 0),
-		TotalBondTokens: NewDecimal(3, 0),
-		Account:         holdActor2,
-		VotingPower:     NewDecimal(300, 0),
+	validator2 := &ValidatorBond{
+		Validator:    actor2,
+		BondedTokens: 3,
+		HoldAccount:  holdActor2,
+		VotingPower:  300,
 	}
-	delegatee3 := &DelegateeBond{
-		Delegatee:       actor3,
-		Commission:      NewDecimal(3, -4),
-		ExchangeRate:    NewDecimal(1, 0),
-		TotalBondTokens: NewDecimal(123, 0),
-		Account:         holdActor3,
-		VotingPower:     NewDecimal(123, 0),
+	validator3 := &ValidatorBond{
+		Validator:    actor3,
+		BondedTokens: 123,
+		HoldAccount:  holdActor3,
+		VotingPower:  123,
 	}
 
-	delegatees := DelegateeBonds{delegatee1, delegatee2, delegatee3}
+	validators := ValidatorBonds{validator1, validator2, validator3}
 
 	//test basic sort
-	delegatees.Sort()
-	//assert.True(delegatees[0].Delegatee.Equals(actor1), "not equal: %v, %v" delegatees[0].DelegateeV//)
-	assert.Equal(delegatees[0].Delegatee, actor2)
-	assert.Equal(delegatees[1].Delegatee, actor3)
-	assert.Equal(delegatees[2].Delegatee, actor1)
+	validators.Sort()
+	//assert.True(validators[0].Validator.Equals(actor1), "not equal: %v, %v" validators[0].ValidatorV//)
+	assert.Equal(validators[0].Validator, actor2)
+	assert.Equal(validators[1].Validator, actor3)
+	assert.Equal(validators[2].Validator, actor1)
 
-	//get the base validators set which will contain all the delegatees
-	validators0 := delegatees.GetValidators()
+	//get the base validators set which will contain all the validators
+	validators0 := validators.GetValidators()
 	require.Equal(3, len(validators0))
-
-	//test to see if the minValBond is functioning
-	minValBond = NewDecimal(10000, 0)
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(0, len(delegatees.GetValidators()), "%v", delegatees.GetValidators())
-	minValBond = NewDecimal(0, 0)
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(3, len(delegatees.GetValidators()), "%v", delegatees.GetValidators())
-	minValBond = NewDecimal(50, 0)
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(2, len(delegatees.GetValidators()), "%v, %v, %v,", delegatees[0], delegatees[1], delegatees[2])
 
 	//test to see if the maxVal is functioning
 	maxVal = 0
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(0, len(delegatees.GetValidators()))
+	validators.UpdateVotingPower(store)
+	assert.Equal(0, len(validators.GetValidators()))
 	maxVal = 1
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(1, len(delegatees.GetValidators()))
+	validators.UpdateVotingPower(store)
+	assert.Equal(1, len(validators.GetValidators()))
 	maxVal = 2
-	delegatees.UpdateVotingPower(store)
-	assert.Equal(2, len(delegatees.GetValidators()))
-
-	//test getting the total voting power
-	assert.True(delegatees.UpdateVotingPower(store).Equal(NewDecimal(423, 0)))
+	validators.UpdateVotingPower(store)
+	assert.Equal(2, len(validators.GetValidators()))
 
 	//get/test the existing validator set
-	validators1 := delegatees.GetValidators()
+	validators1 := validators.GetValidators()
 	require.Equal(2, len(validators1))
 	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address))
 	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address))
 
-	//change the exchange rate and update the voting power
-	delegatee1.ExchangeRate = NewDecimal(1000, 0)
-	delegatees.UpdateVotingPower(store)
-	assert.True(delegatees[0].VotingPower.Equal(NewDecimal(10000, 0)), "bad vp update, expected %v, got %v",
-		NewDecimal(1000, 0), delegatees[0].VotingPower)
-
 	// resort
-	delegatees.Sort()
+	validators.Sort()
 
 	// get the new validator set
-	validators2 := delegatees.GetValidators()
+	validators2 := validators.GetValidators()
 	require.Equal(2, len(validators2))
 	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address))
 	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address))
