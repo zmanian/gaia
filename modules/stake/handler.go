@@ -252,7 +252,7 @@ func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
 		return res
 	}
 
-	sendCoins := func(receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
+	sendCoins := func(sender, receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
 
 		// Move coins from the deletator account to the delegatee lock account
 		send := coin.NewSendOneTx(sender, receiver, amount)
@@ -275,7 +275,7 @@ func getSingleSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	return senders[0], abci.OK
 }
 
-func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Result,
+func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result,
 	store state.SimpleDB, tx TxBond, sender sdk.Actor) abci.Result {
 
 	// Get amount of coins to bond
@@ -293,7 +293,7 @@ func runTxBondGuts(sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Re
 	}
 
 	// Move coins from the delegator account to the delegatee lock account
-	res := sendCoins(delegateeBond.Account, coin.Coins{bondCoin})
+	res := sendCoins(sender, delegateeBond.Account, coin.Coins{bondCoin})
 	if res.IsErr() {
 		return res
 	}

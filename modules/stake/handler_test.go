@@ -7,28 +7,69 @@ import (
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
+	"github.com/stretchr/testify/assert"
 	abci "github.com/tendermint/abci/types"
 )
 
 func TestRunTxBondGuts(t *testing.T) {
+
+	//set a store with a delegatee and delegator account
+	store := state.NewMemKVStore()
+	actorDelegatee := sdk.Actor{"testChain", "testapp", []byte("delegatee")}
+	actorDelegator := sdk.Actor{"testChain", "testapp", []byte("delegator")}
+	actorBonded := sdk.Actor{"testChain", "testapp", []byte("bonded")}
+	delegatees := DelegateeBonds{&DelegateeBond{
+		Delegatee:       actorDelegatee,
+		Commission:      NewDecimal(1, -4),
+		ExchangeRate:    NewDecimal(1, 0),
+		TotalBondTokens: NewDecimal(10000, 0),
+		Account:         actorBonded,
+		VotingPower:     NewDecimal(10000, 0),
+	}}
+	saveDelegateeBonds(store, delegatees)
+	delegators := DelegatorBonds{&DelegatorBond{
+		Delegatee:  actorDelegatee,
+		BondTokens: NewDecimal(500, 0),
+	}}
+	saveDelegatorBonds(store, actorDelegator, delegators)
+
+	//Setup a simple way to evaluate sending
+	dummyAccs := make(map[string]int64)
+	dummyAccs["delegator"] = 1000
+	dummyAccs["bonded"] = 1000
+	dummySend := func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result {
+		dummyAccs[string(sender.Address)] -= amount[0].Amount
+		dummyAccs[string(receiver.Address)] += amount[0].Amount
+		return abci.OK
+	}
+
+	//Add some records to the unbonding queue
+	tx := TxBond{BondUpdate{
+		Delegatee: actorDelegatee,
+		Amount:    coin.Coin{"atom", 10},
+	}}
+
 	type args struct {
-		sendCoins func(receiver sdk.Actor, amount coin.Coins) abci.Result
-		store     state.SimpleDB
-		tx        TxBond
-		sender    sdk.Actor
+		store  state.SimpleDB
+		tx     TxBond
+		sender sdk.Actor
 	}
 	tests := []struct {
-		name string
-		args args
-		want abci.Result
+		name    string
+		args    args
+		wantRes abci.Result
 	}{
-	// TODO: Add test cases.
+		{"test 1", args{store, tx, actorDelegator}, abci.OK},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := runTxBondGuts(tt.args.sendCoins, tt.args.store, tt.args.tx, tt.args.sender); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("runTxBondGuts(%v, %v, %v, %v) = %v, want %v", tt.args.sendCoins, tt.args.store, tt.args.tx, tt.args.sender, got, tt.want)
-			}
+			got := runTxBondGuts(dummySend, tt.args.store, tt.args.tx, tt.args.sender)
+
+			//check the basics
+			assert.True(t, got.IsSameCode(tt.wantRes), "runTxBondGuts(%v, %v) = %v, want %v",
+				tt.args.tx, tt.args.sender, got, tt.wantRes)
+
+			//TODO check that the accounts and the bond account have the appropriate values
 		})
 	}
 }
