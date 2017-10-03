@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	keycmd "github.com/tendermint/go-crypto/cmd"
+	keycmd "github.com/cosmos/cosmos-sdk/client/commands/keys"
 	"github.com/tendermint/tmlibs/cli"
 
 	sdk "github.com/cosmos/cosmos-sdk"
