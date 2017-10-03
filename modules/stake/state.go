@@ -6,7 +6,7 @@ import (
 	"github.com/tendermint/go-wire"
 )
 
-func loadValidatorBonds(store state.SimpleDB) (validatorBonds ValidatorBonds, err error) {
+func Loadvalidatorbonds(store state.SimpleDB) (validatorBonds ValidatorBonds, err error) {
 	b := store.Get([]byte{0x00})
 	if b == nil {
 		return

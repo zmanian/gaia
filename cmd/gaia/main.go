@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/tmlibs/cli"
 	tmflags "github.com/tendermint/tmlibs/cli/flags"
 	"github.com/tendermint/tmlibs/log"
@@ -20,6 +21,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/modules/roles"
 	basecmd "github.com/cosmos/cosmos-sdk/server/commands"
 	"github.com/cosmos/cosmos-sdk/stack"
+	"github.com/cosmos/cosmos-sdk/state"
+	"github.com/cosmos/gaia/modules/stake"
 )
 
 //nolint
@@ -53,6 +56,23 @@ func init() {
 	RootCmd.PersistentFlags().String(FlagLogLevel, defaultLogLevel, "Log level")
 }
 
+// Tick - Called every block even if no transaction,
+//   process all queues, validator rewards, and calculate the validator set difference
+func Tick(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+
+	// Determine the validator set changes
+	validatorBonds, err := stake.Loadvalidatorbonds(store)
+	if err != nil {
+		return
+	}
+	startVal := validatorBonds.GetValidators()
+	validatorBonds.UpdateVotingPower(store)
+	newVal := validatorBonds.GetValidators()
+	diffVal = stake.ValidatorsDiff(startVal, newVal)
+
+	return
+}
+
 func main() {
 	// require all fees in mycoin - change this in your app!
 	basecmd.Handler = stack.New(
@@ -77,7 +97,7 @@ func main() {
 
 	RootCmd.AddCommand(
 		commands.InitCmd,
-		basecmd.StartCmd,
+		basecmd.TickStartCmd(Tick),
 		basecmd.UnsafeResetAllCmd,
 		commands.VersionCmd,
 	)

@@ -61,7 +61,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := runTxBondGuts(dummySend, tt.args.store, tt.args.tx, tt.args.sender)
 
-			validators, err := loadValidatorBonds(store)
+			validators, err := Loadvalidatorbonds(store)
 			require.Nil(t, err)
 
 			//check the basics
@@ -107,7 +107,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 			gotRes := runTxUnbondGuts(getSender, dummySend,
 				tt.args.store, tt.args.tx)
 
-			validators, err := loadValidatorBonds(store)
+			validators, err := Loadvalidatorbonds(store)
 			require.Nil(t, err)
 
 			//check the basics

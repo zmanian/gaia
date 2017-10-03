@@ -5,11 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	keycmd "github.com/cosmos/cosmos-sdk/client/commands/keys"
 	"github.com/tendermint/tmlibs/cli"
 
 	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/client/commands"
+	keycmd "github.com/cosmos/cosmos-sdk/client/commands/keys"
 	"github.com/cosmos/cosmos-sdk/client/commands/proxy"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
 	"github.com/cosmos/cosmos-sdk/client/commands/seeds"

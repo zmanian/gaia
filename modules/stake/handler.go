@@ -115,24 +115,6 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	return res, errors.ErrUnknownTxType(tx.Unwrap())
 }
 
-// Tick - Called every block even if no transaction,
-//   process all queues, validator rewards, and calculate the validator set difference
-func (h Handler) Tick(ctx sdk.Context, height uint64, store state.SimpleDB,
-	dispatch sdk.Deliver) (diffVal []*abci.Validator, err error) {
-
-	// Determine the validator set changes
-	validatorBonds, err := loadValidatorBonds(store)
-	if err != nil {
-		return
-	}
-	startVal := validatorBonds.GetValidators()
-	validatorBonds.UpdateVotingPower(store)
-	newVal := validatorBonds.GetValidators()
-	diffVal = ValidatorsDiff(startVal, newVal)
-
-	return
-}
-
 // DeliverTx executes the tx if valid
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
@@ -205,7 +187,7 @@ func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins)
 	bondAmt := uint64(bondCoin.Amount)
 
 	// Get the validator bond account
-	validatorBonds, err := loadValidatorBonds(store)
+	validatorBonds, err := Loadvalidatorbonds(store)
 	if err != nil {
 		return resErrLoadingValidators(err)
 	}
@@ -261,7 +243,7 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result),
 	}
 
 	//get validator bond
-	validatorBonds, err := loadValidatorBonds(store)
+	validatorBonds, err := Loadvalidatorbonds(store)
 	if err != nil {
 		return resErrLoadingValidators(err)
 	}
