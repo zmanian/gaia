@@ -28,7 +28,7 @@ func TestTypes(t *testing.T) {
 		Commission:      NewDecimal(1, -4),
 		ExchangeRate:    NewDecimal(1, 0),
 		TotalBondTokens: NewDecimal(10, 0),
-		Account:         holdActor1,
+		HoldAccount:     holdActor1,
 		VotingPower:     NewDecimal(10, 0),
 	}
 	delegatee2 := &DelegateeBond{
@@ -36,7 +36,7 @@ func TestTypes(t *testing.T) {
 		Commission:      NewDecimal(2, -4),
 		ExchangeRate:    NewDecimal(100, 0),
 		TotalBondTokens: NewDecimal(3, 0),
-		Account:         holdActor2,
+		HoldAccount:     holdActor2,
 		VotingPower:     NewDecimal(300, 0),
 	}
 	delegatee3 := &DelegateeBond{
@@ -44,7 +44,7 @@ func TestTypes(t *testing.T) {
 		Commission:      NewDecimal(3, -4),
 		ExchangeRate:    NewDecimal(1, 0),
 		TotalBondTokens: NewDecimal(123, 0),
-		Account:         holdActor3,
+		HoldAccount:     holdActor3,
 		VotingPower:     NewDecimal(123, 0),
 	}
 

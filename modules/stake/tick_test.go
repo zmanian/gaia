@@ -28,7 +28,7 @@ func TestProcessQueueUnbond(t *testing.T) {
 		Commission:      NewDecimal(1, -4),
 		ExchangeRate:    NewDecimal(1, 0),
 		TotalBondTokens: NewDecimal(10000, 0),
-		Account:         actorBonded,
+		HoldAccount:     actorBonded,
 		VotingPower:     NewDecimal(10000, 0),
 	}}
 	saveDelegateeBonds(store, delegatees)
@@ -178,7 +178,7 @@ func TestProcessValidatorRewards(t *testing.T) {
 		Commission:      NewDecimal(1, -1),
 		ExchangeRate:    NewDecimal(1, 0),
 		TotalBondTokens: NewDecimal(20000, 0),
-		Account:         actorBonded,
+		HoldAccount:     actorBonded,
 		VotingPower:     NewDecimal(20000, 0),
 	}}
 	saveDelegateeBonds(store, delegatees)

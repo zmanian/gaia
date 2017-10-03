@@ -50,7 +50,7 @@ func processQueueUnbond(sendCoins func(sender, receiver sdk.Actor, amount coin.C
 		coinAmount := unbond.BondTokens.Mul(delegateeBond.ExchangeRate)
 		payout := coin.Coins{{bondDenom, coinAmount.IntPart()}} //TODO update coins to decimal
 
-		err = sendCoins(delegateeBond.Account, unbond.Account, payout)
+		err = sendCoins(delegateeBond.HoldAccount, unbond.Account, payout)
 		if err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		//}
 		totalAtoms = totalAtoms.Add(rewardCoins)
 		credit := coin.Coins{{bondDenom, rewardCoins.IntPart()}} //TODO make Decimal
-		err = creditAcc(validator.Account, credit)
+		err = creditAcc(validator.HoldAccount, credit)
 		if err != nil {
 			return err
 		}

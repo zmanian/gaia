@@ -293,7 +293,7 @@ func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins)
 	}
 
 	// Move coins from the delegator account to the delegatee lock account
-	res := sendCoins(sender, delegateeBond.Account, coin.Coins{bondCoin})
+	res := sendCoins(sender, delegateeBond.HoldAccount, coin.Coins{bondCoin})
 	if res.IsErr() {
 		return res
 	}
@@ -486,7 +486,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 		Commission:      tx.Commission,
 		ExchangeRate:    One,
 		TotalBondTokens: NewDecimal(int64(tx.Amount.Amount), 0), //TODO make coins decimal
-		Account:         sdk.NewActor(name, append([]byte{0x00}, tx.Nominee.Address...)),
+		HoldAccount:     sdk.NewActor(name, append([]byte{0x00}, tx.Nominee.Address...)),
 		VotingPower:     Zero,
 	}
 
@@ -496,7 +496,7 @@ func runTxNominateGuts(bondCoins func(bondAccount sdk.Actor, amount coin.Coins) 
 	}}
 
 	// Bond the coins to the bond account
-	res = bondCoins(delegateeBond.Account, coin.Coins{tx.Amount})
+	res = bondCoins(delegateeBond.HoldAccount, coin.Coins{tx.Amount})
 	if res.IsErr() {
 		return res
 	}

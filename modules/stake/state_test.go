@@ -47,7 +47,7 @@ func TestState(t *testing.T) {
 			Commission:      NewDecimal(7, -2),
 			ExchangeRate:    NewDecimal(8, -1),
 			TotalBondTokens: NewDecimal(9, 1),
-			Account:         sdk.Actor{"testChain", "testapp", []byte("addresslockedtoapp")},
+			HoldAccount:     sdk.Actor{"testChain", "testapp", []byte("addresslockedtoapp")},
 		}}
 	var delegateeNilBonds DelegateeBonds
 
