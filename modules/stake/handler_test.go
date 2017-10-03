@@ -7,36 +7,36 @@ import (
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/abci/types"
 )
 
-func TestRunTxBondGuts(t *testing.T) {
+func TestRunTxBondUnbondGuts(t *testing.T) {
 
 	//set a store with a validator and delegator account
 	store := state.NewMemKVStore()
 	actorValidator := sdk.Actor{"testChain", "testapp", []byte("validator")}
-	actorDelegator := sdk.Actor{"testChain", "testapp", []byte("delegator")}
-	actorBonded := sdk.Actor{"testChain", "testapp", []byte("bonded")}
+	actorBonded := sdk.Actor{"testChain", "testapp", []byte("holding")}
 	validators := ValidatorBonds{&ValidatorBond{
 		Validator:    actorValidator,
-		BondedTokens: 10000,
+		BondedTokens: 0,
 		HoldAccount:  actorBonded,
-		VotingPower:  10000,
+		VotingPower:  0,
 	}}
 	saveValidatorBonds(store, validators)
 
 	//Setup a simple way to evaluate sending
-	dummyAccs := make(map[string]int64)
-	dummyAccs["delegator"] = 1000
-	dummyAccs["bonded"] = 1000
+	dummyAccs := make(map[string]uint64)
+	dummyAccs["validator"] = 1000
+	dummyAccs["holding"] = 0
 	dummySend := func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result {
-		dummyAccs[string(sender.Address)] -= amount[0].Amount
-		dummyAccs[string(receiver.Address)] += amount[0].Amount
+		dummyAccs[string(sender.Address)] -= uint64(amount[0].Amount)
+		dummyAccs[string(receiver.Address)] += uint64(amount[0].Amount)
 		return abci.OK
 	}
 
 	//Add some records to the unbonding queue
-	tx := TxBond{BondUpdate{
+	txBond := TxBond{BondUpdate{
 		Validator: actorValidator,
 		Amount:    coin.Coin{"atom", 10},
 	}}
@@ -47,50 +47,78 @@ func TestRunTxBondGuts(t *testing.T) {
 		sender sdk.Actor
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantRes abci.Result
+		name         string
+		args         args
+		wantRes      abci.Result
+		wantBonded   uint64
+		wantUnbonded uint64
 	}{
-		{"test 1", args{store, tx, actorDelegator}, abci.OK},
+		{"test Bond 1", args{store, txBond, actorValidator}, abci.OK, 10, 990},
+		{"test Bond 2", args{store, txBond, actorValidator}, abci.OK, 20, 980},
+		{"test Bond 3", args{store, txBond, actorValidator}, abci.OK, 30, 970},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := runTxBondGuts(dummySend, tt.args.store, tt.args.tx, tt.args.sender)
 
-			//check the basics
-			assert.True(t, got.IsSameCode(tt.wantRes), "runTxBondGuts(%v, %v) = %v, want %v",
-				tt.args.tx, tt.args.sender, got, tt.wantRes)
+			validators, err := loadValidatorBonds(store)
+			require.Nil(t, err)
 
-			//TODO check that the accounts and the bond account have the appropriate values
+			//check the basics
+			assert.True(t, got.IsSameCode(tt.wantRes), "runTxBondGuts(%v, %v, %v) = %v, want %v",
+				tt.name, tt.args.tx, tt.args.sender, got, tt.wantRes)
+
+			//Check that the accounts and the bond account have the appropriate values
+			assert.Equal(t, tt.wantBonded, validators[0].BondedTokens)
+			assert.Equal(t, tt.wantBonded, dummyAccs["holding"])
+			assert.Equal(t, tt.wantUnbonded, dummyAccs["validator"])
+		})
+	}
+
+	/////////////////////////////////////////////////////////////////////
+	// Unbonding
+
+	getSender := func() (sender sdk.Actor, res abci.Result) {
+		return actorValidator, abci.OK
+	}
+
+	//Add some records to the unbonding queue
+	txUnbond := TxUnbond{BondUpdate{
+		Validator: actorValidator,
+		Amount:    coin.Coin{"atom", 10},
+	}}
+	type args2 struct {
+		store state.SimpleDB
+		tx    TxUnbond
+	}
+	tests2 := []struct {
+		name         string
+		args         args2
+		wantRes      abci.Result
+		wantBonded   uint64
+		wantUnbonded uint64
+	}{
+		{"test unbond 1", args2{store, txUnbond}, abci.OK, 20, 980},
+		{"test unbond 2", args2{store, txUnbond}, abci.OK, 10, 990},
+		{"test unbond 3", args2{store, txUnbond}, abci.OK, 0, 1000},
+	}
+	for _, tt := range tests2 {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRes := runTxUnbondGuts(getSender, dummySend,
+				tt.args.store, tt.args.tx)
+
+			validators, err := loadValidatorBonds(store)
+			require.Nil(t, err)
+
+			//check the basics
+			assert.True(t, gotRes.IsSameCode(tt.wantRes),
+				"runTxUnbondGuts(%v, %v) = %v, want %v",
+				tt.name, tt.args.tx, gotRes, tt.wantRes)
+
+			//Check that the accounts and the bond account have the appropriate values
+			assert.Equal(t, tt.wantBonded, validators[0].BondedTokens)
+			assert.Equal(t, tt.wantBonded, dummyAccs["holding"])
+			assert.Equal(t, tt.wantUnbonded, dummyAccs["validator"])
 		})
 	}
 }
-
-//func TestRunTxUnbondGuts(t *testing.T) {
-
-////queue, err := LoadQueue(queueCommissionTypeByte, store)
-////if err != nil {
-////return err
-////}
-
-//type args struct {
-//getSender func() (sdk.Actor, abci.Result)
-//store     state.SimpleDB
-//tx        TxUnbond
-//height    uint64
-//}
-//tests := []struct {
-//name    string
-//args    args
-//wantRes abci.Result
-//}{
-//// TODO: Add test cases.
-//}
-//for _, tt := range tests {
-//t.Run(tt.name, func(t *testing.T) {
-//if gotRes := runTxUnbondGuts(tt.args.getSender, tt.args.store, tt.args.tx, tt.args.height); !reflect.DeepEqual(gotRes, tt.wantRes) {
-//t.Errorf("runTxUnbondGuts(%v, %v, %v, %v) = %v, want %v", tt.args.getSender, tt.args.store, tt.args.tx, tt.args.height, gotRes, tt.wantRes)
-//}
-//})
-//}
-//}

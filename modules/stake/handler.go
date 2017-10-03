@@ -215,7 +215,7 @@ func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins)
 	}
 
 	// Move coins from the delegator account to the validator lock account
-	res := sendCoins(sender, validatorBond.Validator, coin.Coins{bondCoin})
+	res := sendCoins(sender, validatorBond.HoldAccount, coin.Coins{bondCoin})
 	if res.IsErr() {
 		return res
 	}
@@ -236,6 +236,7 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 	dispatch sdk.Deliver) (res abci.Result) {
 
 	getSender := func() (sender sdk.Actor, res abci.Result) {
+		res = abci.OK
 		senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 		if len(senders) != 0 {
 			res = resMissingSignature
@@ -245,12 +246,12 @@ func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
 		return
 	}
 
-	return runTxUnbondGuts(getSender, getSendFunc(ctx, store, dispatch), store, tx, ctx.BlockHeight())
+	return runTxUnbondGuts(getSender, getSendFunc(ctx, store, dispatch), store, tx)
 }
 
 func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result),
 	sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result,
-	store state.SimpleDB, tx TxUnbond, height uint64) (res abci.Result) {
+	store state.SimpleDB, tx TxUnbond) (res abci.Result) {
 
 	bondAmt := uint64(tx.Amount.Amount)
 
@@ -278,9 +279,9 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result),
 	saveValidatorBonds(store, validatorBonds)
 
 	// send unbonded coins to queue account, based on current exchange rate
-	err = sendCoins(validatorBond.Validator, sender, coin.Coins{tx.Amount})
-	if err != nil {
-		return resErrSendingCoins(err)
+	res = sendCoins(validatorBond.HoldAccount, sender, coin.Coins{tx.Amount})
+	if res.IsErr() {
+		return res
 	}
 
 	return abci.OK
