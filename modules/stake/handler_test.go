@@ -36,9 +36,9 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 	}
 
 	//Add some records to the unbonding queue
-	txBond := TxBond{BondUpdate{
+	txBond := TxBond{
 		Amount: coin.Coin{"atom", 10},
-	}}
+	}
 
 	type args struct {
 		store  state.SimpleDB
@@ -82,9 +82,9 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 	}
 
 	//Add some records to the unbonding queue
-	txUnbond := TxUnbond{BondUpdate{
+	txUnbond := TxUnbond{
 		Amount: coin.Coin{"atom", 10},
-	}}
+	}
 	type args2 struct {
 		store state.SimpleDB
 		tx    TxUnbond

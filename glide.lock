@@ -170,7 +170,7 @@ imports:
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: cd8dff0c96ca3ea1ec44d637f93c10c418edac1a
+  version: 97e980225530133c7b7e2b45e5e65c1f78ace89b
   subpackages:
   - blockchain
   - cmd/tendermint/commands

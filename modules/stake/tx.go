@@ -32,48 +32,59 @@ var _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}
 // TxBond
 
 // TxBond - struct for bonding transactions
-type TxBond struct{ BondUpdate }
-
-// NewTxBond - new TxBond
-func NewTxBond(amount coin.Coin) sdk.Tx {
-	return TxBond{BondUpdate{
-		Amount: amount,
-	}}.Wrap()
-}
-
-// TxUnbond - struct for unbonding transactions
-type TxUnbond struct{ BondUpdate }
-
-// NewTxUnbond - new TxUnbond
-func NewTxUnbond(amount coin.Coin) sdk.Tx {
-	return TxUnbond{BondUpdate{
-		Amount: amount,
-	}}.Wrap()
-}
-
-// BondUpdate - struct for bonding or unbonding transactions
-type BondUpdate struct {
+type TxBond struct {
 	Amount coin.Coin `json:"amount"`
 }
 
+// NewTxBond - new TxBond
+func NewTxBond(amount coin.Coin) sdk.Tx {
+	return TxBond{
+		Amount: amount,
+	}.Wrap()
+}
+
 // Wrap - Wrap a Tx as a Basecoin Tx
-func (tx BondUpdate) Wrap() sdk.Tx {
+func (tx TxBond) Wrap() sdk.Tx {
 	return sdk.Tx{tx}
 }
 
 // ValidateBasic - Check for non-empty actor, and valid coins
-func (tx BondUpdate) ValidateBasic() error {
-	coins := coin.Coins{tx.Amount}
+func (tx TxBond) ValidateBasic() error {
+	return validateBasic(tx.Amount)
+}
+
+// TxUnbond - struct for unbonding transactions
+type TxUnbond struct {
+	Amount coin.Coin `json:"amount"`
+}
+
+// NewTxUnbond - new TxUnbond
+func NewTxUnbond(amount coin.Coin) sdk.Tx {
+	return TxUnbond{
+		Amount: amount,
+	}.Wrap()
+}
+
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxUnbond) Wrap() sdk.Tx {
+	return sdk.Tx{tx}
+}
+
+// ValidateBasic - Check for non-empty actor, and valid coins
+func (tx TxUnbond) ValidateBasic() error {
+	return validateBasic(tx.Amount)
+}
+
+func validateBasic(amount coin.Coin) error {
+	coins := coin.Coins{amount}
 	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()
 	}
 
-	bondCoin := tx.Amount
-	bondAmt := bondCoin.Amount
-	if bondCoin.Denom != bondDenom {
+	if amount.Denom != bondDenom {
 		return fmt.Errorf("Invalid coin denomination")
 	}
-	if bondAmt <= 0 {
+	if amount.Amount <= 0 {
 		return fmt.Errorf("Amount must be > 0")
 	}
 	return nil
