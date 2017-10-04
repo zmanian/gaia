@@ -13,6 +13,8 @@ import:
   - types
 - package: github.com/cosmos/cosmos-sdk
   version: feature/staking
+- package: github.com/tendermint/iavl
+  version: 2d3ca4f466c32953641d4c49cad3d93eb7876a5e
 - package: github.com/tendermint/go-crypto
   version: 0418d32276d7d0f080e4c0e58b49c6ba2f717954
   subpackages:
@@ -46,7 +48,7 @@ import:
   - rpc/lib/types
   - types
 - package: github.com/tendermint/tmlibs
-  version: 0948343a6fd4efce07894c312d8e96c5f277c608
+  version: 096dcb90e60aa00b748b3fe49a4b95e48ebf1e13
   subpackages:
   - cli
   - cli/flags

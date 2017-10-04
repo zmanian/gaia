@@ -93,21 +93,16 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		return res, err
 	}
 
-	switch t := tx.Unwrap().(type) {
+	switch tx.Unwrap().(type) {
 	case TxBond:
 		// TODO could also check for existence of validator here? (already checked in deliverTx)
 
 		//check for suffient funds to send
-		sender, abciRes := getSingleSender(ctx)
+		_, abciRes := getSingleSender(ctx)
 		if abciRes.IsErr() {
 			return res, abciRes
 		}
 
-		//XXX CheckCoins returning an error
-		_, err := coin.CheckCoins(store, sender, coin.Coins{t.Amount}.Negative())
-		if err != nil {
-			return res, err
-		}
 		return sdk.NewCheck(costBond, ""), nil
 
 	case TxUnbond:
