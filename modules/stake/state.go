@@ -6,8 +6,15 @@ import (
 	"github.com/tendermint/go-wire"
 )
 
-func Loadvalidatorbonds(store state.SimpleDB) (validatorBonds ValidatorBonds, err error) {
-	b := store.Get([]byte{0x00})
+//nolint
+var BondKey = []byte{0x00}
+
+// LoadValidatorBonds - loads the validator bond set
+// TODO ultimately this function should be made unexported... being used right now
+// for patchwork of tick functionality therefor much easier if exported until
+// the new SDK is created
+func LoadValidatorBonds(store state.SimpleDB) (validatorBonds ValidatorBonds, err error) {
+	b := store.Get(BondKey)
 	if b == nil {
 		return
 	}
@@ -20,5 +27,5 @@ func Loadvalidatorbonds(store state.SimpleDB) (validatorBonds ValidatorBonds, er
 
 func saveValidatorBonds(store state.SimpleDB, validatorBonds ValidatorBonds) {
 	b := wire.BinaryBytes(validatorBonds)
-	store.Set([]byte{0x00}, b)
+	store.Set(BondKey, b)
 }

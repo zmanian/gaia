@@ -187,11 +187,11 @@ func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins)
 	bondAmt := uint64(bondCoin.Amount)
 
 	// Get the validator bond account
-	validatorBonds, err := Loadvalidatorbonds(store)
+	validatorBonds, err := LoadValidatorBonds(store)
 	if err != nil {
 		return resErrLoadingValidators(err)
 	}
-	i, validatorBond := validatorBonds.Get(tx.Validator)
+	i, validatorBond := validatorBonds.Get(sender)
 	if validatorBond == nil {
 		return resBondNotNominated
 	}
@@ -243,11 +243,11 @@ func runTxUnbondGuts(getSender func() (sdk.Actor, abci.Result),
 	}
 
 	//get validator bond
-	validatorBonds, err := Loadvalidatorbonds(store)
+	validatorBonds, err := LoadValidatorBonds(store)
 	if err != nil {
 		return resErrLoadingValidators(err)
 	}
-	bvIndex, validatorBond := validatorBonds.Get(tx.Validator)
+	bvIndex, validatorBond := validatorBonds.Get(sender)
 	if validatorBond == nil {
 		return resNoValidatorForAddress
 	}

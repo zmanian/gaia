@@ -35,10 +35,9 @@ var _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}
 type TxBond struct{ BondUpdate }
 
 // NewTxBond - new TxBond
-func NewTxBond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+func NewTxBond(amount coin.Coin) sdk.Tx {
 	return TxBond{BondUpdate{
-		Validator: validator,
-		Amount:    amount,
+		Amount: amount,
 	}}.Wrap()
 }
 
@@ -46,17 +45,15 @@ func NewTxBond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
 type TxUnbond struct{ BondUpdate }
 
 // NewTxUnbond - new TxUnbond
-func NewTxUnbond(validator sdk.Actor, amount coin.Coin) sdk.Tx {
+func NewTxUnbond(amount coin.Coin) sdk.Tx {
 	return TxUnbond{BondUpdate{
-		Validator: validator,
-		Amount:    amount,
+		Amount: amount,
 	}}.Wrap()
 }
 
 // BondUpdate - struct for bonding or unbonding transactions
 type BondUpdate struct {
-	Validator sdk.Actor `json:"validator"`
-	Amount    coin.Coin `json:"amount"`
+	Amount coin.Coin `json:"amount"`
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
@@ -66,9 +63,6 @@ func (tx BondUpdate) Wrap() sdk.Tx {
 
 // ValidateBasic - Check for non-empty actor, and valid coins
 func (tx BondUpdate) ValidateBasic() error {
-	if tx.Validator.Empty() {
-		return errValidatorEmpty
-	}
 	coins := coin.Coins{tx.Amount}
 	if !coins.IsValidNonnegative() {
 		return coin.ErrInvalidCoins()

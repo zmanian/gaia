@@ -4,12 +4,10 @@ package stake
 import (
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk/errors"
 	abci "github.com/tendermint/abci/types"
 )
 
 var (
-	errValidatorEmpty      = fmt.Errorf("Cannot bond to an empty validator")
 	errBadBondingDenom     = fmt.Errorf("Invalid coin denomination")
 	errBadBondingAmount    = fmt.Errorf("Amount must be > 0")
 	errBadBondingValidator = fmt.Errorf("Cannot bond to non-nominated account")
@@ -29,10 +27,4 @@ var (
 
 func resErrLoadingValidators(err error) abci.Result {
 	return abci.ErrBaseEncodingError.AppendLog("Error loading validators: " + err.Error()) //should never occur
-}
-
-///////////////////////////////////////
-
-func ErrValidatorEmpty() errors.TMError {
-	return errors.WithCode(errValidatorEmpty, invalidInput)
 }

@@ -37,8 +37,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 
 	//Add some records to the unbonding queue
 	txBond := TxBond{BondUpdate{
-		Validator: actorValidator,
-		Amount:    coin.Coin{"atom", 10},
+		Amount: coin.Coin{"atom", 10},
 	}}
 
 	type args struct {
@@ -61,7 +60,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := runTxBondGuts(dummySend, tt.args.store, tt.args.tx, tt.args.sender)
 
-			validators, err := Loadvalidatorbonds(store)
+			validators, err := LoadValidatorBonds(store)
 			require.Nil(t, err)
 
 			//check the basics
@@ -84,8 +83,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 
 	//Add some records to the unbonding queue
 	txUnbond := TxUnbond{BondUpdate{
-		Validator: actorValidator,
-		Amount:    coin.Coin{"atom", 10},
+		Amount: coin.Coin{"atom", 10},
 	}}
 	type args2 struct {
 		store state.SimpleDB
@@ -107,7 +105,7 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 			gotRes := runTxUnbondGuts(getSender, dummySend,
 				tt.args.store, tt.args.tx)
 
-			validators, err := Loadvalidatorbonds(store)
+			validators, err := LoadValidatorBonds(store)
 			require.Nil(t, err)
 
 			//check the basics

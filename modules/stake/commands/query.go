@@ -1,32 +1,38 @@
 package commands
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/cosmos/cosmos-sdk/client/commands"
+	"github.com/cosmos/cosmos-sdk/client/commands/query"
+	"github.com/cosmos/cosmos-sdk/stack"
+	"github.com/cosmos/gaia/modules/stake"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+)
 
+//nolint
 var (
-	//CmdQueryValidator - CLI command to query the counter state
 	CmdQueryValidator = &cobra.Command{
 		Use:   "validator",
 		Short: "Query a validator account",
+		//RunE:  cmdQueryValidator,
+	}
+	CmdQueryValidators = &cobra.Command{
+		Use:   "validators",
+		Short: "Query for the validator set",
+		RunE:  cmdQueryValidators,
 	}
 )
 
-//func init() {
-//CmdQueryValidator
-//}
+func cmdQueryValidators(cmd *cobra.Command, args []string) error {
 
-//TODO complete functionality
-func cmdQueryValidator(cmd *cobra.Command, args []string) error {
-	return nil
+	var bonds stake.ValidatorBonds
+
+	prove := !viper.GetBool(commands.FlagTrustNode)
+	key := stack.PrefixedKey(stake.Name(), stake.BondKey)
+	h, err := query.GetParsed(key, &bonds, prove)
+	if err != nil {
+		return err
+	}
+
+	return query.OutputProof(bonds, h)
 }
-
-//func counterQueryCmd(cmd *cobra.Command, args []string) error {
-//key := stack.PrefixedKey(counter.NameCounter, counter.StateKey())
-
-//var cp counter.State
-//proof, err := proofcmd.GetAndParseAppProof(key, &cp)
-//if err != nil {
-//return err
-//}
-
-//return proofcmd.OutputProof(cp, proof.BlockHeight())
-//}

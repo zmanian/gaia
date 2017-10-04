@@ -60,8 +60,11 @@ func init() {
 //   process all queues, validator rewards, and calculate the validator set difference
 func Tick(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 
+	// First need to prefix the store, at this point it's a global store
+	store = stack.PrefixedStore(stake.Name(), store)
+
 	// Determine the validator set changes
-	validatorBonds, err := stake.Loadvalidatorbonds(store)
+	validatorBonds, err := stake.LoadValidatorBonds(store)
 	if err != nil {
 		return
 	}
