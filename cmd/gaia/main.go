@@ -4,14 +4,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/tmlibs/cli"
-	tmflags "github.com/tendermint/tmlibs/cli/flags"
-	"github.com/tendermint/tmlibs/log"
 
-	"github.com/cosmos/cosmos-sdk/client/commands"
+	client "github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -25,35 +22,10 @@ import (
 	"github.com/cosmos/gaia/modules/stake"
 )
 
-//nolint
-const (
-	defaultLogLevel = "error"
-	FlagLogLevel    = "log_level"
-)
-
-var (
-	logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout)).With("module", "main")
-)
-
-// RootCmd - main node command
+// RootCmd is the entry point for this binary
 var RootCmd = &cobra.Command{
 	Use:   "gaia",
 	Short: "The Cosmos Network delegation-game blockchain test",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-		level := viper.GetString(FlagLogLevel)
-		logger, err = tmflags.ParseLogLevel(level, logger, defaultLogLevel)
-		if err != nil {
-			return err
-		}
-		if viper.GetBool(cli.TraceFlag) {
-			logger = log.NewTracingLogger(logger)
-		}
-		return nil
-	},
-}
-
-func init() {
-	RootCmd.PersistentFlags().String(FlagLogLevel, defaultLogLevel, "Log level")
 }
 
 // Tick - Called every block even if no transaction,
@@ -96,14 +68,16 @@ func main() {
 			coin.NewHandler(),
 			stack.WrapHandler(roles.NewHandler()),
 			stack.WrapHandler(ibc.NewHandler()),
+			stake.Handler{},
 		)
 
 	RootCmd.AddCommand(
-		commands.InitCmd,
+		basecmd.InitCmd,
 		basecmd.TickStartCmd(Tick),
 		basecmd.UnsafeResetAllCmd,
-		commands.VersionCmd,
+		client.VersionCmd,
 	)
+	basecmd.SetUpRoot(RootCmd)
 
 	cmd := cli.PrepareMainCmd(RootCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia"))
 	cmd.Execute()

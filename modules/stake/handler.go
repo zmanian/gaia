@@ -102,6 +102,8 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		if abciRes.IsErr() {
 			return res, abciRes
 		}
+
+		//XXX CheckCoins returning an error
 		_, err := coin.CheckCoins(store, sender, coin.Coins{t.Amount}.Negative())
 		if err != nil {
 			return res, err
@@ -112,7 +114,8 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		// TODO check for sufficient validator tokens to unbond here? (already checked in deliverTx)
 		return sdk.NewCheck(costUnbond, ""), nil
 	}
-	return res, errors.ErrUnknownTxType(tx.Unwrap())
+	//return res, errors.ErrUnknownTxType(tx.Unwrap())
+	return res, errors.ErrUnknownTxType("GTH")
 }
 
 // DeliverTx executes the tx if valid

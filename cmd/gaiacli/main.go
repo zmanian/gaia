@@ -7,28 +7,23 @@ import (
 
 	"github.com/tendermint/tmlibs/cli"
 
-	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/client/commands"
-	keycmd "github.com/cosmos/cosmos-sdk/client/commands/keys"
+	"github.com/cosmos/cosmos-sdk/client/commands/auto"
+	"github.com/cosmos/cosmos-sdk/client/commands/keys"
 	"github.com/cosmos/cosmos-sdk/client/commands/proxy"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
+	rpccmd "github.com/cosmos/cosmos-sdk/client/commands/rpc"
 	"github.com/cosmos/cosmos-sdk/client/commands/seeds"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
-	"github.com/cosmos/cosmos-sdk/modules/auth"
 	authcmd "github.com/cosmos/cosmos-sdk/modules/auth/commands"
-	"github.com/cosmos/cosmos-sdk/modules/base"
 	basecmd "github.com/cosmos/cosmos-sdk/modules/base/commands"
-	"github.com/cosmos/cosmos-sdk/modules/coin"
 	coincmd "github.com/cosmos/cosmos-sdk/modules/coin/commands"
-	"github.com/cosmos/cosmos-sdk/modules/fee"
 	feecmd "github.com/cosmos/cosmos-sdk/modules/fee/commands"
-	"github.com/cosmos/cosmos-sdk/modules/ibc"
-	"github.com/cosmos/cosmos-sdk/modules/nonce"
+	ibccmd "github.com/cosmos/cosmos-sdk/modules/ibc/commands"
 	noncecmd "github.com/cosmos/cosmos-sdk/modules/nonce/commands"
-	"github.com/cosmos/cosmos-sdk/modules/roles"
-	"github.com/cosmos/cosmos-sdk/stack"
+	rolecmd "github.com/cosmos/cosmos-sdk/modules/roles/commands"
 
-	stkcmd "github.com/cosmos/gaia/modules/stake/commands"
+	stakecmd "github.com/cosmos/gaia/modules/stake/commands"
 )
 
 // GaiaCli represents the base command when called without any subcommands
@@ -37,75 +32,63 @@ var GaiaCli = &cobra.Command{
 	Short: "Client for Cosmos-Gaia blockchain",
 }
 
-// BuildApp constructs the stack we want to use for this app
-func BuildApp(feeDenom string) sdk.Handler {
-	return stack.New(
-		base.Logger{},
-		stack.Recovery{},
-		auth.Signatures{},
-		base.Chain{},
-		stack.Checkpoint{OnCheck: true},
-		nonce.ReplayCheck{},
-	).
-		IBC(ibc.NewMiddleware()).
-		Apps(
-			roles.NewMiddleware(),
-			fee.NewSimpleFeeMiddleware(coin.Coin{feeDenom, 0}, fee.Bank),
-			stack.Checkpoint{OnDeliver: true},
-		).
-		Dispatch(
-			coin.NewHandler(),
-			stack.WrapHandler(roles.NewHandler()),
-			stack.WrapHandler(ibc.NewHandler()),
-		)
-}
-
 func main() {
 	commands.AddBasicFlags(GaiaCli)
 
 	// Prepare queries
 	query.RootCmd.AddCommand(
-		// These are default parsers, optional in your app
+		// These are default parsers, but optional in your app (you can remove key)
 		query.TxQueryCmd,
 		query.KeyQueryCmd,
 		coincmd.AccountQueryCmd,
 		noncecmd.NonceQueryCmd,
+		rolecmd.RoleQueryCmd,
+		ibccmd.IBCQueryCmd,
 
-		// Staking commands
-		stkcmd.CmdQueryValidator,
+		stakecmd.CmdQueryValidator,
+		stakecmd.CmdQueryValidators,
 	)
 
 	// set up the middleware
 	txcmd.Middleware = txcmd.Wrappers{
 		feecmd.FeeWrapper{},
+		rolecmd.RoleWrapper{},
 		noncecmd.NonceWrapper{},
 		basecmd.ChainWrapper{},
 		authcmd.SigWrapper{},
 	}
 	txcmd.Middleware.Register(txcmd.RootCmd.PersistentFlags())
 
-	// Prepare transactions
+	// you will always want this for the base send command
 	txcmd.RootCmd.AddCommand(
 		// This is the default transaction, optional in your app
 		coincmd.SendTxCmd,
+		coincmd.CreditTxCmd,
+		// this enables creating roles
+		rolecmd.CreateRoleTxCmd,
+		// these are for handling ibc
+		ibccmd.RegisterChainTxCmd,
+		ibccmd.UpdateChainTxCmd,
+		ibccmd.PostPacketTxCmd,
 
-		// Staking commands
-		stkcmd.CmdBond,
-		stkcmd.CmdUnbond,
+		stakecmd.CmdBond,
+		stakecmd.CmdUnbond,
 	)
 
-	// Set up the various high-level commands to use
+	// Set up the various commands to use
 	GaiaCli.AddCommand(
 		commands.InitCmd,
 		commands.ResetCmd,
-		commands.VersionCmd, //TODO update to custom version command
-		keycmd.RootCmd,
+		keys.RootCmd,
 		seeds.RootCmd,
+		rpccmd.RootCmd,
 		query.RootCmd,
 		txcmd.RootCmd,
 		proxy.RootCmd,
+		commands.VersionCmd,
+		auto.AutoCompleteCmd,
 	)
 
-	cmd := cli.PrepareMainCmd(GaiaCli, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
+	cmd := cli.PrepareMainCmd(GaiaCli, "BC", os.ExpandEnv("$HOME/.basecli"))
 	cmd.Execute()
 }
