@@ -26,9 +26,12 @@ type ValidatorBond struct {
 
 // ABCIValidator - Get the validator from a bond value
 func (b ValidatorBond) ABCIValidator() *abci.Validator {
+
+	//var PubKey crypto.PubKeyEd25519 = make([]byte, 32)
+	//b.Validator.Address
 	return &abci.Validator{
-		PubKey: b.Validator.Address,
-		Power:  b.VotingPower, //TODO could be a problem sending in truncated IntPart here
+		PubKey: b.Validator.Address, //XXX needs to actually be wire.BinaryBytes(ValidatorPubKey)
+		Power:  b.VotingPower,       //TODO could be a problem sending in truncated IntPart here
 	}
 }
 

@@ -77,17 +77,14 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 	/////////////////////////////////////////////////////////////////////
 	// Unbonding
 
-	getSender := func() (sender sdk.Actor, res abci.Result) {
-		return actorValidator, abci.OK
-	}
-
 	//Add some records to the unbonding queue
 	txUnbond := TxUnbond{
 		Amount: coin.Coin{"atom", 10},
 	}
 	type args2 struct {
-		store state.SimpleDB
-		tx    TxUnbond
+		store  state.SimpleDB
+		tx     TxUnbond
+		sender sdk.Actor
 	}
 	tests2 := []struct {
 		name         string
@@ -96,13 +93,13 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 		wantBonded   uint64
 		wantUnbonded uint64
 	}{
-		{"test unbond 1", args2{store, txUnbond}, abci.OK, 20, 980},
-		{"test unbond 2", args2{store, txUnbond}, abci.OK, 10, 990},
-		{"test unbond 3", args2{store, txUnbond}, abci.OK, 0, 1000},
+		{"test unbond 1", args2{store, txUnbond, actorValidator}, abci.OK, 20, 980},
+		{"test unbond 2", args2{store, txUnbond, actorValidator}, abci.OK, 10, 990},
+		{"test unbond 3", args2{store, txUnbond, actorValidator}, abci.OK, 0, 1000},
 	}
 	for _, tt := range tests2 {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRes := runTxUnbondGuts(getSender, dummySend,
+			gotRes := runTxUnbondGuts(tt.args.sender, dummySend,
 				tt.args.store, tt.args.tx)
 
 			validators, err := LoadValidatorBonds(store)
