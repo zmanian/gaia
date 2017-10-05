@@ -1,5 +1,5 @@
 hash: fe107361baadb79e91c7f2df72f71251b42866c18421d815c1f9e374833af756
-updated: 2017-10-04T18:17:58.505995871-04:00
+updated: 2017-10-05T15:16:50.857434788-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 16bea90399ee73755c840a7be1d579cc310b23e6
+  version: 0e703d3f9ec0572e8283992ad37a0a69744c7c20
   subpackages:
   - app
   - client
@@ -46,7 +46,7 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/go-kit/kit
-  version: 9ed37433947b357910facd0e38a8ec110fda62c1
+  version: 4dc7be5d2d12881735283bcab7352178e190fc71
   subpackages:
   - log
   - log/level
@@ -98,22 +98,20 @@ imports:
   version: a5cdd64afdee435007ee3e9f6ed4684af949d568
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
-- name: github.com/pelletier/go-buffruneio
-  version: c37440a7cf42ac63b919c752ca73a85067e05992
 - name: github.com/pelletier/go-toml
-  version: 13d49d4606eb801b8f01ae542b4afc4c6ee3d84a
+  version: 2009e44b6f182e34d8ce081ac2767622937ea3d4
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/rcrowley/go-metrics
   version: 1f30fe9094a513ce4c700b9a54458bbb0c96996c
 - name: github.com/spf13/afero
-  version: ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b
+  version: 3de492c3cda9570c77bc1f495857bfbf4b760efd
   subpackages:
   - mem
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 0dacccfbaabc71b872087c1719c5380d3e185173
+  version: d5bde60e022436203e377c47806e001418c16af3
 - name: github.com/spf13/jwalterweatherman
   version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
@@ -226,7 +224,7 @@ imports:
   - ripemd160
   - salsa20/salsa
 - name: golang.org/x/net
-  version: 0a9397675ba34b2845f758fe3cd68828369c6517
+  version: a04bdaca5b32abe1c069418fb7088ae607de5bd0
   subpackages:
   - context
   - http2
@@ -240,7 +238,7 @@ imports:
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 1cbadb444a806fd9430d14ad08967ed91da4fa0a
+  version: d82c1812e304abfeeabd31e995a115a2855bf642
   subpackages:
   - secure/bidirule
   - transform
@@ -251,7 +249,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 83acb05607c2b8797dfbf62ed3369a18fe8bbc54
+  version: 22c3f92f5faea8db492fb0f5ae4daf0d2752b19e
   subpackages:
   - balancer
   - codes
