@@ -11,16 +11,17 @@ import (
 
 //nolint
 var (
-	CmdQueryValidator = &cobra.Command{
-		Use:   "validator",
-		Short: "Query a validator account",
-		//RunE:  cmdQueryValidator,
-	}
 	CmdQueryValidators = &cobra.Command{
 		Use:   "validators",
 		Short: "Query for the validator set",
 		RunE:  cmdQueryValidators,
 	}
+	// TODO individual validators
+	//CmdQueryValidator = &cobra.Command{
+	//Use:   "validator",
+	//Short: "Query a validator account",
+	//RunE:  cmdQueryValidator,
+	//}
 )
 
 func cmdQueryValidators(cmd *cobra.Command, args []string) error {

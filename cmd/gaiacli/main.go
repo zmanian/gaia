@@ -45,7 +45,7 @@ func main() {
 		rolecmd.RoleQueryCmd,
 		ibccmd.IBCQueryCmd,
 
-		stakecmd.CmdQueryValidator,
+		//stakecmd.CmdQueryValidator,
 		stakecmd.CmdQueryValidators,
 	)
 
