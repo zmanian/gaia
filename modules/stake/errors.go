@@ -20,6 +20,7 @@ var (
 	resNoValidatorForAddress = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
 	resNoDelegatorForAddress = abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain validator bond")
 	resInsufficientFunds     = abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
+	resBadRemoveValidator    = abci.ErrInternalError.AppendLog("Error removing validator")
 
 	invalidInput = abci.CodeType_BaseInvalidInput
 )

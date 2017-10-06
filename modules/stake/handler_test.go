@@ -87,15 +87,16 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 		sender sdk.Actor
 	}
 	tests2 := []struct {
-		name         string
-		args         args2
-		wantRes      abci.Result
-		wantBonded   uint64
-		wantUnbonded uint64
+		name            string
+		args            args2
+		wantRes         abci.Result
+		validatorExists bool
+		wantBonded      uint64
+		wantUnbonded    uint64
 	}{
-		{"test unbond 1", args2{store, txUnbond, actorValidator}, abci.OK, 20, 980},
-		{"test unbond 2", args2{store, txUnbond, actorValidator}, abci.OK, 10, 990},
-		{"test unbond 3", args2{store, txUnbond, actorValidator}, abci.OK, 0, 1000},
+		{"test unbond 1", args2{store, txUnbond, actorValidator}, abci.OK, true, 20, 980},
+		{"test unbond 2", args2{store, txUnbond, actorValidator}, abci.OK, true, 10, 990},
+		{"test unbond 3", args2{store, txUnbond, actorValidator}, abci.OK, false, 0, 1000},
 	}
 	for _, tt := range tests2 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -111,7 +112,9 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 				tt.name, tt.args.tx, gotRes, tt.wantRes)
 
 			//Check that the accounts and the bond account have the appropriate values
-			assert.Equal(t, tt.wantBonded, validators[0].BondedTokens)
+			if tt.validatorExists {
+				assert.Equal(t, tt.wantBonded, validators[0].BondedTokens)
+			}
 			assert.Equal(t, tt.wantBonded, dummyAccs["holding"])
 			assert.Equal(t, tt.wantUnbonded, dummyAccs["validator"])
 		})

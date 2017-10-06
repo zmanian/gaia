@@ -193,6 +193,7 @@ func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins)
 	if validatorBond == nil { //if it doesn't yet exist create it
 		validatorBond = &ValidatorBond{
 			Validator:    sender,
+			PubKey:       tx.PubKey,
 			BondedTokens: 0,
 			HoldAccount:  getHoldAccount(sender),
 			VotingPower:  0,
@@ -250,10 +251,22 @@ func runTxUnbondGuts(sender sdk.Actor,
 	}
 
 	// subtract tokens from validatorBonds
-	validatorBond.BondedTokens -= bondAmt
-	if validatorBond.BondedTokens == 0 {
-		validatorBonds.Remove(bvIndex)
+	switch {
+	case validatorBond.BondedTokens > bondAmt:
+		validatorBond.BondedTokens -= bondAmt
+	case validatorBond.BondedTokens == bondAmt:
+		validatorBonds, err = validatorBonds.Remove(bvIndex)
+		if err != nil {
+			return resBadRemoveValidator
+		}
+	case validatorBond.BondedTokens < bondAmt:
+		return resInsufficientFunds
 	}
+
+	//validatorBond.BondedTokens -= bondAmt
+	//if validatorBond.BondedTokens == 0 {
+	//validatorBonds.Remove(bvIndex)
+	//}
 
 	saveValidatorBonds(store, validatorBonds)
 

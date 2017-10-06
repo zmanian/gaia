@@ -34,12 +34,14 @@ var _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}
 // TxBond - struct for bonding transactions
 type TxBond struct {
 	Amount coin.Coin `json:"amount"`
+	PubKey []byte    `json:"pubkey"`
 }
 
 // NewTxBond - new TxBond
-func NewTxBond(amount coin.Coin) sdk.Tx {
+func NewTxBond(amount coin.Coin, pubKey []byte) sdk.Tx {
 	return TxBond{
 		Amount: amount,
+		PubKey: pubKey,
 	}.Wrap()
 }
 

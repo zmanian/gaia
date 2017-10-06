@@ -40,10 +40,10 @@ func Tick(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 	if err != nil {
 		return
 	}
-	startVal := validatorBonds.GetValidators()
+	//startVal := validatorBonds.GetValidators()
 	validatorBonds.UpdateVotingPower(store)
-	newVal := validatorBonds.GetValidators()
-	diffVal = stake.ValidatorsDiff(startVal, newVal)
+	//newVal := validatorBonds.GetValidators()
+	//diffVal = stake.ValidatorsDiff(startVal, newVal)
 
 	return
 }

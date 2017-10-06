@@ -1,11 +1,15 @@
 package commands
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	wire "github.com/tendermint/go-wire"
 
 	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/client/commands/keys"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 
@@ -46,8 +50,15 @@ func cmdBond(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tx := stake.NewTxBond(amount)
-	//return cmdBonding(stake.NewTxBond)
+	name := viper.GetString(txcmd.FlagName)
+	if len(name) == 0 {
+		return fmt.Errorf("must use --name flag")
+	}
+	info, err := keys.GetKeyManager().Get(name)
+	if err != nil {
+		return err
+	}
+	tx := stake.NewTxBond(amount, wire.BinaryBytes(info.PubKey))
 	return txcmd.DoTx(tx)
 }
 

@@ -19,6 +19,7 @@ import (
 // total bonds multiplied by exchange rate.
 type ValidatorBond struct {
 	Validator    sdk.Actor
+	PubKey       []byte
 	BondedTokens uint64    // Total number of bond tokens for the validator
 	HoldAccount  sdk.Actor // Account where the bonded coins are held. Controlled by the app
 	VotingPower  uint64    // Total number of bond tokens for the validator
@@ -26,12 +27,9 @@ type ValidatorBond struct {
 
 // ABCIValidator - Get the validator from a bond value
 func (b ValidatorBond) ABCIValidator() *abci.Validator {
-
-	//var PubKey crypto.PubKeyEd25519 = make([]byte, 32)
-	//b.Validator.Address
 	return &abci.Validator{
-		PubKey: b.Validator.Address, //XXX needs to actually be wire.BinaryBytes(ValidatorPubKey)
-		Power:  b.VotingPower,       //TODO could be a problem sending in truncated IntPart here
+		PubKey: b.PubKey,
+		Power:  b.VotingPower, //TODO could be a problem sending in truncated IntPart here
 	}
 }
 

@@ -15,27 +15,35 @@ func TestTypes(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
-	actor1 := sdk.Actor{"testChain", "testapp", []byte("address1")}
-	actor2 := sdk.Actor{"testChain", "testapp", []byte("address2")}
-	actor3 := sdk.Actor{"testChain", "testapp", []byte("address3")}
-	holdActor1 := sdk.Actor{"testChain", "testapp", []byte("holdaccountAddr1")}
-	holdActor2 := sdk.Actor{"testChain", "testapp", []byte("holdaccountAddr2")}
-	holdActor3 := sdk.Actor{"testChain", "testapp", []byte("holdaccountAddr3")}
+	addr1 := []byte("addr1")
+	addr2 := []byte("addr2")
+	addr3 := []byte("addr3")
+	actor1 := sdk.Actor{"testChain", "testapp", addr1}
+	actor2 := sdk.Actor{"testChain", "testapp", addr2}
+	actor3 := sdk.Actor{"testChain", "testapp", addr3}
+	holdActor1 := sdk.Actor{"testChain", "testapp", []byte("hold1")}
+	holdActor2 := sdk.Actor{"testChain", "testapp", []byte("hol2")}
+	holdActor3 := sdk.Actor{"testChain", "testapp", []byte("hol3")}
 
+	//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
+	// instead this is just being set the address here for testing purposes
 	validator1 := &ValidatorBond{
 		Validator:    actor1,
+		PubKey:       actor1.Address.Bytes(),
 		BondedTokens: 10,
 		HoldAccount:  holdActor1,
 		VotingPower:  10,
 	}
 	validator2 := &ValidatorBond{
 		Validator:    actor2,
+		PubKey:       actor2.Address.Bytes(),
 		BondedTokens: 300,
 		HoldAccount:  holdActor2,
 		VotingPower:  300,
 	}
 	validator3 := &ValidatorBond{
 		Validator:    actor3,
+		PubKey:       actor3.Address.Bytes(),
 		BondedTokens: 123,
 		HoldAccount:  holdActor3,
 		VotingPower:  123,
@@ -68,8 +76,8 @@ func TestTypes(t *testing.T) {
 	//get/test the existing validator set
 	validators1 := validators.GetValidators()
 	require.Equal(2, len(validators1))
-	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address),
-		"%v, %v", validators1[0].PubKey, actor2.Address)
+	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address.Bytes()),
+		"%v, %v", validators1[0].PubKey, actor2.Address.Bytes())
 	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address),
 		"%v, %v", validators1[1].PubKey, actor3.Address)
 
@@ -78,7 +86,7 @@ func TestTypes(t *testing.T) {
 	validators.UpdateVotingPower(store)
 	validators2 := validators.GetValidators()
 	require.Equal(2, len(validators2))
-	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address),
+	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address.Bytes()),
 		"%v, %v", validators2[0].PubKey, actor1.Address)
 	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address),
 		"%v, %v", validators2[1].PubKey, actor2.Address)
