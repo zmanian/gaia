@@ -32,7 +32,7 @@ Next initialize a gaia chain and your account a bunch of fun fake money
 
 ```
 gaia init --chain-id=test <YOURPUBKEY>
-gaia start
+gaia startnoval
 ```
 
 In a separate terminal window initialize the client

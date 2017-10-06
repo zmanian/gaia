@@ -1,5 +1,5 @@
 hash: fe107361baadb79e91c7f2df72f71251b42866c18421d815c1f9e374833af756
-updated: 2017-10-05T15:16:50.857434788-04:00
+updated: 2017-10-06T15:49:28.177216197-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 0e703d3f9ec0572e8283992ad37a0a69744c7c20
+  version: c04200ceeb474c43dd7a18d1ef9f0c7500467f60
   subpackages:
   - app
   - client
@@ -111,11 +111,11 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: d5bde60e022436203e377c47806e001418c16af3
+  version: bc69223348ce9692e3ab90f04c375ac6cd71e9ba
 - name: github.com/spf13/jwalterweatherman
   version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
-  version: be7121dd7a937a85e1e4b1ddda6a3edce3466110
+  version: 2c300e72a98b4351617d9b927d2d2860ece8ee24
 - name: github.com/spf13/viper
   version: d9cca5ef33035202efb1586825bdbb15ff9ec3ba
 - name: github.com/syndtr/goleveldb
@@ -234,11 +234,11 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 314a259e304ff91bd6985da2a7149bbf91237993
+  version: ebfc5b4631820b793c9010c87fd8fef0f39eb082
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: d82c1812e304abfeeabd31e995a115a2855bf642
+  version: 825fc78a2fd6fa0a5447e300189e3219e05e1f25
   subpackages:
   - secure/bidirule
   - transform
@@ -249,7 +249,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 22c3f92f5faea8db492fb0f5ae4daf0d2752b19e
+  version: 5279edf262dc22329b1e53281ce9d55c0a998216
   subpackages:
   - balancer
   - codes

@@ -30,22 +30,28 @@ var RootCmd = &cobra.Command{
 
 // Tick - Called every block even if no transaction,
 //   process all queues, validator rewards, and calculate the validator set difference
-func Tick(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+func getTickFnc(updateVal bool) func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+	return func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 
-	// First need to prefix the store, at this point it's a global store
-	store = stack.PrefixedStore(stake.Name(), store)
+		// First need to prefix the store, at this point it's a global store
+		store = stack.PrefixedStore(stake.Name(), store)
 
-	// Determine the validator set changes
-	validatorBonds, err := stake.LoadValidatorBonds(store)
-	if err != nil {
+		// Determine the validator set changes
+		validatorBonds, err := stake.LoadValidatorBonds(store)
+		if err != nil {
+			return
+		}
+		if updateVal {
+			startVal := validatorBonds.GetValidators()
+			validatorBonds.UpdateVotingPower(store)
+			newVal := validatorBonds.GetValidators()
+			diffVal = stake.ValidatorsDiff(startVal, newVal)
+		} else {
+			validatorBonds.UpdateVotingPower(store)
+		}
+
 		return
 	}
-	//startVal := validatorBonds.GetValidators()
-	validatorBonds.UpdateVotingPower(store)
-	//newVal := validatorBonds.GetValidators()
-	//diffVal = stake.ValidatorsDiff(startVal, newVal)
-
-	return
 }
 
 func main() {
@@ -71,9 +77,22 @@ func main() {
 			stake.Handler{},
 		)
 
+	var startCmd = &cobra.Command{
+		Use:   "start",
+		Short: "Start this full node",
+	}
+	basecmd.InitTickStartCmd(getTickFnc(true), startCmd)
+
+	var startNoValCmd = &cobra.Command{
+		Use:   "startnoval",
+		Short: "Start a full node that never updates the validator set with tendermint",
+	}
+	basecmd.InitTickStartCmd(getTickFnc(false), startNoValCmd)
+
 	RootCmd.AddCommand(
 		basecmd.InitCmd,
-		basecmd.TickStartCmd(Tick),
+		startCmd,
+		startNoValCmd,
 		basecmd.UnsafeResetAllCmd,
 		client.VersionCmd,
 	)
