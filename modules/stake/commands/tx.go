@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 	wire "github.com/tendermint/go-wire"
 
-	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/client/commands/keys"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -25,12 +24,12 @@ const (
 var (
 	CmdBond = &cobra.Command{
 		Use:   "bond",
-		Short: "bond some coins to give voting power to a validator/validator",
+		Short: "bond coins to your validator bond account",
 		RunE:  cmdBond,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "unbond",
-		Short: "unbond your coins from a validator/validator",
+		Short: "unbond coins from your validator bond account",
 		RunE:  cmdUnbond,
 	}
 )
@@ -63,16 +62,12 @@ func cmdBond(cmd *cobra.Command, args []string) error {
 }
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
-	return cmdBonding(stake.NewTxUnbond)
-}
-
-func cmdBonding(NewTx func(amount coin.Coin) sdk.Tx) error {
 
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err
 	}
 
-	tx := NewTx(amount)
+	tx := stake.NewTxUnbond(amount)
 	return txcmd.DoTx(tx)
 }

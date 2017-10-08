@@ -79,15 +79,13 @@ func (tx TxUnbond) ValidateBasic() error {
 
 func validateBasic(amount coin.Coin) error {
 	coins := coin.Coins{amount}
-	if !coins.IsValidNonnegative() {
+	switch {
+	case !coins.IsValid():
 		return coin.ErrInvalidCoins()
-	}
-
-	if amount.Denom != bondDenom {
-		return fmt.Errorf("Invalid coin denomination")
-	}
-	if amount.Amount <= 0 {
+	case !coins.IsPositive():
 		return fmt.Errorf("Amount must be > 0")
+	case amount.Denom != bondDenom:
+		return fmt.Errorf("Invalid coin denomination")
 	}
 	return nil
 }

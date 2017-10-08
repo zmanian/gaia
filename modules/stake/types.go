@@ -26,10 +26,10 @@ type ValidatorBond struct {
 }
 
 // ABCIValidator - Get the validator from a bond value
-func (b ValidatorBond) ABCIValidator() *abci.Validator {
+func (vb ValidatorBond) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
-		PubKey: b.PubKey,
-		Power:  b.VotingPower, //TODO could be a problem sending in truncated IntPart here
+		PubKey: vb.PubKey,
+		Power:  vb.VotingPower, //TODO could be a problem sending in truncated IntPart here
 	}
 }
 
@@ -41,48 +41,44 @@ type ValidatorBonds []*ValidatorBond
 var _ sort.Interface = ValidatorBonds{} //enforce the sort interface at compile time
 
 // nolint - sort interface functions
-func (b ValidatorBonds) Len() int      { return len(b) }
-func (b ValidatorBonds) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
-func (b ValidatorBonds) Less(i, j int) bool {
-	vp1, vp2 := b[i].VotingPower, b[j].VotingPower
-	d1, d2 := b[i].Validator, b[j].Validator
+func (vbs ValidatorBonds) Len() int      { return len(vbs) }
+func (vbs ValidatorBonds) Swap(i, j int) { vbs[i], vbs[j] = vbs[j], vbs[i] }
+func (vbs ValidatorBonds) Less(i, j int) bool {
+	vp1, vp2 := vbs[i].VotingPower, vbs[j].VotingPower
+	d1, d2 := vbs[i].Validator, vbs[j].Validator
 	switch {
 	case vp1 != vp2:
 		return vp1 > vp2
-	case d1.ChainID < d2.ChainID:
-		return true
-	case d1.ChainID > d2.ChainID:
-		return false
-	case d1.App < d2.App:
-		return true
-	case d1.App > d2.App:
-		return false
+	case d1.ChainID != d2.ChainID:
+		return d1.ChainID < d2.ChainID
+	case d1.App != d2.App:
+		return d1.App < d2.App
 	default:
 		return bytes.Compare(d1.Address, d2.Address) == -1
 	}
 }
 
 // Sort - Sort the array of bonded values
-func (b ValidatorBonds) Sort() {
-	sort.Sort(b)
+func (vbs ValidatorBonds) Sort() {
+	sort.Sort(vbs)
 }
 
 // UpdateVotingPower - voting power based on bond tokens and exchange rate
 // TODO make not a function of ValidatorBonds as validatorbonds can be loaded from the store
-func (b ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
+func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 
-	for _, bv := range b {
-		bv.VotingPower = bv.BondedTokens
+	for _, vb := range vbs {
+		vb.VotingPower = vb.BondedTokens
 	}
 
 	// Now sort and truncate the power
-	b.Sort()
-	for i, bv := range b {
+	vbs.Sort()
+	for i, vb := range vbs {
 		if i >= maxVal {
-			bv.VotingPower = 0
+			vb.VotingPower = 0
 		}
 	}
-	saveValidatorBonds(store, b)
+	saveValidatorBonds(store, vbs)
 	return
 }
 
@@ -90,27 +86,33 @@ func (b ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 // ValidatorBonds. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (b ValidatorBonds) GetValidators() []*abci.Validator {
-	validators := make([]*abci.Validator, 0, maxVal)
-	for _, bv := range b {
-		if bv.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
+func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
+	validators := make([]*abci.Validator, maxVal)
+	i := 0
+	for i = range vbs {
+		if vbs[i].VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
-		validators = append(validators, bv.ABCIValidator())
+		validators[i] = vbs[i].ABCIValidator()
 	}
-	return validators
+	if i >= maxVal {
+		return validators
+	}
+	return validators[:i+1]
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func ValidatorsDiff(previous, new []*abci.Validator) (diff []*abci.Validator) {
+func ValidatorsDiff(baseline, update []*abci.Validator) (diff []*abci.Validator) {
 
-	//calculate any differences from the previous to the new validator set
-	// first loop through the previous validator set, and then catch any
-	// missed records in the new validator set
+	//TODO do something more efficient possibly by sorting first
+
+	//calculate any differences from the baseline to the update validator set
+	// first loop through the baseline validator set, and then catch any
+	// missed records in the update validator set
 	diff = make([]*abci.Validator, 0, maxVal)
-	for _, prevVal := range previous {
+	for _, prevVal := range baseline {
 		found := false
-		for _, newVal := range new {
+		for _, newVal := range update {
 			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
 				found = true
 				if newVal.Power != prevVal.Power {
@@ -123,9 +125,9 @@ func ValidatorsDiff(previous, new []*abci.Validator) (diff []*abci.Validator) {
 			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
 		}
 	}
-	for _, newVal := range new {
+	for _, newVal := range update {
 		found := false
-		for _, prevVal := range previous {
+		for _, prevVal := range baseline {
 			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
 				found = true
 				break
@@ -139,23 +141,23 @@ func ValidatorsDiff(previous, new []*abci.Validator) (diff []*abci.Validator) {
 }
 
 // Get - get a ValidatorBond for a specific validator from the ValidatorBonds
-func (b ValidatorBonds) Get(validator sdk.Actor) (int, *ValidatorBond) {
-	for i, bv := range b {
-		if bv.Validator.Equals(validator) {
-			return i, bv
+func (vbs ValidatorBonds) Get(validator sdk.Actor) (int, *ValidatorBond) {
+	for i, vb := range vbs {
+		if vb.Validator.Equals(validator) {
+			return i, vb
 		}
 	}
 	return 0, nil
 }
 
 // Remove - remove validator from the validator list
-func (b ValidatorBonds) Remove(i int) (ValidatorBonds, error) {
+func (vbs ValidatorBonds) Remove(i int) (ValidatorBonds, error) {
 	switch {
 	case i < 0:
-		return b, fmt.Errorf("Cannot remove a negative element")
-	case i >= len(b):
-		return b, fmt.Errorf("Element is out of upper bound")
+		return vbs, fmt.Errorf("Cannot remove a negative element")
+	case i >= len(vbs):
+		return vbs, fmt.Errorf("Element is out of upper bound")
 	default:
-		return append(b[:i], b[i+1:]...), nil
+		return append(vbs[:i], vbs[i+1:]...), nil
 	}
 }

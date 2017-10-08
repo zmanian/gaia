@@ -245,7 +245,7 @@ func runTxUnbondGuts(sender sdk.Actor,
 	if err != nil {
 		return resErrLoadingValidators(err)
 	}
-	bvIndex, validatorBond := validatorBonds.Get(sender)
+	bondIndex, validatorBond := validatorBonds.Get(sender)
 	if validatorBond == nil {
 		return resNoValidatorForAddress
 	}
@@ -255,18 +255,13 @@ func runTxUnbondGuts(sender sdk.Actor,
 	case validatorBond.BondedTokens > bondAmt:
 		validatorBond.BondedTokens -= bondAmt
 	case validatorBond.BondedTokens == bondAmt:
-		validatorBonds, err = validatorBonds.Remove(bvIndex)
+		validatorBonds, err = validatorBonds.Remove(bondIndex)
 		if err != nil {
 			return resBadRemoveValidator
 		}
 	case validatorBond.BondedTokens < bondAmt:
 		return resInsufficientFunds
 	}
-
-	//validatorBond.BondedTokens -= bondAmt
-	//if validatorBond.BondedTokens == 0 {
-	//validatorBonds.Remove(bvIndex)
-	//}
 
 	saveValidatorBonds(store, validatorBonds)
 

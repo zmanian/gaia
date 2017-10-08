@@ -39,7 +39,7 @@ func getTickFnc(updateVal bool) func(store state.SimpleDB) (diffVal []*abci.Vali
 		// Determine the validator set changes
 		validatorBonds, err := stake.LoadValidatorBonds(store)
 		if err != nil {
-			return
+			panic(err) //This error should really never happen - vital that this loads properly
 		}
 		if updateVal {
 			startVal := validatorBonds.GetValidators()
