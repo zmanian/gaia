@@ -37,7 +37,7 @@ func getTickFnc(updateVal bool) func(store state.SimpleDB) (diffVal []*abci.Vali
 		store = stack.PrefixedStore(stake.Name(), store)
 
 		// Determine the validator set changes
-		validatorBonds, err := stake.LoadValidatorBonds(store)
+		validatorBonds, err := stake.LoadBonds(store)
 		if err != nil {
 			panic(err) //This error should really never happen - vital that this loads properly
 		}
@@ -74,7 +74,7 @@ func main() {
 			coin.NewHandler(),
 			stack.WrapHandler(roles.NewHandler()),
 			stack.WrapHandler(ibc.NewHandler()),
-			stake.Handler{},
+			stake.NewHandler(),
 		)
 
 	var startCmd = &cobra.Command{

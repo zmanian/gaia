@@ -16,8 +16,8 @@ import (
 const (
 	ByteTxBond   = 0x55
 	ByteTxUnbond = 0x56
-	TypeTxBond   = name + "/bond"
-	TypeTxUnbond = name + "/unbond"
+	TypeTxBond   = stakingModuleName + "/bond"
+	TypeTxUnbond = stakingModuleName + "/unbond"
 )
 
 func init() {
@@ -79,12 +79,15 @@ func (tx TxUnbond) ValidateBasic() error {
 
 func validateBasic(amount coin.Coin) error {
 	coins := coin.Coins{amount}
-	switch {
-	case !coins.IsValid():
+	if !coins.IsValid() {
 		return coin.ErrInvalidCoins()
-	case !coins.IsPositive():
+	}
+
+	if !coins.IsPositive() {
 		return fmt.Errorf("Amount must be > 0")
-	case amount.Denom != bondDenom:
+	}
+
+	if amount.Denom != allowedBondDenom {
 		return fmt.Errorf("Invalid coin denomination")
 	}
 	return nil

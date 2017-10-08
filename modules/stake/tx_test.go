@@ -12,9 +12,9 @@ var (
 	validator = sdk.Actor{"testChain", "testapp", []byte("addressvalidator1")}
 	empty     sdk.Actor
 
-	coinPos          = coin.Coin{"mycoin", 1000}
-	coinZero         = coin.Coin{"mycoin", 0}
-	coinNeg          = coin.Coin{"mycoin", -10000}
+	coinPos          = coin.Coin{"strings", 1000}
+	coinZero         = coin.Coin{"strings", 0}
+	coinNeg          = coin.Coin{"strings", -10000}
 	coinPosNotAtoms  = coin.Coin{"foo", 10000}
 	coinZeroNotAtoms = coin.Coin{"foo", 0}
 	coinNegNotAtoms  = coin.Coin{"foo", -10000}

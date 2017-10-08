@@ -1,7 +1,7 @@
 package stake
 
 import (
-	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,90 +11,123 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-func TestTypes(t *testing.T) {
+func newActors(n int) (actors []sdk.Actor) {
+	for i := 0; i < n; i++ {
+		actors = append(actors, sdk.Actor{
+			"testChain", "testapp", []byte(fmt.Sprintf("addr%d", i))})
+	}
+	return
+}
+
+//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
+// instead this is just being set the address here for testing purposes
+func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
+	for i, a := range actors {
+		bonds = append(bonds, &ValidatorBond{
+			Validator:    a,
+			PubKey:       a.Address.Bytes(),
+			BondedTokens: uint64(amts[i]),
+			HoldAccount:  getHoldAccount(a),
+			VotingPower:  uint64(amts[i]),
+		})
+	}
+	return
+
+}
+
+func TestValidatorBondsMaxVals(t *testing.T) {
+	globalParams = defaultParams()
+	assert := assert.New(t)
+	store := state.NewMemKVStore()
+	actors := newActors(3)
+	bonds := ValidatorBonds(bondsFromActors(actors, []int{10, 300, 123}))
+
+	testCases := []struct {
+		maxVals, expectedVals int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 2},
+		{3, 3},
+		{4, 3},
+	}
+
+	for _, testCase := range testCases {
+		globalParams.MaxVals = testCase.maxVals
+		bonds.UpdateVotingPower(store)
+		assert.Equal(testCase.expectedVals, len(bonds.GetValidators()))
+	}
+}
+
+func TestValidatorBondsSort(t *testing.T) {
+	globalParams = defaultParams()
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
-	addr1 := []byte("addr1")
-	addr2 := []byte("addr2")
-	addr3 := []byte("addr3")
-	actor1 := sdk.Actor{"testChain", "testapp", addr1}
-	actor2 := sdk.Actor{"testChain", "testapp", addr2}
-	actor3 := sdk.Actor{"testChain", "testapp", addr3}
-	holdActor1 := sdk.Actor{"testChain", "testapp", []byte("hold1")}
-	holdActor2 := sdk.Actor{"testChain", "testapp", []byte("hol2")}
-	holdActor3 := sdk.Actor{"testChain", "testapp", []byte("hol3")}
-
-	//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
-	// instead this is just being set the address here for testing purposes
-	validator1 := &ValidatorBond{
-		Validator:    actor1,
-		PubKey:       actor1.Address.Bytes(),
-		BondedTokens: 10,
-		HoldAccount:  holdActor1,
-		VotingPower:  10,
-	}
-	validator2 := &ValidatorBond{
-		Validator:    actor2,
-		PubKey:       actor2.Address.Bytes(),
-		BondedTokens: 300,
-		HoldAccount:  holdActor2,
-		VotingPower:  300,
-	}
-	validator3 := &ValidatorBond{
-		Validator:    actor3,
-		PubKey:       actor3.Address.Bytes(),
-		BondedTokens: 123,
-		HoldAccount:  holdActor3,
-		VotingPower:  123,
-	}
-
-	validators := ValidatorBonds{validator1, validator2, validator3}
+	N := 5
+	actors := newActors(N)
+	bonds := ValidatorBonds(bondsFromActors(actors, []int{10, 300, 123, 4, 200}))
+	expectedOrder := []int{1, 4, 2, 0, 3}
 
 	//test basic sort
-	validators.Sort()
-	//assert.True(validators[0].Validator.Equals(actor1), "not equal: %v, %v" validators[0].ValidatorV//)
-	assert.Equal(validators[0].Validator, actor2)
-	assert.Equal(validators[1].Validator, actor3)
-	assert.Equal(validators[2].Validator, actor1)
+	bonds.Sort()
 
-	//get the base validators set which will contain all the validators
-	validators0 := validators.GetValidators()
-	require.Equal(3, len(validators0))
+	vals := bonds.GetValidators()
+	require.Equal(N, len(vals))
 
-	//test to see if the maxVal is functioning
-	maxVal = 0
-	validators.UpdateVotingPower(store)
-	assert.Equal(0, len(validators.GetValidators()))
-	maxVal = 1
-	validators.UpdateVotingPower(store)
-	assert.Equal(1, len(validators.GetValidators()))
-	maxVal = 2
-	validators.UpdateVotingPower(store)
-	assert.Equal(2, len(validators.GetValidators()))
+	for i, val := range vals {
+		expectedIdx := expectedOrder[i]
+		assert.Equal(val.PubKey, actors[expectedIdx].Address.Bytes())
+	}
 
-	//get/test the existing validator set
-	validators1 := validators.GetValidators()
-	require.Equal(2, len(validators1))
-	assert.True(bytes.Equal(validators1[0].PubKey, actor2.Address.Bytes()),
-		"%v, %v", validators1[0].PubKey, actor2.Address.Bytes())
-	assert.True(bytes.Equal(validators1[1].PubKey, actor3.Address),
-		"%v, %v", validators1[1].PubKey, actor3.Address)
+	// now reduce the maxvals, ensure they're still ordered
+	maxVals := 3
+	globalParams.MaxVals = maxVals
+	bonds.UpdateVotingPower(store)
+	vals = bonds.GetValidators()
+	require.Equal(maxVals, len(vals))
+
+	for i, val := range vals {
+		expectedIdx := expectedOrder[i]
+		assert.Equal(val.PubKey, actors[expectedIdx].Address.Bytes())
+	}
+}
+
+func TestValidatorBondsUpdate(t *testing.T) {
+	globalParams = defaultParams()
+	assert, require := assert.New(t), require.New(t)
+	store := state.NewMemKVStore()
+
+	actors := newActors(3)
+	bonds := ValidatorBonds(bondsFromActors(actors, []int{10, 300, 123}))
+	bonds.Sort()
+
+	maxVals := 2
+	globalParams.MaxVals = maxVals
 
 	// Change some of the bonded tokens, get the new validator set
-	validator1.BondedTokens = 1000
-	validators.UpdateVotingPower(store)
-	validators2 := validators.GetValidators()
-	require.Equal(2, len(validators2))
-	assert.True(bytes.Equal(validators2[0].PubKey, actor1.Address.Bytes()),
-		"%v, %v", validators2[0].PubKey, actor1.Address)
-	assert.True(bytes.Equal(validators2[1].PubKey, actor2.Address),
-		"%v, %v", validators2[1].PubKey, actor2.Address)
+	vals1 := bonds.GetValidators()
+	bonds[2].BondedTokens = 1000
+	bonds.UpdateVotingPower(store)
+	vals2 := bonds.GetValidators()
+	fmt.Println("_-------------------------")
+	fmt.Println(vals1)
+	fmt.Println("_-------------------------")
+	fmt.Println(vals2)
+	fmt.Println("_-------------------------")
+
+	require.Equal(maxVals, len(vals2))
+
+	expectedOrder := []int{0, 1, 2}
+	for i, val := range vals2 {
+		expectedIdx := expectedOrder[i]
+		assert.Equal(val.PubKey, actors[expectedIdx].Address.Bytes())
+	}
 
 	// calculate the difference in the validator set from the original set
-	diff := ValidatorsDiff(validators1, validators2)
+	diff := ValidatorsDiff(vals1, vals2)
 	require.Equal(2, len(diff), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
-		diff, validators1, validators2)
+		diff, vals1, vals2)
 	assert.True(diff[0].Power == 0)
-	assert.True(diff[1].Power == validators2[0].Power)
+	assert.True(diff[1].Power == 1000)
 }
