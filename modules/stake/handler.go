@@ -27,9 +27,7 @@ func Name() string {
 	return stakingModuleName
 }
 
-var (
-	allowedBondDenom string = "strings" // bondable coin denomination
-)
+var allowedBondDenom = "strings" // bondable coin denomination
 
 // Params defines the parameters for bonding and unbonding
 type Params struct {

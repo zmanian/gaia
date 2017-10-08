@@ -27,10 +27,10 @@ func defaultTransferFn(ctx sdk.Context, store state.SimpleDB, dispatch sdk.Deliv
 	}
 }
 
-//nolint
+//BondKey - state key for the bond bytes
 var BondKey = []byte{0x00}
 
-// LoadValidatorBonds - loads the validator bond set
+// LoadBonds - loads the validator bond set
 // TODO ultimately this function should be made unexported... being used right now
 // for patchwork of tick functionality therefor much easier if exported until
 // the new SDK is created

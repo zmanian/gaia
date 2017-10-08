@@ -26,6 +26,7 @@ type ValidatorBond struct {
 	VotingPower  uint64    // Total number of bond tokens for the validator
 }
 
+// NewValidatorBond - returns a new empty validator bond object
 func NewValidatorBond(sender, holder sdk.Actor, pubKey []byte) *ValidatorBond {
 	return &ValidatorBond{
 		Validator:    sender,
