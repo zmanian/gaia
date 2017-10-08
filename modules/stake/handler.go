@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	abci "github.com/tendermint/abci/types"
+	cmn "github.com/tendermint/tmlibs/common"
 	"github.com/tendermint/tmlibs/log"
 
 	"github.com/cosmos/cosmos-sdk"
@@ -17,68 +18,87 @@ import (
 
 //nolint
 const (
-	name = "stake"
+	stakingModuleName = "stake"
 )
 
-//nolint
-var (
-	//TODO should all these global parameters be moved to the state?
-	bondDenom string = "mycoin" // bondable coin denomination
-	maxVal    int    = 100      // maximum number of validators
-
-	// GasAllocations per staking transaction
-	costBond   = uint64(20)
-	costUnbond = uint64(0)
-)
-
-// Name - simply the name TODO do we need name to be unexposed for security?
+// Name is the name of the modules.
+// TODO do we need name to be unexposed for security?
 func Name() string {
-	return name
+	return stakingModuleName
 }
+
+var (
+	allowedBondDenom string = "strings" // bondable coin denomination
+)
+
+// Params defines the parameters for bonding and unbonding
+type Params struct {
+	MaxVals int `json:"max_vals"` // maximum number of validators
+
+	// gas costs for txs
+	GasBond   uint64 `json:"gas_bond"`
+	GasUnbond uint64 `json:"gas_unbond"`
+}
+
+func defaultParams() Params {
+	return Params{
+		MaxVals:   100,
+		GasBond:   20,
+		GasUnbond: 0,
+	}
+}
+
+// global for now
+var globalParams = defaultParams()
 
 // Handler - the transaction processing handler
 type Handler struct {
 	stack.PassInitValidate
 }
 
+// NewHandler returns a new Handler with the default Params.
+func NewHandler() Handler {
+	return Handler{}
+}
+
 var _ stack.Dispatchable = Handler{} // enforce interface at compile time
 
 // Name - return stake namespace
 func (Handler) Name() string {
-	return name
+	return stakingModuleName
 }
 
 // AssertDispatcher - placeholder for stack.Dispatchable
 func (Handler) AssertDispatcher() {}
 
 // InitState - set genesis parameters for staking
-func (Handler) InitState(l log.Logger, store state.SimpleDB,
+func (h Handler) InitState(l log.Logger, store state.SimpleDB,
 	module, key, value string, cb sdk.InitStater) (log string, err error) {
-	return "", initState(module, key, value, store)
+	return "", h.initState(module, key, value, store)
 }
 
 //separated for testing
-func initState(module, key, value string, store state.SimpleDB) (err error) {
-	if module != name {
+func (Handler) initState(module, key, value string, store state.SimpleDB) (err error) {
+	if module != stakingModuleName {
 		return errors.ErrUnknownModule(module)
 	}
 	switch key {
-	case "bond_coin":
-		bondDenom = value
-	case "maxval",
-		"cost_bond",
-		"cost_unbond":
+	case "allowed_bond_denom":
+		allowedBondDenom = value
+	case "max_vals",
+		"gas_bond",
+		"gas_unbond":
 		i, err := strconv.Atoi(value)
 		if err != nil {
 			return fmt.Errorf("input must be integer, Error: %v", err.Error())
 		}
 		switch key {
-		case "maxval":
-			maxVal = i
-		case "cost_bond":
-			costBond = uint64(i)
-		case "cost_unbond":
-			costUnbond = uint64(i)
+		case "max_val":
+			globalParams.MaxVals = i
+		case "gas_bond":
+			globalParams.GasBond = uint64(i)
+		case "gas_unbound":
+			globalParams.GasUnbond = uint64(i)
 		}
 	}
 	return errors.ErrUnknownKey(key)
@@ -93,23 +113,22 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		return res, err
 	}
 
+	// get the sender
+	sender, err := getTxSender(ctx)
+	if err != nil {
+		return res, err
+	}
+	_ = sender
+
+	// return the fee for each tx type
 	switch tx.Unwrap().(type) {
 	case TxBond:
-		// TODO could also check for existence of validator here? (already checked in deliverTx)
-
-		//check for suffient funds to send
-		_, abciRes := getSingleSender(ctx)
-		if abciRes.IsErr() {
-			return res, abciRes
-		}
-
-		return sdk.NewCheck(costBond, ""), nil
-
+		// TODO: check the sender has enough coins to bond
+		return sdk.NewCheck(globalParams.GasBond, ""), nil
 	case TxUnbond:
-		// TODO check for sufficient validator tokens to unbond here? (already checked in deliverTx)
-		return sdk.NewCheck(costUnbond, ""), nil
+		// TODO check the sender has coins to unbond
+		return sdk.NewCheck(globalParams.GasUnbond, ""), nil
 	}
-	//return res, errors.ErrUnknownTxType(tx.Unwrap())
 	return res, errors.ErrUnknownTxType("GTH")
 }
 
@@ -117,19 +136,28 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
 
-	_, err = h.CheckTx(ctx, store, tx, nil)
+	err = tx.ValidateBasic()
 	if err != nil {
-		return
+		return res, err
 	}
 
+	sender, abciRes := getTxSender(ctx)
+	if abciRes.IsErr() {
+		return res, abciRes
+	}
+
+	holder := getHoldAccount(sender)
+
 	//Run the transaction
-	unwrap := tx.Unwrap()
-	var abciRes abci.Result
-	switch txType := unwrap.(type) {
+	switch _tx := tx.Unwrap().(type) {
 	case TxBond:
-		abciRes = runTxBond(ctx, store, txType, dispatch)
+		fn := defaultTransferFn(ctx, store, dispatch)
+		abciRes = runTxBond(store, sender, holder, fn, _tx)
 	case TxUnbond:
-		abciRes = runTxUnbond(ctx, store, txType, dispatch)
+		//context with hold account permissions
+		ctx2 := ctx.WithPermissions(holder)
+		fn := defaultTransferFn(ctx2, store, dispatch)
+		abciRes = runTxUnbond(store, sender, holder, fn, _tx)
 	}
 
 	res = sdk.DeliverResult{
@@ -140,136 +168,87 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+// these functions assume everything has been authenticated,
+// now we just bond or unbond and save
 
-func runTxBond(ctx sdk.Context, store state.SimpleDB, tx TxBond,
-	dispatch sdk.Deliver) (res abci.Result) {
+func runTxBond(store state.SimpleDB, sender, holder sdk.Actor,
+	transferFn transferFn, tx TxBond) (res abci.Result) {
 
-	sender, res := getSingleSender(ctx)
+	// Get amount of coins to bond
+	bondCoin := tx.Amount
+
+	// Get the validator bond account
+	bonds, err := LoadBonds(store)
+	if err != nil {
+		return resErrLoadingValidators(err)
+	}
+
+	// Get the bond and index for this sender
+	idx, bond := bonds.Get(sender)
+	if bond == nil { //if it doesn't yet exist create it
+		bond = NewValidatorBond(sender, holder, tx.PubKey)
+		bonds = append(bonds, bond)
+		idx = len(bonds) - 1
+	}
+
+	// Move coins from the sender account to the holder account
+	res = transferFn(sender, holder, coin.Coins{bondCoin})
 	if res.IsErr() {
 		return res
 	}
 
-	return runTxBondGuts(getSendFunc(ctx, store, dispatch), store, tx, sender)
+	// Update the bond and save to store
+	bonds[idx].BondedTokens += uint64(bondCoin.Amount)
+	saveBonds(store, bonds)
+
+	return abci.OK
 }
 
-// sendCoins is a helper function
-func getSendFunc(ctx sdk.Context, store state.SimpleDB,
-	dispatch sdk.Deliver) func(sender, receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
+func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
+	transferFn transferFn, tx TxUnbond) (res abci.Result) {
 
-	return func(sender, receiver sdk.Actor, amount coin.Coins) (res abci.Result) {
-		// Move coins from the deletator account to the validator lock account
-		send := coin.NewSendOneTx(sender, receiver, amount)
-
-		// If the deduction fails (too high), abort the command
-		_, err := dispatch.DeliverTx(ctx, store, send)
-		if err != nil {
-			return abci.ErrInsufficientFunds.AppendLog(err.Error())
-		}
-		return
+	//get validator bond
+	bonds, err := LoadBonds(store)
+	if err != nil {
+		return resErrLoadingValidators(err)
 	}
+
+	idx, bond := bonds.Get(sender)
+	if bond == nil {
+		return resNoValidatorForAddress
+	}
+
+	// transfer coins back to account
+	unbondCoin := tx.Amount
+	unbondAmt := uint64(unbondCoin.Amount)
+	res = transferFn(holder, sender, coin.Coins{unbondCoin})
+	if res.IsErr() {
+		return res
+	}
+
+	bond.BondedTokens -= unbondAmt
+
+	if bond.BondedTokens == 0 {
+		bonds, err = bonds.Remove(idx)
+		if err != nil {
+			cmn.PanicSanity(resBadRemoveValidator.Error())
+		}
+	}
+	saveBonds(store, bonds)
+	return abci.OK
 }
 
-func getSingleSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
+// get the sender from the ctx and ensure it matches the tx pubkey
+func getTxSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
 	if len(senders) != 1 {
 		return sender, resMissingSignature
 	}
+	// TODO: ensure senders[0] matches tx.pubkey ...
 	return senders[0], abci.OK
-}
-
-func runTxBondGuts(sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result,
-	store state.SimpleDB, tx TxBond, sender sdk.Actor) abci.Result {
-
-	// Get amount of coins to bond
-	bondCoin := tx.Amount
-	bondAmt := uint64(bondCoin.Amount)
-
-	// Get the validator bond account
-	validatorBonds, err := LoadValidatorBonds(store)
-	if err != nil {
-		return resErrLoadingValidators(err)
-	}
-	i, validatorBond := validatorBonds.Get(sender)
-	if validatorBond == nil { //if it doesn't yet exist create it
-		validatorBond = &ValidatorBond{
-			Validator:    sender,
-			PubKey:       tx.PubKey,
-			BondedTokens: 0,
-			HoldAccount:  getHoldAccount(sender),
-			VotingPower:  0,
-		}
-		validatorBonds = append(validatorBonds, validatorBond)
-	}
-
-	// Move coins from the delegator account to the validator lock account
-	res := sendCoins(sender, validatorBond.HoldAccount, coin.Coins{bondCoin})
-	if res.IsErr() {
-		return res
-	}
-
-	validatorBonds[i].BondedTokens += bondAmt
-
-	// Save to store
-	saveValidatorBonds(store, validatorBonds)
-
-	return abci.OK
 }
 
 func getHoldAccount(sender sdk.Actor) sdk.Actor {
 	holdAddr := append([]byte{0x00}, sender.Address[1:]...) //shift and prepend a zero
-	return sdk.NewActor(name, holdAddr)
-}
-
-func runTxUnbond(ctx sdk.Context, store state.SimpleDB, tx TxUnbond,
-	dispatch sdk.Deliver) (res abci.Result) {
-
-	sender, res := getSingleSender(ctx)
-	if res.IsErr() {
-		return res
-	}
-
-	//context with hold account permissions
-	ctxHoldPermission := ctx.WithPermissions(getHoldAccount(sender))
-
-	return runTxUnbondGuts(sender, getSendFunc(ctxHoldPermission, store, dispatch), store, tx)
-}
-
-func runTxUnbondGuts(sender sdk.Actor,
-	sendCoins func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result,
-	store state.SimpleDB, tx TxUnbond) (res abci.Result) {
-
-	bondAmt := uint64(tx.Amount.Amount)
-
-	//get validator bond
-	validatorBonds, err := LoadValidatorBonds(store)
-	if err != nil {
-		return resErrLoadingValidators(err)
-	}
-	bondIndex, validatorBond := validatorBonds.Get(sender)
-	if validatorBond == nil {
-		return resNoValidatorForAddress
-	}
-
-	// subtract tokens from validatorBonds
-	switch {
-	case validatorBond.BondedTokens > bondAmt:
-		validatorBond.BondedTokens -= bondAmt
-	case validatorBond.BondedTokens == bondAmt:
-		validatorBonds, err = validatorBonds.Remove(bondIndex)
-		if err != nil {
-			return resBadRemoveValidator
-		}
-	case validatorBond.BondedTokens < bondAmt:
-		return resInsufficientFunds
-	}
-
-	saveValidatorBonds(store, validatorBonds)
-
-	// send unbonded coins to queue account, based on current exchange rate
-	res = sendCoins(validatorBond.HoldAccount, sender, coin.Coins{tx.Amount})
-	if res.IsErr() {
-		return res
-	}
-
-	return abci.OK
+	return sdk.NewActor(stakingModuleName, holdAddr)
 }

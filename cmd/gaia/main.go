@@ -74,7 +74,7 @@ func main() {
 			coin.NewHandler(),
 			stack.WrapHandler(roles.NewHandler()),
 			stack.WrapHandler(ibc.NewHandler()),
-			stake.Handler{},
+			stake.NewHandler(),
 		)
 
 	var startCmd = &cobra.Command{

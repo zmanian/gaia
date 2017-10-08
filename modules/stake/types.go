@@ -25,6 +25,16 @@ type ValidatorBond struct {
 	VotingPower  uint64    // Total number of bond tokens for the validator
 }
 
+func NewValidatorBond(sender, holder sdk.Actor, pubKey []byte) *ValidatorBond {
+	return &ValidatorBond{
+		Validator:    sender,
+		PubKey:       pubKey,
+		BondedTokens: 0,
+		HoldAccount:  holder,
+		VotingPower:  0,
+	}
+}
+
 // ABCIValidator - Get the validator from a bond value
 func (vb ValidatorBond) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
@@ -74,11 +84,11 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 	// Now sort and truncate the power
 	vbs.Sort()
 	for i, vb := range vbs {
-		if i >= maxVal {
+		if i >= globalParams.MaxVals {
 			vb.VotingPower = 0
 		}
 	}
-	saveValidatorBonds(store, vbs)
+	saveBonds(store, vbs)
 	return
 }
 
@@ -87,32 +97,33 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
 func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
-	validators := make([]*abci.Validator, maxVal)
-	i := 0
-	for i = range vbs {
-		if vbs[i].VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
+	validators := make([]*abci.Validator, 0, globalParams.MaxVals)
+	var i int
+	var vb *ValidatorBond
+	for i, vb = range vbs {
+		if vb.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
-		validators[i] = vbs[i].ABCIValidator()
+		validators[i] = vb.ABCIValidator()
 	}
-	if i >= maxVal {
+	if i >= globalParams.MaxVals {
 		return validators
 	}
 	return validators[:i+1]
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func ValidatorsDiff(baseline, update []*abci.Validator) (diff []*abci.Validator) {
+func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator) {
 
 	//TODO do something more efficient possibly by sorting first
 
-	//calculate any differences from the baseline to the update validator set
-	// first loop through the baseline validator set, and then catch any
-	// missed records in the update validator set
-	diff = make([]*abci.Validator, 0, maxVal)
-	for _, prevVal := range baseline {
+	//calculate any differences from the previous to the new validator set
+	// first loop through the previous validator set, and then catch any
+	// missed records in the new validator set
+	diff = make([]*abci.Validator, 0, globalParams.MaxVals)
+	for _, prevVal := range previous {
 		found := false
-		for _, newVal := range update {
+		for _, newVal := range current {
 			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
 				found = true
 				if newVal.Power != prevVal.Power {
@@ -125,9 +136,9 @@ func ValidatorsDiff(baseline, update []*abci.Validator) (diff []*abci.Validator)
 			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
 		}
 	}
-	for _, newVal := range update {
+	for _, newVal := range current {
 		found := false
-		for _, prevVal := range baseline {
+		for _, prevVal := range previous {
 			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
 				found = true
 				break
