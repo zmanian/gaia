@@ -186,8 +186,7 @@ func runTxBond(store state.SimpleDB, sender, holder sdk.Actor,
 	// Get the bond and index for this sender
 	idx, bond := bonds.Get(sender)
 	if bond == nil { //if it doesn't yet exist create it
-		bond = NewValidatorBond(sender, holder, tx.PubKey)
-		bonds = append(bonds, bond)
+		bonds.Add(NewValidatorBond(sender, holder, tx.PubKey))
 		idx = len(bonds) - 1
 	}
 

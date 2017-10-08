@@ -1,15 +1,6 @@
 package stake
 
-import (
-	"testing"
-
-	"github.com/cosmos/cosmos-sdk"
-	"github.com/cosmos/cosmos-sdk/modules/coin"
-	"github.com/cosmos/cosmos-sdk/state"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	abci "github.com/tendermint/abci/types"
-)
+/*
 
 func TestRunTxBondUnbondGuts(t *testing.T) {
 
@@ -120,3 +111,4 @@ func TestRunTxBondUnbondGuts(t *testing.T) {
 		})
 	}
 }
+*/

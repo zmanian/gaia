@@ -30,20 +30,20 @@ func TestState(t *testing.T) {
 	// ValidatorBonds checks
 
 	//check the empty store first
-	resGet, err := LoadValidatorBonds(store)
+	resGet, err := LoadBonds(store)
 	require.Nil(err)
 	assert.Equal(validatorNilBonds, resGet)
 
 	//Set and retrieve a record
-	saveValidatorBonds(store, validatorBonds)
-	resGet, err = LoadValidatorBonds(store)
+	saveBonds(store, validatorBonds)
+	resGet, err = LoadBonds(store)
 	require.Nil(err)
 	assert.Equal(validatorBonds, resGet)
 
 	//modify a records, save, and retrieve
 	validatorBonds[0].BondedTokens = 99
-	saveValidatorBonds(store, validatorBonds)
-	resGet, err = LoadValidatorBonds(store)
+	saveBonds(store, validatorBonds)
+	resGet, err = LoadBonds(store)
 	require.Nil(err)
 	assert.Equal(validatorBonds, resGet)
 

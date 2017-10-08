@@ -8,6 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
 	abci "github.com/tendermint/abci/types"
+	cmn "github.com/tendermint/tmlibs/common"
 )
 
 // ValidatorBond defines the total amount of bond tokens and their exchange rate to
@@ -97,19 +98,19 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
 func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
-	validators := make([]*abci.Validator, 0, globalParams.MaxVals)
+	validators := make([]*abci.Validator, cmn.MinInt(len(vbs), globalParams.MaxVals))
 	var i int
 	var vb *ValidatorBond
 	for i, vb = range vbs {
 		if vb.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
+		if i >= globalParams.MaxVals {
+			return validators
+		}
 		validators[i] = vb.ABCIValidator()
 	}
-	if i >= globalParams.MaxVals {
-		return validators
-	}
-	return validators[:i+1]
+	return validators
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
@@ -159,6 +160,11 @@ func (vbs ValidatorBonds) Get(validator sdk.Actor) (int, *ValidatorBond) {
 		}
 	}
 	return 0, nil
+}
+
+// Add - adds a ValidatorBond
+func (vbs ValidatorBonds) Add(bond *ValidatorBond) ValidatorBonds {
+	return append(vbs, bond)
 }
 
 // Remove - remove validator from the validator list
