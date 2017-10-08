@@ -2,6 +2,7 @@ package stake
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,52 +12,43 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-func TestTypes(t *testing.T) {
+func newActors(n int) (actors []sdk.Actor) {
+	for i := 0; i < n; i++ {
+		actors = append(actors, sdk.Actor{
+			"testChain", "testapp", fmt.Sprintf("addr%d", i)})
+	}
+	return
+}
+
+//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
+// instead this is just being set the address here for testing purposes
+func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
+	for i, a := range actors {
+		bonds = append(bonds, &ValidatorBond{
+			Validator:    a,
+			PubKey:       a.Address.Bytes(),
+			BondedTokens: amts[i],
+			HoldAccount:  getHoldAccount(a),
+			VotingPower:  amts[i],
+		})
+	}
+	return
+
+}
+
+func TestValidatorBonds(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
-	addr1 := []byte("addr1")
-	addr2 := []byte("addr2")
-	addr3 := []byte("addr3")
-	actor1 := sdk.Actor{"testChain", "testapp", addr1}
-	actor2 := sdk.Actor{"testChain", "testapp", addr2}
-	actor3 := sdk.Actor{"testChain", "testapp", addr3}
-	holdActor1 := sdk.Actor{"testChain", "testapp", []byte("hold1")}
-	holdActor2 := sdk.Actor{"testChain", "testapp", []byte("hol2")}
-	holdActor3 := sdk.Actor{"testChain", "testapp", []byte("hol3")}
-
-	//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
-	// instead this is just being set the address here for testing purposes
-	validator1 := &ValidatorBond{
-		Validator:    actor1,
-		PubKey:       actor1.Address.Bytes(),
-		BondedTokens: 10,
-		HoldAccount:  holdActor1,
-		VotingPower:  10,
-	}
-	validator2 := &ValidatorBond{
-		Validator:    actor2,
-		PubKey:       actor2.Address.Bytes(),
-		BondedTokens: 300,
-		HoldAccount:  holdActor2,
-		VotingPower:  300,
-	}
-	validator3 := &ValidatorBond{
-		Validator:    actor3,
-		PubKey:       actor3.Address.Bytes(),
-		BondedTokens: 123,
-		HoldAccount:  holdActor3,
-		VotingPower:  123,
-	}
-
-	validators := ValidatorBonds{validator1, validator2, validator3}
+	actors := newActors(3)
+	vals := ValidatorBonds(valsFromActors(actors, []int{10, 300, 123}))
 
 	//test basic sort
-	validators.Sort()
+	vals.Sort()
 	//assert.True(validators[0].Validator.Equals(actor1), "not equal: %v, %v" validators[0].ValidatorV//)
-	assert.Equal(validators[0].Validator, actor2)
-	assert.Equal(validators[1].Validator, actor3)
-	assert.Equal(validators[2].Validator, actor1)
+	assert.Equal(vals[0].Validator, actors[1])
+	assert.Equal(vals[1].Validator, actors[2])
+	assert.Equal(vals[2].Validator, actors[0])
 
 	//get the base validators set which will contain all the validators
 	validators0 := validators.GetValidators()
