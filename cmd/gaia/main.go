@@ -30,7 +30,7 @@ var RootCmd = &cobra.Command{
 
 // Tick - Called every block even if no transaction,
 //   process all queues, validator rewards, and calculate the validator set difference
-func getTickFnc(updateVal bool) func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+func getTickFnc() func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 	return func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 
 		// First need to prefix the store, at this point it's a global store
@@ -41,22 +41,18 @@ func getTickFnc(updateVal bool) func(store state.SimpleDB) (diffVal []*abci.Vali
 		if err != nil {
 			panic(err) //This error should really never happen - vital that this loads properly
 		}
-		if updateVal {
-			startVal := validatorBonds.GetValidators()
-			validatorBonds.UpdateVotingPower(store)
-			newVal := validatorBonds.GetValidators()
-			diffVal = stake.ValidatorsDiff(startVal, newVal)
-			validatorBonds.CleanupEmpty(store)
-		} else {
-			validatorBonds.UpdateVotingPower(store)
-		}
+		startVal := validatorBonds.GetValidators()
+		validatorBonds.UpdateVotingPower(store)
+		newVal := validatorBonds.GetValidators()
+		diffVal = stake.ValidatorsDiff(startVal, newVal)
+		validatorBonds.CleanupEmpty(store)
 
 		return
 	}
 }
 
 func main() {
-	// require all fees in mycoin - change this in your app!
+	// require all fees in strings - change this in your app!
 	basecmd.Handler = stack.New(
 		base.Logger{},
 		stack.Recovery{},
@@ -68,7 +64,7 @@ func main() {
 		IBC(ibc.NewMiddleware()).
 		Apps(
 			roles.NewMiddleware(),
-			fee.NewSimpleFeeMiddleware(coin.Coin{"mycoin", 0}, fee.Bank),
+			fee.NewSimpleFeeMiddleware(coin.Coin{"strings", 0}, fee.Bank),
 			stack.Checkpoint{OnDeliver: true},
 		).
 		Dispatch(
@@ -78,22 +74,9 @@ func main() {
 			stake.NewHandler(),
 		)
 
-	var startCmd = &cobra.Command{
-		Use:   "start",
-		Short: "Start this full node",
-	}
-	basecmd.InitTickStartCmd(getTickFnc(true), startCmd)
-
-	var startNoValCmd = &cobra.Command{
-		Use:   "startnoval",
-		Short: "Start a full node that never updates the validator set with tendermint",
-	}
-	basecmd.InitTickStartCmd(getTickFnc(false), startNoValCmd)
-
 	RootCmd.AddCommand(
 		basecmd.InitCmd,
-		startCmd,
-		startNoValCmd,
+		basecmd.InitTickStartCmd(getTickFnc()),
 		basecmd.UnsafeResetAllCmd,
 		client.VersionCmd,
 	)
