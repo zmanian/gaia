@@ -177,13 +177,8 @@ func runTxBond(store state.SimpleDB, sender, holder sdk.Actor,
 	// Get amount of coins to bond
 	bondCoin := tx.Amount
 
-	// Get the validator bond account
-	bonds, err := LoadBonds(store)
-	if err != nil {
-		return resErrLoadingValidators(err)
-	}
-
-	// Get the bond and index for this sender
+	// Get the validator bond accounts, and bond and index for this sender
+	bonds := LoadBonds(store)
 	idx, bond := bonds.Get(sender)
 	if bond == nil { //if it doesn't yet exist create it
 		bonds = bonds.Add(NewValidatorBond(sender, holder, tx.PubKey))
@@ -207,11 +202,7 @@ func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
 	transferFn transferFn, tx TxUnbond) (res abci.Result) {
 
 	//get validator bond
-	bonds, err := LoadBonds(store)
-	if err != nil {
-		return resErrLoadingValidators(err)
-	}
-
+	bonds := LoadBonds(store)
 	_, bond := bonds.Get(sender)
 	if bond == nil {
 		return resNoValidatorForAddress

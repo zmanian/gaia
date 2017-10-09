@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
 func TestState(t *testing.T) {
-	assert, require := assert.New(t), require.New(t)
+	assert := assert.New(t)
 
 	store := state.NewMemKVStore()
 
@@ -30,21 +29,18 @@ func TestState(t *testing.T) {
 	// ValidatorBonds checks
 
 	//check the empty store first
-	resGet, err := LoadBonds(store)
-	require.Nil(err)
+	resGet := LoadBonds(store)
 	assert.Equal(validatorNilBonds, resGet)
 
 	//Set and retrieve a record
 	saveBonds(store, validatorBonds)
-	resGet, err = LoadBonds(store)
-	require.Nil(err)
+	resGet = LoadBonds(store)
 	assert.Equal(validatorBonds, resGet)
 
 	//modify a records, save, and retrieve
 	validatorBonds[0].BondedTokens = 99
 	saveBonds(store, validatorBonds)
-	resGet, err = LoadBonds(store)
-	require.Nil(err)
+	resGet = LoadBonds(store)
 	assert.Equal(validatorBonds, resGet)
 
 }

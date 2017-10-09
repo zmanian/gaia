@@ -37,10 +37,7 @@ func getTickFnc() func(store state.SimpleDB) (diffVal []*abci.Validator, err err
 		store = stack.PrefixedStore(stake.Name(), store)
 
 		// Determine the validator set changes
-		validatorBonds, err := stake.LoadBonds(store)
-		if err != nil {
-			panic(err) //This error should really never happen - vital that this loads properly
-		}
+		validatorBonds := stake.LoadBonds(store)
 		startVal := validatorBonds.GetValidators()
 		validatorBonds.UpdateVotingPower(store)
 		newVal := validatorBonds.GetValidators()

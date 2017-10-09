@@ -24,7 +24,3 @@ var (
 
 	invalidInput = abci.CodeType_BaseInvalidInput
 )
-
-func resErrLoadingValidators(err error) abci.Result {
-	return abci.ErrBaseEncodingError.AppendLog("Error loading validators: " + err.Error()) //should never occur
-}

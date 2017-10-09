@@ -2,7 +2,6 @@ package stake
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk"
-	"github.com/cosmos/cosmos-sdk/errors"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
 	abci "github.com/tendermint/abci/types"
@@ -34,14 +33,14 @@ var BondKey = []byte{0x00}
 // TODO ultimately this function should be made unexported... being used right now
 // for patchwork of tick functionality therefor much easier if exported until
 // the new SDK is created
-func LoadBonds(store state.SimpleDB) (validatorBonds ValidatorBonds, err error) {
+func LoadBonds(store state.SimpleDB) (validatorBonds ValidatorBonds) {
 	b := store.Get(BondKey)
 	if b == nil {
 		return
 	}
-	err = wire.ReadBinaryBytes(b, &validatorBonds)
+	err := wire.ReadBinaryBytes(b, &validatorBonds)
 	if err != nil {
-		err = errors.ErrDecoding()
+		panic(err) // This error should never occure big problem if does
 	}
 	return
 }

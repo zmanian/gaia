@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	abci "github.com/tendermint/abci/types"
 
@@ -14,7 +13,7 @@ import (
 )
 
 func TestRunTxBondUnbond(t *testing.T) {
-	assert, require := assert.New(t), require.New(t)
+	assert := assert.New(t)
 
 	//set a store with a validator and delegator account
 	store := state.NewMemKVStore()
@@ -64,14 +63,12 @@ func TestRunTxBondUnbond(t *testing.T) {
 			holder := getHoldAccount(tt.args.sender)
 			got := runTxBond(tt.args.store, tt.args.sender, holder, dummySend, tt.args.tx)
 
-			validators, err := LoadBonds(store)
-			require.Nil(err)
-
 			//check the basics
 			assert.True(got.IsSameCode(tt.wantRes), "runTxBondGuts(%v, %v, %v) = %v, want %v",
 				tt.name, tt.args.tx, tt.args.sender, got, tt.wantRes)
 
 			//Check that the accounts and the bond account have the appropriate values
+			validators := LoadBonds(store)
 			assert.Equal(tt.wantBonded, validators[0].BondedTokens, "%v, %v, %v",
 				tt.name, tt.wantBonded, validators[0].BondedTokens)
 			assert.Equal(tt.wantBonded, dummyAccs[string(holder.Address)], "%v, %v, %v",
@@ -110,15 +107,13 @@ func TestRunTxBondUnbond(t *testing.T) {
 			holder := getHoldAccount(tt.args.sender)
 			got := runTxUnbond(tt.args.store, tt.args.sender, holder, dummySend, tt.args.tx)
 
-			validators, err := LoadBonds(store)
-			require.Nil(err)
-
 			//check the basics
 			assert.True(got.IsSameCode(tt.wantRes),
 				"runTxUnbondGuts(%v, %v) = %v, want %v",
 				tt.name, tt.args.tx, got, tt.wantRes)
 
 			//Check that the accounts and the bond account have the appropriate values
+			validators := LoadBonds(store)
 			if tt.validatorExists {
 				assert.Equal(tt.wantBonded, validators[0].BondedTokens, "%v, %v, %v",
 					tt.name, tt.wantBonded, validators[0].BondedTokens)
