@@ -76,13 +76,15 @@ func (h Handler) InitState(l log.Logger, store state.SimpleDB,
 }
 
 //separated for testing
-func (Handler) initState(module, key, value string, store state.SimpleDB) (err error) {
+func (Handler) initState(module, key, value string, store state.SimpleDB) error {
 	if module != stakingModuleName {
 		return errors.ErrUnknownModule(module)
 	}
+
 	switch key {
 	case "allowed_bond_denom":
 		allowedBondDenom = value
+		return nil
 	case "max_vals",
 		"gas_bond",
 		"gas_unbond":
@@ -98,6 +100,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) (err e
 		case "gas_unbound":
 			globalParams.GasUnbond = uint64(i)
 		}
+		return nil
 	}
 	return errors.ErrUnknownKey(key)
 }

@@ -1,11 +1,13 @@
 package commands
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	crypto "github.com/tendermint/go-crypto"
 	wire "github.com/tendermint/go-wire"
 
 	"github.com/cosmos/cosmos-sdk/client/commands/keys"
@@ -18,6 +20,7 @@ import (
 //nolint
 const (
 	FlagAmount = "amount"
+	FlagPubKey = "pubkey"
 )
 
 //nolint
@@ -37,7 +40,8 @@ var (
 func init() {
 	//Add Flags
 	fsDelegation := flag.NewFlagSet("", flag.ContinueOnError)
-	fsDelegation.String(FlagAmount, "1atom", "Amount of Atoms") //TODO make string once decimal integrated with coin
+	fsDelegation.String(FlagAmount, "1atom", "Amount of Atoms")
+	fsDelegation.String(FlagPubKey, "", "PubKey of the Validator")
 
 	CmdBond.Flags().AddFlagSet(fsDelegation)
 	CmdUnbond.Flags().AddFlagSet(fsDelegation)
@@ -49,15 +53,35 @@ func cmdBond(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	name := viper.GetString(txcmd.FlagName)
-	if len(name) == 0 {
-		return fmt.Errorf("must use --name flag")
+	var pubkey crypto.PubKey
+	pubkeyStr := viper.GetString(FlagPubKey)
+	if len(pubkeyStr) != 0 {
+
+		pkBytes, err := hex.DecodeString(pubkeyStr)
+		if err != nil {
+			return err
+		}
+		if len(pkBytes) != 32 { //if len(pubkeyStr) != 64 {
+			return fmt.Errorf("pubkey must be hex encoded string which is 64 characters long")
+		}
+		var pkEd crypto.PubKeyEd25519
+		copy(pkEd[:], pkBytes[:])
+		pubkey = pkEd.Wrap()
+
+	} else { // if pubkey flag is not used get the pubkey of the signer
+
+		name := viper.GetString(txcmd.FlagName)
+		if len(name) == 0 {
+			return fmt.Errorf("must use --name flag")
+		}
+		info, err := keys.GetKeyManager().Get(name)
+		if err != nil {
+			return err
+		}
+		pubkey = info.PubKey
 	}
-	info, err := keys.GetKeyManager().Get(name)
-	if err != nil {
-		return err
-	}
-	tx := stake.NewTxBond(amount, wire.BinaryBytes(info.PubKey))
+
+	tx := stake.NewTxBond(amount, wire.BinaryBytes(pubkey))
 	return txcmd.DoTx(tx)
 }
 
