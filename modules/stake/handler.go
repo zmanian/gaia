@@ -22,16 +22,14 @@ const (
 )
 
 // Name is the name of the modules.
-// TODO do we need name to be unexposed for security?
 func Name() string {
 	return stakingModuleName
 }
 
-var allowedBondDenom = "strings" // bondable coin denomination
-
 // Params defines the parameters for bonding and unbonding
 type Params struct {
-	MaxVals int `json:"max_vals"` // maximum number of validators
+	MaxVals          int    `json:"max_vals"`           // maximum number of validators
+	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
 	GasBond   uint64 `json:"gas_bond"`
@@ -40,9 +38,10 @@ type Params struct {
 
 func defaultParams() Params {
 	return Params{
-		MaxVals:   100,
-		GasBond:   20,
-		GasUnbond: 0,
+		MaxVals:          100,
+		AllowedBondDenom: "strings",
+		GasBond:          20,
+		GasUnbond:        0,
 	}
 }
 
@@ -83,7 +82,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 
 	switch key {
 	case "allowed_bond_denom":
-		allowedBondDenom = value
+		globalParams.AllowedBondDenom = value
 		return nil
 	case "max_vals",
 		"gas_bond",
