@@ -100,9 +100,7 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 // is to modify the VotingPower
 func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
 	validators := make([]*abci.Validator, cmn.MinInt(len(vbs), globalParams.MaxVals))
-	var i int
-	var vb *ValidatorBond
-	for i, vb = range vbs {
+	for i, vb := range vbs {
 		if vb.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
@@ -123,13 +121,17 @@ func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator
 	// first loop through the previous validator set, and then catch any
 	// missed records in the new validator set
 	diff = make([]*abci.Validator, 0, globalParams.MaxVals)
+
 	for _, prevVal := range previous {
+		if prevVal == nil {
+			continue
+		}
 		found := false
-		for _, newVal := range current {
-			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
+		for _, curVal := range current {
+			if bytes.Equal(prevVal.PubKey, curVal.PubKey) {
 				found = true
-				if newVal.Power != prevVal.Power {
-					diff = append(diff, &abci.Validator{newVal.PubKey, newVal.Power})
+				if curVal.Power != prevVal.Power {
+					diff = append(diff, &abci.Validator{curVal.PubKey, curVal.Power})
 					break
 				}
 			}
@@ -138,16 +140,19 @@ func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator
 			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
 		}
 	}
-	for _, newVal := range current {
+	for _, curVal := range current {
 		found := false
 		for _, prevVal := range previous {
-			if bytes.Equal(prevVal.PubKey, newVal.PubKey) {
+			if prevVal == nil {
+				continue
+			}
+			if bytes.Equal(prevVal.PubKey, curVal.PubKey) {
 				found = true
 				break
 			}
 		}
 		if !found {
-			diff = append(diff, &abci.Validator{newVal.PubKey, newVal.Power})
+			diff = append(diff, &abci.Validator{curVal.PubKey, curVal.Power})
 		}
 	}
 	return

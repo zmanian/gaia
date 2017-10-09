@@ -45,6 +45,7 @@ func defaultParams() Params {
 	}
 }
 
+// TODO sync with the state
 // global for now
 var globalParams = defaultParams()
 
@@ -114,9 +115,9 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	}
 
 	// get the sender
-	sender, err := getTxSender(ctx)
-	if err != nil {
-		return res, err
+	sender, abciRes := getTxSender(ctx)
+	if abciRes.IsErr() {
+		return res, abciRes
 	}
 	_ = sender
 
@@ -186,7 +187,7 @@ func runTxBond(store state.SimpleDB, sender, holder sdk.Actor,
 	// Get the bond and index for this sender
 	idx, bond := bonds.Get(sender)
 	if bond == nil { //if it doesn't yet exist create it
-		bonds.Add(NewValidatorBond(sender, holder, tx.PubKey))
+		bonds = bonds.Add(NewValidatorBond(sender, holder, tx.PubKey))
 		idx = len(bonds) - 1
 	}
 
