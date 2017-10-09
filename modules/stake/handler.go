@@ -118,18 +118,57 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	if abciRes.IsErr() {
 		return res, abciRes
 	}
-	_ = sender
 
 	// return the fee for each tx type
-	switch tx.Unwrap().(type) {
+	switch txInner := tx.Unwrap().(type) {
 	case TxBond:
-		// TODO: check the sender has enough coins to bond
-		return sdk.NewCheck(globalParams.GasBond, ""), nil
+		return sdk.NewCheck(globalParams.GasBond, ""),
+			checkTxBond(txInner, sender, store)
 	case TxUnbond:
-		// TODO check the sender has coins to unbond
-		return sdk.NewCheck(globalParams.GasUnbond, ""), nil
+		return sdk.NewCheck(globalParams.GasUnbond, ""),
+			checkTxUnbond(txInner, sender, store)
 	}
 	return res, errors.ErrUnknownTxType("GTH")
+}
+
+func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
+	// TODO check the sender has enough coins to bond
+	//acc := coin.Account{}
+	//// vvv this causes nil pointer ref error INSIDE of GetParsed
+	//_, err := query.GetParsed(sender.Address, &acc, true) //NOTE we are not using proof queries
+	//if err != nil {
+	//return err
+	//}
+	//if acc.Coins.IsGTE(coin.Coins{tx.Amount}) {
+	//return fmt.Errorf("not enough coins to bond, have %v, trying to bond %v",
+	//acc.Coins, tx.Amount)
+	//}
+
+	// check to see if the pubkey has been registered before,
+	//  if it has been used ensure that the validator account is same
+	//  to prevent accidentally bonding to validator other than you
+	bonds := LoadBonds(store)
+	_, bond := bonds.GetByPubKey(tx.PubKey)
+	if bond != nil {
+		if !bond.Validator.Equals(sender) {
+			return fmt.Errorf("cannot bond tokens to pubkey used by another validator"+
+				" PubKey %v already registered with %v validator address",
+				bond.PubKey, bond.Validator)
+		}
+	}
+	return nil
+}
+
+func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
+
+	//check if have enough tokens to unbond
+	bonds := LoadBonds(store)
+	_, bond := bonds.Get(sender)
+	if bond.BondedTokens < uint64(tx.Amount.Amount) {
+		return fmt.Errorf("not enough bond tokens to unbond, have %v, trying to unbond %v",
+			bond.BondedTokens, tx.Amount)
+	}
+	return nil
 }
 
 // DeliverTx executes the tx if valid
@@ -224,11 +263,20 @@ func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
 
 // get the sender from the ctx and ensure it matches the tx pubkey
 func getTxSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
-	senders := ctx.GetPermissions("", auth.NameSigs) //XXX does auth need to be checked here?
+	senders := ctx.GetPermissions("", auth.NameSigs)
 	if len(senders) != 1 {
 		return sender, resMissingSignature
 	}
 	// TODO: ensure senders[0] matches tx.pubkey ...
+	// NOTE on TODO..  right now the PubKey doesn't need to match the sender
+	// and we actually don't have the means to construct the priv_validator.json
+	// with its private key with current keys tooling in SDK so needs to be
+	// a second key... This is still secure because you will only be able to
+	// unbond to the first married account, although, you could hypotheically
+	// bond some coins to somebody elses account (effectively giving them coins)
+	// maybe that is worth checking more. Validators should probably be allowed
+	// to use two different keys, one for validating and one with coins on it...
+	// so this point may never be relevant
 	return senders[0], abci.OK
 }
 

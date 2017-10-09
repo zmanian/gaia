@@ -188,6 +188,16 @@ func (vbs ValidatorBonds) Get(validator sdk.Actor) (int, *ValidatorBond) {
 	return 0, nil
 }
 
+// GetByPubKey - get a ValidatorBond for a specific validator from the ValidatorBonds
+func (vbs ValidatorBonds) GetByPubKey(pubkey []byte) (int, *ValidatorBond) {
+	for i, vb := range vbs {
+		if bytes.Equal(vb.PubKey, pubkey) {
+			return i, vb
+		}
+	}
+	return 0, nil
+}
+
 // Add - adds a ValidatorBond
 func (vbs ValidatorBonds) Add(bond *ValidatorBond) ValidatorBonds {
 	return append(vbs, bond)

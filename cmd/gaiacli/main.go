@@ -89,6 +89,6 @@ func main() {
 		auto.AutoCompleteCmd,
 	)
 
-	cmd := cli.PrepareMainCmd(GaiaCli, "BC", os.ExpandEnv("$HOME/.basecli"))
+	cmd := cli.PrepareMainCmd(GaiaCli, "BC", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
 	cmd.Execute()
 }
