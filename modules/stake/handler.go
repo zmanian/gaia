@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	abci "github.com/tendermint/abci/types"
-	cmn "github.com/tendermint/tmlibs/common"
 	"github.com/tendermint/tmlibs/log"
 
 	"github.com/cosmos/cosmos-sdk"
@@ -213,7 +212,7 @@ func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
 		return resErrLoadingValidators(err)
 	}
 
-	idx, bond := bonds.Get(sender)
+	_, bond := bonds.Get(sender)
 	if bond == nil {
 		return resNoValidatorForAddress
 	}
@@ -228,12 +227,6 @@ func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
 
 	bond.BondedTokens -= unbondAmt
 
-	if bond.BondedTokens == 0 {
-		bonds, err = bonds.Remove(idx)
-		if err != nil {
-			cmn.PanicSanity(resBadRemoveValidator.Error())
-		}
-	}
 	saveBonds(store, bonds)
 	return abci.OK
 }

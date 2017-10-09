@@ -94,6 +94,20 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 	return
 }
 
+// CleanupEmpty - removes all validators which have no bonded atoms left
+func (vbs ValidatorBonds) CleanupEmpty(store state.SimpleDB) {
+	for i, vb := range vbs {
+		if vb.BondedTokens == 0 {
+			var err error
+			vbs, err = vbs.Remove(i)
+			if err != nil {
+				cmn.PanicSanity(resBadRemoveValidator.Error())
+			}
+		}
+	}
+	saveBonds(store, vbs)
+}
+
 // GetValidators - get the most recent updated validator set from the
 // ValidatorBonds. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
@@ -128,6 +142,9 @@ func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator
 		}
 		found := false
 		for _, curVal := range current {
+			if curVal == nil {
+				continue
+			}
 			if bytes.Equal(prevVal.PubKey, curVal.PubKey) {
 				found = true
 				if curVal.Power != prevVal.Power {
@@ -141,6 +158,9 @@ func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator
 		}
 	}
 	for _, curVal := range current {
+		if curVal == nil {
+			continue
+		}
 		found := false
 		for _, prevVal := range previous {
 			if prevVal == nil {
