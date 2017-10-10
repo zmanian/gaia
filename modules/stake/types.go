@@ -29,7 +29,7 @@ type ValidatorBond struct {
 // NewValidatorBond - returns a new empty validator bond object
 func NewValidatorBond(sender, holder sdk.Actor, pubKey []byte) *ValidatorBond {
 	return &ValidatorBond{
-		Validator:    sender,
+		Sender:       sender,
 		PubKey:       pubKey,
 		BondedTokens: 0,
 		HoldAccount:  holder,
@@ -57,7 +57,7 @@ func (vbs ValidatorBonds) Len() int      { return len(vbs) }
 func (vbs ValidatorBonds) Swap(i, j int) { vbs[i], vbs[j] = vbs[j], vbs[i] }
 func (vbs ValidatorBonds) Less(i, j int) bool {
 	vp1, vp2 := vbs[i].VotingPower, vbs[j].VotingPower
-	d1, d2 := vbs[i].Validator, vbs[j].Validator
+	d1, d2 := vbs[i].Sender, vbs[j].Sender
 	switch {
 	case vp1 != vp2:
 		return vp1 > vp2
@@ -178,10 +178,10 @@ func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator
 	return
 }
 
-// Get - get a ValidatorBond for a specific validator from the ValidatorBonds
-func (vbs ValidatorBonds) Get(validator sdk.Actor) (int, *ValidatorBond) {
+// Get - get a ValidatorBond for a specific sender from the ValidatorBonds
+func (vbs ValidatorBonds) Get(sender sdk.Actor) (int, *ValidatorBond) {
 	for i, vb := range vbs {
-		if vb.Validator.Equals(validator) {
+		if vb.Sender.Equals(sender) {
 			return i, vb
 		}
 	}

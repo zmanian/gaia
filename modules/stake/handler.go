@@ -150,10 +150,10 @@ func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
 	bonds := LoadBonds(store)
 	_, bond := bonds.GetByPubKey(tx.PubKey)
 	if bond != nil {
-		if !bond.Validator.Equals(sender) {
+		if !bond.Sender.Equals(sender) {
 			return fmt.Errorf("cannot bond tokens to pubkey used by another validator"+
 				" PubKey %v already registered with %v validator address",
-				bond.PubKey, bond.Validator)
+				bond.PubKey, bond.Sender)
 		}
 	}
 	return nil
@@ -177,7 +177,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 
 	// TODO: remove redunandcy
 	// also we don't need to check the res - gas is already deducted in sdk
-	_, err = h.CheckTx(ctx, store, tx, dispath)
+	_, err = h.CheckTx(ctx, store, tx, nil)
 	if err != nil {
 		return
 	}

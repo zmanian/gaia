@@ -12,6 +12,61 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
+func dummyTransferFn(store map[string]int64) transferFn {
+	return func(from, to sdk.Actor, coins coin.Coins) abci.Result {
+		store[string(from.Address)] -= int64(coins[0].Amount)
+		store[string(to.Address)] += int64(coins[0].Amount)
+		return abci.OK
+	}
+}
+
+func TestBondTxIncrements(t *testing.T) {
+	assert := assert.New(t)
+
+	store := state.NewMemKVStore()
+
+	// make a validator
+	senders := newActors(1)
+	sender := senders[0]
+	holder := getHoldAccount(sender)
+
+	// create sender acc and bondtx to send
+	initSender := int64(1000)
+	bondAmount := int64(10)
+	accStore := map[string]int64{
+		string(sender.Address): initSender - bondAmount,
+		string(holder.Address): bondAmount,
+	}
+	txBond := TxBond{
+		Amount: coin.Coin{"atom", bondAmount},
+	}
+
+	// create initial bond
+	bonds := bondsFromActors(senders, []int{int(bondAmount)})
+	saveBonds(store, bonds)
+
+	// just send the txbond multiple times
+	for i := 0; i < 5; i++ {
+		got := runTxBond(store, sender, holder, dummyTransferFn(accStore), txBond)
+
+		//check the basics
+		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
+
+		//Check that the accounts and the bond account have the appropriate values
+		validators := LoadBonds(store)
+		expectedBond := int64(i+2) * bondAmount // +2 since we started with 1 and we send 1 at the start of loop
+		expectedSender := initSender - expectedBond
+		gotBonded := int64(validators[0].BondedTokens)
+		gotHolder := accStore[string(holder.Address)]
+		gotSender := accStore[string(sender.Address)]
+
+		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
+		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
+		assert.Equal(expectedSender, gotSender, "%v, %v", expectedSender, gotSender)
+	}
+}
+
+/*
 func TestRunTxBondUnbond(t *testing.T) {
 	assert := assert.New(t)
 
@@ -125,3 +180,4 @@ func TestRunTxBondUnbond(t *testing.T) {
 		})
 	}
 }
+*/

@@ -24,7 +24,7 @@ func newActors(n int) (actors []sdk.Actor) {
 func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
 	for i, a := range actors {
 		bonds = append(bonds, &ValidatorBond{
-			Validator:    a,
+			Sender:       a,
 			PubKey:       a.Address.Bytes(),
 			BondedTokens: uint64(amts[i]),
 			HoldAccount:  getHoldAccount(a),
