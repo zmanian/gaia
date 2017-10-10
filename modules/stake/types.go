@@ -19,8 +19,8 @@ import (
 // delegated divided by the current exchange rate. Voting power can be calculated as
 // total bonds multiplied by exchange rate.
 type ValidatorBond struct {
-	Validator    sdk.Actor
-	PubKey       []byte
+	Sender       sdk.Actor // Sender of BondTx - UnbondTx returns here
+	PubKey       []byte    // Pubkey of validator
 	BondedTokens uint64    // Total number of bond tokens for the validator
 	HoldAccount  sdk.Actor // Account where the bonded coins are held. Controlled by the app
 	VotingPower  uint64    // Total number of bond tokens for the validator
@@ -41,7 +41,7 @@ func NewValidatorBond(sender, holder sdk.Actor, pubKey []byte) *ValidatorBond {
 func (vb ValidatorBond) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
 		PubKey: vb.PubKey,
-		Power:  vb.VotingPower, //TODO could be a problem sending in truncated IntPart here
+		Power:  vb.VotingPower,
 	}
 }
 

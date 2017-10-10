@@ -175,9 +175,11 @@ func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
 
-	err = tx.ValidateBasic()
+	// TODO: remove redunandcy
+	// also we don't need to check the res - gas is already deducted in sdk
+	_, err = h.CheckTx(ctx, store, tx, dispath)
 	if err != nil {
-		return res, err
+		return
 	}
 
 	sender, abciRes := getTxSender(ctx)
@@ -185,6 +187,8 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		return res, abciRes
 	}
 
+	// get the holding account for the sender's bond.
+	// holding account is just an sdk.Actor, with the sender's address shifted one byte right.
 	holder := getHoldAccount(sender)
 
 	//Run the transaction
@@ -200,9 +204,11 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	}
 
 	res = sdk.DeliverResult{
-		Data: abciRes.Data,
-		Log:  abciRes.Log,
+		Data:    abciRes.Data,
+		Log:     abciRes.Log,
+		GasUsed: globalParams.GasBond,
 	}
+
 	return
 }
 
