@@ -20,31 +20,35 @@ make all
 
 Here is a quick example to get you off your feet: 
 
-First generate a new key, save your name and pubkey for later
+First, generate a new key with a name, and save the address:
 
 ```
-gaiacli keys new 
-gaiacli keys list 
-<generate your new key under YOURNAME, save YOURPUBKEY>
+MYNAME=<your name>
+gaiacli keys new $MYNAME
+gaiacli keys list
+MYADDR=<your newly generated address>
 ```
-
-Next initialize a gaia chain and your account a bunch of fun fake money
-
-```
-gaia init <YOURPUBKEY> --home=$HOME/.atlas1 --chain-id=test 
-```
-
-Also initialize a second chain which will be used to connect to to represent 
-your validaator. Copy the genesis from the first chain in.
+Now initialize a gaia chain:
 
 ```
-gaia init <YOURPUBKEY> --home=$HOME/.atlas2 --chain-id=test
-cp $HOME/.atlas1/genesis.json $HOME/.atlas2/genesis.json 
+gaia init $MYADDR --home=$HOME/.atlas1 --chain-id=test 
 ```
 
-Additionally open the file `$HOME/.atlas2/config.toml` and modify it 
-to use different addresses from the first node as well as connect to the 
-first node. Your config should look as follows:
+This will create all the files necessary to run a single node chain in `$HOME/.atlas1`:
+a `priv_validator.json` file with the validators private key, and a `genesis.json` file 
+with the list of validators and accounts. In this case, we have one random validator,
+and `$MYADDR` is an independent account that has a bunch of coins.
+
+We can add a second node on our local machine by initiating a node in a new directory,
+and copying in the genesis:
+
+
+```
+gaia init $MYADDR --home=$HOME/.atlas2 --chain-id=test
+cp $HOME/.atlas1/genesis.json $HOME/.atlas2/genesis.json
+```
+
+We need to also modify `$HOME/.atlas2/config.toml` to set new seeds and ports. It should look like:
 
 ```
 proxy_app = "tcp://127.0.0.1:46668"
@@ -58,46 +62,85 @@ laddr = "tcp://0.0.0.0:46667"
 
 [p2p]
 laddr = "tcp://0.0.0.0:46666"
-seeds = "tcp://0.0.0.0:46656"
+seeds = "0.0.0.0:46656"
 ```
 
-Great, now that we've initialized the chains, let's 
-start the first and second node.
+Great, now that we've initialized the chains, we can start both nodes in the background:
+
 ```
-gaia start --home=$HOME/atlas1
-gaia start --home=$HOME/atlas2
+gaia start --home=$HOME/.atlas1  &> atlas1.log &
+NODE1_PID=$!
+gaia start --home=$HOME/.atlas2  &> atlas2.log &
+NODE2_PID=$!
 ```
 
-In a separate terminal window initialize the client to the first node
+Note we save the `PID` so we can later kill the processes.
+
+Of course, you can peak at your logs with `tail atlas1.log`, or follow them 
+for a bit with `tail -f atlas1.log`.
+
+Now we can initialize a client for the first node, and look up our account:
 
 ```
 gaiacli init --chain-id=test --node=tcp://localhost:46657
+gaiacli query account $MYADDR
 ```
 
-Now bond some coins and check out the validator set. You should see that coins
-have moved from your account balance and to the validator account. 
-The validator pubkey must be registered using the `--pubkey` flag. 
-In this example, your validator pubkey which you have registered can be found in:
-`~/.atlas2/priv_validator.json`
+Nice. We can also lookup the validator set:
 
 ```
-gaiacli query account <YOURPUBKEY>
-gaiacli tx bond --amount 2strings --name <YOURNAME> --pubkey <VALIDATORPUBKEY>
 gaiacli query validators
-gaiacli query account <YOURPUBKEY>
+```
+
+Notice it's empty! This is because the initial validators are special - 
+the app doesn't know about them, so they can't be removed. To see what
+tendermint itself thinks the validator set is, use:
+
+```
+curl localhost:46657/validators
+```
+
+Ok, let's add the second node as a validator. First, we need the pubkey data:
+
+```
+cat $HOME/.atlas2/priv_validator.json 
+```
+
+If you have a json parser like `jq`, you can get just the pubkey:
+
+```
+cat $HOME/.atlas2/priv_validator.json | jq .pub_key.data
+```
+
+Now we can bond some coins to that pubkey:
+
+```
+gaiacli tx bond --amount 10strings --name $MYNAME --pubkey <validator pubkey>
+```
+
+We should see our account balance decrement, and the pubkey get added to the app's list of bonds:
+
+```
+gaiacli query account $MYADDR
+gaiacli query validators
 ``` 
 
-After your coins have been bonded you should start to see blocks rolling in on the 
-second node. If the second node is halted then the first node should continue publishing blocks
-as it has a voting power of 10 (from genesis.json) which is greater than the number 
-of tokens we bonded in the previous step. If we had bonded a larger amount such as 11 _strings_ 
-then the network would have halted when to paused the second node. Give it a shot!
+To confirm for certain the new validator is active, check tendermint:
 
-Finally watch all your power relinquish as you unbond some coins, you should see your
+```
+curl localhost:46657/validators
+```
+
+If you now kill your second node, blocks will stop streaming in, because there aren't enough validators online.
+Turn her back on and they will start streaming again.
+
+Finally, to relinquish all your power, unbond some coins. You should see your
 VotingPower reduce and your account balance increase.
 
 ```
-gaiacli tx unbond --amount 1strings --name <YOURNAME>
+gaiacli tx unbond --amount 1strings --name $MYNAME
 gaiacli query validators
-gaiacli query account <YOURPUBKEY>
+gaiacli query account $MYNAME
 ``` 
+
+Once you unbond enough, you will no longer be needed to make new blocks.
