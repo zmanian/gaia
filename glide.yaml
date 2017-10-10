@@ -1,25 +1,63 @@
 package: github.com/cosmos/gaia
 import:
+- package: github.com/gorilla/websocket
+- package: github.com/pkg/errors
+  version: ^0.8.0
 - package: github.com/spf13/cobra
-  version: master
+- package: github.com/spf13/pflag
+- package: github.com/spf13/viper
 - package: github.com/tendermint/abci
-  version: develop
+  version: 191c4b6d176169ffc7f9972d490fa362a3b7d940
   subpackages:
+  - server
   - types
-- package: github.com/tendermint/basecoin
-  version: master
-  subpackages:
-  - state
-  - types
+- package: github.com/cosmos/cosmos-sdk
+  version: feature/staking
+- package: github.com/tendermint/iavl
+  version: 2d3ca4f466c32953641d4c49cad3d93eb7876a5e
 - package: github.com/tendermint/go-crypto
-  version: develop
-- package: github.com/tendermint/go-wire
-  version: develop
-- package: github.com/tendermint/basecoin-stake
-  version: develop
-- package: github.com/cosmos/basecoin-delegationgame
-  version: develop
-- package: github.com/tendermint/merkleeyes
-  version: ^0.2.4
+  version: 0418d32276d7d0f080e4c0e58b49c6ba2f717954
   subpackages:
+  - cmd
+  - keys
+- package: github.com/tendermint/go-wire
+  version: 5f88da3dbc1a72844e6dfaf274ce87f851d488eb
+  subpackages:
+  - data
+- package: github.com/tendermint/light-client
+  version: ac2e4bf47b31aaf5d3d336691ac786ec751bfc32
+  subpackages:
+  - proofs
+  - certifiers
+  - certifiers/client
+  - certifiers/files
+- package: github.com/tendermint/merkleeyes
+  version: 2f6e5d31e7a35045d8d0a5895cb1fec33dd4d32b
+  subpackages:
+  - client
   - iavl
+- package: github.com/tendermint/tendermint
+  version: 97e980225530133c7b7e2b45e5e65c1f78ace89b
+  subpackages:
+  - config
+  - node
+  - proxy
+  - rpc/client
+  - rpc/core/types
+  - rpc/lib/client
+  - rpc/lib/types
+  - types
+- package: github.com/tendermint/tmlibs
+  version: 096dcb90e60aa00b748b3fe49a4b95e48ebf1e13
+  subpackages:
+  - cli
+  - cli/flags
+  - common
+  - events
+  - log
+  - logger
+testImport:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
+  - require
