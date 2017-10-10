@@ -16,7 +16,7 @@ cd $GOPATH/src/github.com/cosmos/gaia
 make all
 ```
 
-### Example
+### Local-Test Example
 
 Here is a quick example to get you off your feet: 
 
@@ -31,22 +31,54 @@ gaiacli keys list
 Next initialize a gaia chain and your account a bunch of fun fake money
 
 ```
-gaia init --chain-id=test <YOURPUBKEY>
-gaia start
+gaia init <YOURPUBKEY> --home=$HOME/.atlas1 --chain-id=test 
 ```
 
-In a separate terminal window initialize the client
+Also initialize a second chain which will be used to connect to to represent 
+your validaator. Copy the genesis from the first chain in.
+
+```
+gaia init <YOURPUBKEY> --home=$HOME/.atlas2 --chain-id=test
+cp $HOME/.atlas1/genesis.json $HOME/.atlas2/genesis.json 
+```
+
+Additionally open the file `$HOME/.atlas2/config.toml` and modify it 
+to use different addresses from the first node as well as connect to the 
+first node. Your config should look as follows:
+
+```
+proxy_app = "tcp://127.0.0.1:46668"
+moniker = "anonymous"
+fast_sync = true
+db_backend = "leveldb"
+log_level = "state:info,*:error"
+
+[rpc]
+laddr = "tcp://0.0.0.0:46667"
+
+[p2p]
+laddr = "tcp://0.0.0.0:46666"
+seeds = "tcp://0.0.0.0:46656"
+```
+
+Great, now that we've initialized the chains, let's 
+start the first and second node.
+```
+gaia start --home=$HOME/atlas1
+gaia start --home=$HOME/atlas2
+```
+
+In a separate terminal window initialize the client to the first node
 
 ```
 gaiacli init --chain-id=test --node=tcp://localhost:46657
 ```
 
 Now bond some coins and check out the validator set. You should see that coins
-have moved from your account balance and to the validator account. If the validator
-pubkey is the same as the account who is sending the coins then the the `--pubkey`
-flag does not need to be used. Otherwise the validator can have a pubkey registered
-using the `--pubkey` flag. In this example, this pubkey can be found within 
-`~/.cosmos-gaia/priv_validator.json`
+have moved from your account balance and to the validator account. 
+The validator pubkey must be registered using the `--pubkey` flag. 
+In this example, your validator pubkey which you have registered can be found in:
+`~/.atlas2/priv_validator.json`
 
 ```
 gaiacli query account <YOURPUBKEY>
@@ -55,8 +87,14 @@ gaiacli query validators
 gaiacli query account <YOURPUBKEY>
 ``` 
 
-Next unbond some coins, you should see your VotingPower reduce 
-and your account balance increase.
+After your coins have been bonded you should start to see blocks rolling in on the 
+second node. If the second node is halted then the first node should continue publishing blocks
+as it has a voting power of 10 (from genesis.json) which is greater than the number 
+of tokens we bonded in the previous step. If we had bonded a larger amount such as 11 _strings_ 
+then the network would have halted when to paused the second node. Give it a shot!
+
+Finally watch all your power relinquish as you unbond some coins, you should see your
+VotingPower reduce and your account balance increase.
 
 ```
 gaiacli tx unbond --amount 1strings --name <YOURNAME>
