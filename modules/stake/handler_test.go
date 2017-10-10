@@ -20,41 +20,77 @@ func dummyTransferFn(store map[string]int64) transferFn {
 	}
 }
 
+func initAccounts(n int, amount int64) ([]sdk.Actor, map[string]int64) {
+	accStore := map[string]int64{}
+	senders := newActors(n)
+	for _, sender := range senders {
+		accStore[string(sender.Address)] = amount
+	}
+	return senders, accStore
+}
+
+func newTxBond(amt int64) TxBond {
+	return TxBond{
+		Amount: coin.Coin{"atom", amt},
+	}
+}
+
+func newTxUnbond(amt int64) TxUnbond {
+	return TxUnbond{
+		Amount: coin.Coin{"atom", amt},
+	}
+}
+
+func TestBondTxDuplicatePubKey(t *testing.T) {
+	assert := assert.New(t)
+
+	store := state.NewMemKVStore() // for bonds
+	initSender := int64(1000)
+	senders, accStore := initAccounts(2, initSender) // for accounts
+	sender, sender2 := senders[0], senders[1]
+	holder := getHoldAccount(sender)
+
+	bondAmount := int64(10)
+	txBond := newTxBond(bondAmount)
+
+	txBond.PubKey = []byte("pubkey1")
+	got := runTxBond(store, sender, holder, dummyTransferFn(accStore), txBond)
+	assert.Equal(got, abci.OK, "expected no error on runTxBond")
+
+	// one sender can bond to different pubkeys
+	txBond.PubKey = []byte("pubkey2")
+	err := checkTxBond(txBond, sender, store)
+	assert.Nil(err, "expected no error on checkTx")
+
+	// execute the last tx
+	got = runTxBond(store, sender, holder, dummyTransferFn(accStore), txBond)
+	assert.Equal(got, abci.OK, "expected no error on runTxBond")
+
+	// two senders cant bond to the same pubkey
+	txBond.PubKey = []byte("pubkey1")
+	err = checkTxBond(txBond, sender2, store)
+	assert.NotNil(err, "expected error on checkTx")
+}
+
 func TestBondTxIncrements(t *testing.T) {
 	assert := assert.New(t)
 
-	store := state.NewMemKVStore()
-
-	// make a validator
-	senders := newActors(1)
+	store := state.NewMemKVStore() // for bonds
+	initSender := int64(1000)
+	senders, accStore := initAccounts(1, initSender) // for accounts
 	sender := senders[0]
 	holder := getHoldAccount(sender)
 
-	// create sender acc and bondtx to send
-	initSender := int64(1000)
+	// just send the same txbond multiple times
 	bondAmount := int64(10)
-	accStore := map[string]int64{
-		string(sender.Address): initSender - bondAmount,
-		string(holder.Address): bondAmount,
-	}
-	txBond := TxBond{
-		Amount: coin.Coin{"atom", bondAmount},
-	}
-
-	// create initial bond
-	bonds := bondsFromActors(senders, []int{int(bondAmount)})
-	saveBonds(store, bonds)
-
-	// just send the txbond multiple times
+	txBond := newTxBond(bondAmount)
 	for i := 0; i < 5; i++ {
 		got := runTxBond(store, sender, holder, dummyTransferFn(accStore), txBond)
-
-		//check the basics
 		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the accounts and the bond account have the appropriate values
 		validators := LoadBonds(store)
-		expectedBond := int64(i+2) * bondAmount // +2 since we started with 1 and we send 1 at the start of loop
+		expectedBond := int64(i+1) * bondAmount // +1 since we send 1 at the start of loop
 		expectedSender := initSender - expectedBond
 		gotBonded := int64(validators[0].BondedTokens)
 		gotHolder := accStore[string(holder.Address)]
@@ -66,118 +102,78 @@ func TestBondTxIncrements(t *testing.T) {
 	}
 }
 
-/*
-func TestRunTxBondUnbond(t *testing.T) {
+func TestUnbondTxIncrements(t *testing.T) {
 	assert := assert.New(t)
 
-	//set a store with a validator and delegator account
-	store := state.NewMemKVStore()
-	validator := sdk.Actor{"testChain", "testapp", []byte("validator")}
-	holder := getHoldAccount(validator)
-	validators := ValidatorBonds{&ValidatorBond{
-		Validator:    validator,
-		BondedTokens: 0,
-		HoldAccount:  holder,
-		VotingPower:  0,
-	}}
-	saveBonds(store, validators)
+	store := state.NewMemKVStore() // for bonds
+	initSender := int64(0)
+	senders, accStore := initAccounts(1, initSender) // for accounts
+	sender := senders[0]
+	holder := getHoldAccount(sender)
 
-	//Setup a simple way to evaluate sending
-	dummyAccs := make(map[string]uint64)
-	dummyAccs[string(validator.Address)] = 1000
-	dummyAccs[string(holder.Address)] = 0
-	dummySend := func(sender, receiver sdk.Actor, amount coin.Coins) abci.Result {
-		dummyAccs[string(sender.Address)] -= uint64(amount[0].Amount)
-		dummyAccs[string(receiver.Address)] += uint64(amount[0].Amount)
-		return abci.OK
-	}
+	// set initial bond
+	initBond := int64(1000)
+	accStore[string(sender.Address)] = initBond
+	got := runTxBond(store, sender, holder, dummyTransferFn(accStore), newTxBond(initBond))
+	assert.True(got.IsOK(), "expected initial bond tx to be ok, got %v", got)
 
-	txBond := TxBond{
-		Amount: coin.Coin{"atom", 10},
-	}
+	// just send the same txunbond multiple times
+	unbondAmount := int64(10)
+	txUnbond := newTxUnbond(unbondAmount)
+	for i := 0; i < 5; i++ {
+		got := runTxUnbond(store, sender, holder, dummyTransferFn(accStore), txUnbond)
+		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
 
-	type args struct {
-		store  state.SimpleDB
-		tx     TxBond
-		sender sdk.Actor
-	}
-	tests := []struct {
-		name         string
-		args         args
-		wantRes      abci.Result
-		wantBonded   uint64
-		wantUnbonded uint64
-	}{
-		{"test bond 1", args{store, txBond, validator}, abci.OK, 10, 990},
-		{"test bond 2", args{store, txBond, validator}, abci.OK, 20, 980},
-		{"test bond 3", args{store, txBond, validator}, abci.OK, 30, 970},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		//Check that the accounts and the bond account have the appropriate values
+		validators := LoadBonds(store)
+		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
+		expectedSender := initSender + (initBond - expectedBond)
+		gotBonded := int64(validators[0].BondedTokens)
+		gotHolder := accStore[string(holder.Address)]
+		gotSender := accStore[string(sender.Address)]
 
-			holder := getHoldAccount(tt.args.sender)
-			got := runTxBond(tt.args.store, tt.args.sender, holder, dummySend, tt.args.tx)
-
-			//check the basics
-			assert.True(got.IsSameCode(tt.wantRes), "runTxBondGuts(%v, %v, %v) = %v, want %v",
-				tt.name, tt.args.tx, tt.args.sender, got, tt.wantRes)
-
-			//Check that the accounts and the bond account have the appropriate values
-			validators := LoadBonds(store)
-			assert.Equal(tt.wantBonded, validators[0].BondedTokens, "%v, %v, %v",
-				tt.name, tt.wantBonded, validators[0].BondedTokens)
-			assert.Equal(tt.wantBonded, dummyAccs[string(holder.Address)], "%v, %v, %v",
-				tt.name, tt.wantBonded, dummyAccs[string(holder.Address)])
-			assert.Equal(tt.wantUnbonded, dummyAccs[string(validator.Address)], "%v, %v, %v",
-				tt.name, tt.wantUnbonded, dummyAccs[string(validator.Address)])
-		})
-	}
-
-	/////////////////////////////////////////////////////////////////////
-	// Unbonding
-
-	txUnbond := TxUnbond{
-		Amount: coin.Coin{"atom", 10},
-	}
-	type args2 struct {
-		store  state.SimpleDB
-		tx     TxUnbond
-		sender sdk.Actor
-	}
-	tests2 := []struct {
-		name            string
-		args            args2
-		wantRes         abci.Result
-		validatorExists bool
-		wantBonded      uint64
-		wantUnbonded    uint64
-	}{
-		{"test unbond 1", args2{store, txUnbond, validator}, abci.OK, true, 20, 980},
-		{"test unbond 2", args2{store, txUnbond, validator}, abci.OK, true, 10, 990},
-		{"test unbond 3", args2{store, txUnbond, validator}, abci.OK, false, 0, 1000},
-	}
-	for _, tt := range tests2 {
-		t.Run(tt.name, func(t *testing.T) {
-
-			holder := getHoldAccount(tt.args.sender)
-			got := runTxUnbond(tt.args.store, tt.args.sender, holder, dummySend, tt.args.tx)
-
-			//check the basics
-			assert.True(got.IsSameCode(tt.wantRes),
-				"runTxUnbondGuts(%v, %v) = %v, want %v",
-				tt.name, tt.args.tx, got, tt.wantRes)
-
-			//Check that the accounts and the bond account have the appropriate values
-			validators := LoadBonds(store)
-			if tt.validatorExists {
-				assert.Equal(tt.wantBonded, validators[0].BondedTokens, "%v, %v, %v",
-					tt.name, tt.wantBonded, validators[0].BondedTokens)
-			}
-			assert.Equal(tt.wantBonded, dummyAccs[string(holder.Address)], "%v, %v, %v",
-				tt.name, tt.wantBonded, dummyAccs[string(holder.Address)])
-			assert.Equal(tt.wantUnbonded, dummyAccs[string(validator.Address)], "%v, %v, %v",
-				tt.name, tt.wantUnbonded, dummyAccs[string(validator.Address)])
-		})
+		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
+		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
+		assert.Equal(expectedSender, gotSender, "%v, %v", expectedSender, gotSender)
 	}
 }
-*/
+
+func TestBondTxMultipleVals(t *testing.T) {
+	assert := assert.New(t)
+
+	store := state.NewMemKVStore()
+	initSender := int64(1000)
+	senders, accStore := initAccounts(3, initSender)
+
+	// bond them all
+	for i, sender := range senders {
+		txBond := newTxBond(int64(i))
+		got := runTxBond(store, sender, getHoldAccount(sender), dummyTransferFn(accStore), txBond)
+		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
+
+		//Check that the account is bonded
+		validators := LoadBonds(store)
+		val := validators[i]
+		balanceGot, balanceExpect := accStore[string(val.Sender.Address)], initSender-int64(i)
+		assert.Equal(len(validators), i+1, "expected %d validators got %d", i+1, len(validators))
+		assert.Equal(int(val.BondedTokens), i, "expected %d tokens, got %d", i, val.BondedTokens)
+		assert.Equal(balanceGot, balanceExpect, "expected account to have %d, got %d", balanceExpect, balanceGot)
+	}
+
+	// unbond them all
+	for i, sender := range senders {
+		txUnbond := newTxUnbond(int64(i))
+		got := runTxUnbond(store, sender, getHoldAccount(sender), dummyTransferFn(accStore), txUnbond)
+		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
+
+		//Check that the account is unbonded
+		validators := LoadBonds(store)
+		val := validators[0]
+		validators.CleanupEmpty(store)
+		validators = LoadBonds(store)
+		balanceGot, balanceExpect := accStore[string(val.Sender.Address)], initSender
+		assert.Equal(len(validators), len(senders)-(i+1), "expected %d validators got %d", len(senders)-(i+1), len(validators))
+		assert.Equal(int(val.BondedTokens), 0, "expected %d tokens, got %d", i, val.BondedTokens)
+		assert.Equal(balanceGot, balanceExpect, "expected account to have %d, got %d", balanceExpect, balanceGot)
+	}
+}

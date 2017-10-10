@@ -110,11 +110,6 @@ func TestValidatorBondsUpdate(t *testing.T) {
 	bonds[2].BondedTokens = 1000
 	bonds.UpdateVotingPower(store)
 	vals2 := bonds.GetValidators()
-	fmt.Println("_-------------------------")
-	fmt.Println(vals1)
-	fmt.Println("_-------------------------")
-	fmt.Println(vals2)
-	fmt.Println("_-------------------------")
 
 	require.Equal(maxVals, len(vals2))
 
