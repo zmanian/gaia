@@ -1,5 +1,5 @@
 hash: fe107361baadb79e91c7f2df72f71251b42866c18421d815c1f9e374833af756
-updated: 2017-10-10T01:53:35.873183212-04:00
+updated: 2017-10-11T14:24:34.685967044-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 5a7566a81a31f570981a951f26082f7e705191df
+  version: 1613da91cab4dfa422f73c2615cd39da97fbda3f
   subpackages:
   - app
   - client
@@ -72,9 +72,9 @@ imports:
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
 - name: github.com/gorilla/websocket
-  version: 4201258b820c74ac8e6922fc9e6b52f71fe46f8d
+  version: f918560c4c3d6a271185320bb1d4a1e40f77297f
 - name: github.com/hashicorp/hcl
-  version: 68e816d1c783414e79bc65b3994d9ab6b0a722ab
+  version: 42e33e2d55a0ff1d6263f738896ea8c13571a8d0
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -105,17 +105,17 @@ imports:
 - name: github.com/rcrowley/go-metrics
   version: 1f30fe9094a513ce4c700b9a54458bbb0c96996c
 - name: github.com/spf13/afero
-  version: 3de492c3cda9570c77bc1f495857bfbf4b760efd
+  version: e67d870304c4bca21331b02f414f970df13aa694
   subpackages:
   - mem
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: bc69223348ce9692e3ab90f04c375ac6cd71e9ba
+  version: 40f18800b20df8f74ad2b02aa4e56748a3d17239
 - name: github.com/spf13/jwalterweatherman
   version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
-  version: 2c300e72a98b4351617d9b927d2d2860ece8ee24
+  version: a9789e855c7696159b7db0db7f440b449edf2b31
 - name: github.com/spf13/viper
   version: d9cca5ef33035202efb1586825bdbb15ff9ec3ba
 - name: github.com/syndtr/goleveldb
@@ -249,7 +249,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 5279edf262dc22329b1e53281ce9d55c0a998216
+  version: 90947a8e84063f7500473104c845848debf27453
   subpackages:
   - balancer
   - codes

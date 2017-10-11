@@ -72,8 +72,8 @@ func main() {
 		)
 
 	RootCmd.AddCommand(
-		basecmd.InitCmd,
-		basecmd.InitTickStartCmd(getTickFnc()),
+		basecmd.GetInitCmd("fermion"),
+		basecmd.GetTickStartCmd(getTickFnc()),
 		basecmd.UnsafeResetAllCmd,
 		client.VersionCmd,
 	)
