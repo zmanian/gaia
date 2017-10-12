@@ -25,29 +25,6 @@ func Name() string {
 	return stakingModuleName
 }
 
-// Params defines the parameters for bonding and unbonding
-type Params struct {
-	MaxVals          int    `json:"max_vals"`           // maximum number of validators
-	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
-
-	// gas costs for txs
-	GasBond   uint64 `json:"gas_bond"`
-	GasUnbond uint64 `json:"gas_unbond"`
-}
-
-func defaultParams() Params {
-	return Params{
-		MaxVals:          100,
-		AllowedBondDenom: "strings",
-		GasBond:          20,
-		GasUnbond:        0,
-	}
-}
-
-// TODO sync with the state
-// global for now
-var globalParams = defaultParams()
-
 // Handler - the transaction processing handler
 type Handler struct {
 	stack.PassInitValidate
@@ -79,11 +56,10 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 	if module != stakingModuleName {
 		return errors.ErrUnknownModule(module)
 	}
-
+	params := loadParams(store)
 	switch key {
 	case "allowed_bond_denom":
-		globalParams.AllowedBondDenom = value
-		return nil
+		params.AllowedBondDenom = value
 	case "max_vals",
 		"gas_bond",
 		"gas_unbond":
@@ -92,16 +68,18 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 			return fmt.Errorf("input must be integer, Error: %v", err.Error())
 		}
 		switch key {
-		case "max_val":
-			globalParams.MaxVals = i
+		case "max_vals":
+			params.MaxVals = i
 		case "gas_bond":
-			globalParams.GasBond = uint64(i)
+			params.GasBond = uint64(i)
 		case "gas_unbound":
-			globalParams.GasUnbond = uint64(i)
+			params.GasUnbond = uint64(i)
 		}
-		return nil
+	default:
+		return errors.ErrUnknownKey(key)
 	}
-	return errors.ErrUnknownKey(key)
+	saveParams(store, params)
+	return nil
 }
 
 // CheckTx checks if the tx is properly structured
@@ -119,13 +97,14 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		return res, abciRes
 	}
 
+	params := loadParams(store)
 	// return the fee for each tx type
 	switch txInner := tx.Unwrap().(type) {
 	case TxBond:
-		return sdk.NewCheck(globalParams.GasBond, ""),
+		return sdk.NewCheck(params.GasBond, ""),
 			checkTxBond(txInner, sender, store)
 	case TxUnbond:
-		return sdk.NewCheck(globalParams.GasUnbond, ""),
+		return sdk.NewCheck(params.GasUnbond, ""),
 			checkTxUnbond(txInner, sender, store)
 	}
 	return res, errors.ErrUnknownTxType("GTH")
@@ -144,6 +123,11 @@ func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
 	//acc.Coins, tx.Amount)
 	//}
 
+	//check denom
+	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
+		return fmt.Errorf("Invalid coin denomination")
+	}
+
 	// check to see if the pubkey has been registered before,
 	//  if it has been used ensure that the validator account is same
 	//  to prevent accidentally bonding to validator other than you
@@ -156,10 +140,16 @@ func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
 				bond.PubKey, bond.Sender)
 		}
 	}
+
 	return nil
 }
 
 func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
+
+	//check denom
+	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
+		return fmt.Errorf("Invalid coin denomination")
+	}
 
 	//check if have enough tokens to unbond
 	bonds := LoadBonds(store)
@@ -206,7 +196,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	res = sdk.DeliverResult{
 		Data:    abciRes.Data,
 		Log:     abciRes.Log,
-		GasUsed: globalParams.GasBond,
+		GasUsed: loadParams(store).GasBond,
 	}
 
 	return

@@ -82,13 +82,8 @@ func validateBasic(amount coin.Coin) error {
 	if !coins.IsValid() {
 		return coin.ErrInvalidCoins()
 	}
-
 	if !coins.IsPositive() {
 		return fmt.Errorf("Amount must be > 0")
-	}
-
-	if amount.Denom != globalParams.AllowedBondDenom {
-		return fmt.Errorf("Invalid coin denomination")
 	}
 	return nil
 }

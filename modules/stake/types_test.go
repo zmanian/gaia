@@ -36,7 +36,7 @@ func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
 }
 
 func TestValidatorBondsMaxVals(t *testing.T) {
-	globalParams = defaultParams()
+	params := defaultParams()
 	assert := assert.New(t)
 	store := state.NewMemKVStore()
 	actors := newActors(3)
@@ -53,14 +53,15 @@ func TestValidatorBondsMaxVals(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		globalParams.MaxVals = testCase.maxVals
+		params.MaxVals = testCase.maxVals
+		saveParams(store, params)
 		bonds.UpdateVotingPower(store)
-		assert.Equal(testCase.expectedVals, len(bonds.GetValidators()))
+		assert.Equal(testCase.expectedVals, len(bonds.GetValidators(store)), "%v", bonds.GetValidators(store))
 	}
 }
 
 func TestValidatorBondsSort(t *testing.T) {
-	globalParams = defaultParams()
+	params := defaultParams()
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
@@ -72,7 +73,7 @@ func TestValidatorBondsSort(t *testing.T) {
 	//test basic sort
 	bonds.Sort()
 
-	vals := bonds.GetValidators()
+	vals := bonds.GetValidators(store)
 	require.Equal(N, len(vals))
 
 	for i, val := range vals {
@@ -82,9 +83,10 @@ func TestValidatorBondsSort(t *testing.T) {
 
 	// now reduce the maxvals, ensure they're still ordered
 	maxVals := 3
-	globalParams.MaxVals = maxVals
+	params.MaxVals = maxVals
+	saveParams(store, params)
 	bonds.UpdateVotingPower(store)
-	vals = bonds.GetValidators()
+	vals = bonds.GetValidators(store)
 	require.Equal(maxVals, len(vals))
 
 	for i, val := range vals {
@@ -94,7 +96,7 @@ func TestValidatorBondsSort(t *testing.T) {
 }
 
 func TestValidatorBondsUpdate(t *testing.T) {
-	globalParams = defaultParams()
+	params := defaultParams()
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
@@ -103,13 +105,14 @@ func TestValidatorBondsUpdate(t *testing.T) {
 	bonds.Sort()
 
 	maxVals := 2
-	globalParams.MaxVals = maxVals
+	params.MaxVals = maxVals
+	saveParams(store, params)
 
 	// Change some of the bonded tokens, get the new validator set
-	vals1 := bonds.GetValidators()
+	vals1 := bonds.GetValidators(store)
 	bonds[2].BondedTokens = 1000
 	bonds.UpdateVotingPower(store)
-	vals2 := bonds.GetValidators()
+	vals2 := bonds.GetValidators(store)
 
 	require.Equal(maxVals, len(vals2))
 
@@ -120,7 +123,7 @@ func TestValidatorBondsUpdate(t *testing.T) {
 	}
 
 	// calculate the difference in the validator set from the original set
-	diff := ValidatorsDiff(vals1, vals2)
+	diff := ValidatorsDiff(vals1, vals2, store)
 	require.Equal(2, len(diff), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
 		diff, vals1, vals2)
 	assert.True(diff[0].Power == 0)

@@ -31,13 +31,13 @@ func initAccounts(n int, amount int64) ([]sdk.Actor, map[string]int64) {
 
 func newTxBond(amt int64) TxBond {
 	return TxBond{
-		Amount: coin.Coin{"atom", amt},
+		Amount: coin.Coin{"fermion", amt},
 	}
 }
 
 func newTxUnbond(amt int64) TxUnbond {
 	return TxUnbond{
-		Amount: coin.Coin{"atom", amt},
+		Amount: coin.Coin{"fermion", amt},
 	}
 }
 

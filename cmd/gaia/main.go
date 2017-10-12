@@ -38,10 +38,10 @@ func getTickFnc() func(store state.SimpleDB) (diffVal []*abci.Validator, err err
 
 		// Determine the validator set changes
 		validatorBonds := stake.LoadBonds(store)
-		startVal := validatorBonds.GetValidators()
+		startVal := validatorBonds.GetValidators(store)
 		validatorBonds.UpdateVotingPower(store)
-		newVal := validatorBonds.GetValidators()
-		diffVal = stake.ValidatorsDiff(startVal, newVal)
+		newVal := validatorBonds.GetValidators(store)
+		diffVal = stake.ValidatorsDiff(startVal, newVal, store)
 		validatorBonds.CleanupEmpty(store)
 
 		return
@@ -72,7 +72,7 @@ func main() {
 		)
 
 	RootCmd.AddCommand(
-		basecmd.GetInitCmd("fermion"),
+		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
 		basecmd.GetTickStartCmd(getTickFnc()),
 		basecmd.UnsafeResetAllCmd,
 		client.VersionCmd,

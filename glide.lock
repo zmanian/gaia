@@ -1,5 +1,5 @@
-hash: 917ee31643bd8f0f562b3c29346a9cddf4a26f12d70dc76019b1c32ad04f5a4a
-updated: 2017-10-11T17:25:35.560762759-04:00
+hash: fe107361baadb79e91c7f2df72f71251b42866c18421d815c1f9e374833af756
+updated: 2017-10-11T21:51:15.566903713-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -12,7 +12,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 1785f54a5745573fad898ab7764583617218e2cb
+  version: 9291a9ef1636b3aceebc67103720b9aea1c805c5
   subpackages:
   - app
   - client

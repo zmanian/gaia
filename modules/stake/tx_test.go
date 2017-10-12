@@ -12,9 +12,9 @@ var (
 	validator = sdk.Actor{"testChain", "testapp", []byte("addressvalidator1")}
 	empty     sdk.Actor
 
-	coinPos          = coin.Coin{"strings", 1000}
-	coinZero         = coin.Coin{"strings", 0}
-	coinNeg          = coin.Coin{"strings", -10000}
+	coinPos          = coin.Coin{"fermion", 1000}
+	coinZero         = coin.Coin{"fermion", 0}
+	coinNeg          = coin.Coin{"fermion", -10000}
 	coinPosNotAtoms  = coin.Coin{"foo", 10000}
 	coinZeroNotAtoms = coin.Coin{"foo", 0}
 	coinNegNotAtoms  = coin.Coin{"foo", -10000}
@@ -33,9 +33,6 @@ func TestBondUpdateValidateBasic(t *testing.T) {
 		{"empty delegator", fields{coinPos}, false},
 		{"zero coin", fields{coinZero}, true},
 		{"neg coin", fields{coinNeg}, true},
-		{"pos coin, non-atom denom", fields{coinPosNotAtoms}, true},
-		{"zero coin, non-atom denom", fields{coinZeroNotAtoms}, true},
-		{"neg coin, non-atom denom", fields{coinNegNotAtoms}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

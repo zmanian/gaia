@@ -27,7 +27,10 @@ func defaultTransferFn(ctx sdk.Context, store state.SimpleDB, dispatch sdk.Deliv
 }
 
 //BondKey - state key for the bond bytes
-var BondKey = []byte{0x00}
+var (
+	BondKey  = []byte{0x00}
+	ParamKey = []byte{0x01}
+)
 
 // LoadBonds - loads the validator bond set
 // TODO ultimately this function should be made unexported... being used right now
@@ -48,4 +51,21 @@ func LoadBonds(store state.SimpleDB) (validatorBonds ValidatorBonds) {
 func saveBonds(store state.SimpleDB, validatorBonds ValidatorBonds) {
 	b := wire.BinaryBytes(validatorBonds)
 	store.Set(BondKey, b)
+}
+
+// load/save the global staking params
+func loadParams(store state.SimpleDB) (params Params) {
+	b := store.Get(ParamKey)
+	if b == nil {
+		return defaultParams()
+	}
+	err := wire.ReadBinaryBytes(b, &params)
+	if err != nil {
+		panic(err) // This error should never occure big problem if does
+	}
+	return
+}
+func saveParams(store state.SimpleDB, params Params) {
+	b := wire.BinaryBytes(params)
+	store.Set(ParamKey, b)
 }

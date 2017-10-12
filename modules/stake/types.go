@@ -11,6 +11,27 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// Params defines the high level settings for staking
+type Params struct {
+	MaxVals          int    `json:"max_vals"`           // maximum number of validators
+	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
+
+	// gas costs for txs
+	GasBond   uint64 `json:"gas_bond"`
+	GasUnbond uint64 `json:"gas_unbond"`
+}
+
+func defaultParams() Params {
+	return Params{
+		MaxVals:          100,
+		AllowedBondDenom: "fermion",
+		GasBond:          20,
+		GasUnbond:        0,
+	}
+}
+
+//--------------------------------------------------------------------------------
+
 // ValidatorBond defines the total amount of bond tokens and their exchange rate to
 // coins, associated with a single validator. Accumulation of interest is modelled
 // as an in increase in the exchange rate, and slashing as a decrease.
@@ -86,7 +107,7 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 	// Now sort and truncate the power
 	vbs.Sort()
 	for i, vb := range vbs {
-		if i >= globalParams.MaxVals {
+		if i >= loadParams(store).MaxVals {
 			vb.VotingPower = 0
 		}
 	}
@@ -112,13 +133,14 @@ func (vbs ValidatorBonds) CleanupEmpty(store state.SimpleDB) {
 // ValidatorBonds. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
-	validators := make([]*abci.Validator, cmn.MinInt(len(vbs), globalParams.MaxVals))
+func (vbs ValidatorBonds) GetValidators(store state.SimpleDB) []*abci.Validator {
+	maxVals := loadParams(store).MaxVals
+	validators := make([]*abci.Validator, cmn.MinInt(len(vbs), maxVals))
 	for i, vb := range vbs {
 		if vb.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
-		if i >= globalParams.MaxVals {
+		if i >= maxVals {
 			return validators
 		}
 		validators[i] = vb.ABCIValidator()
@@ -127,14 +149,14 @@ func (vbs ValidatorBonds) GetValidators() []*abci.Validator {
 }
 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
-func ValidatorsDiff(previous, current []*abci.Validator) (diff []*abci.Validator) {
+func ValidatorsDiff(previous, current []*abci.Validator, store state.SimpleDB) (diff []*abci.Validator) {
 
 	//TODO do something more efficient possibly by sorting first
 
 	//calculate any differences from the previous to the new validator set
 	// first loop through the previous validator set, and then catch any
 	// missed records in the new validator set
-	diff = make([]*abci.Validator, 0, globalParams.MaxVals)
+	diff = make([]*abci.Validator, 0, loadParams(store).MaxVals)
 
 	for _, prevVal := range previous {
 		if prevVal == nil {
