@@ -16,6 +16,85 @@ cd $GOPATH/src/github.com/cosmos/gaia
 make all
 ```
 
+### Atlas Test-Net Example
+
+To work on the Atlas you will need some tokens to get started. 
+To do this first generate a new key: 
+
+```
+MYNAME=<your name>
+gaiacli keys new $MYNAME
+gaiacli keys list
+MYADDR=<your newly generated address>
+```
+
+Then get a hold of us through [Rocket Chat](https://cosmos.rocket.chat/home)
+with your key address and we'll send you some `fermion` testnet tokens :)
+
+Fetch and navigate to the repository of testnet data 
+```
+git clone https://github.com/tendermint/testnets $HOME/testnets
+GAIANET=$HOME/testnets/atlas/gaia
+cd $GAIANET
+```
+
+Now we can start a new node in the background:
+
+```
+gaia start --home=$GAIANET  &> atlas1.log &
+```
+
+The above command will automaticaly generate a validator private key found in
+`$GAIANET/priv_validator.json`. Let's get the pubkey data for our validator
+node
+
+```
+cat $HOME/.atlas2/priv_validator.json 
+MYADDR=<your newly generated address>
+```
+
+If you have a json parser like `jq`, you can get just the pubkey:
+
+```
+PUBKEY=cat $GAIANET/priv_validator.json | jq .pub_key.data
+```
+
+Next let's initialize the gaia client to start interacting with the testnet:
+
+```
+gaiacli init --chain-id=atlas --node=tcp://localhost:46657
+```
+
+First let's check out our balance
+
+```
+gaiacli query account $MYADDR
+```
+
+We are now ready to bond some tokens:
+
+```
+gaiacli tx bond --amount 5fermion --name $MYNAME --pubkey <validator pubkey>
+```
+
+Bonding tokens means that your balance is tied up as _stake_. Don't worry,
+you'll be able to get it back later. As soon as some tokens have been bonded
+the validator node which we started earlier will have power in the network and
+begin to participate in consensus!
+
+We can now check the validator set and see that we are a part of the club!
+```
+gaiacli query validators
+```
+
+Finally lets unbond to get back our tokens
+
+```
+gaiacli tx unbond --amount 5fermion --name $MYNAME
+```
+
+Remember to unbond before stopping your node!
+
 ### Local-Test Example
 
 Here is a quick example to get you off your feet: 
