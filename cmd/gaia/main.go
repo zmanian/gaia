@@ -8,7 +8,6 @@ import (
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/tmlibs/cli"
 
-	client "github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -19,7 +18,9 @@ import (
 	basecmd "github.com/cosmos/cosmos-sdk/server/commands"
 	"github.com/cosmos/cosmos-sdk/stack"
 	"github.com/cosmos/cosmos-sdk/state"
+
 	"github.com/cosmos/gaia/modules/stake"
+	"github.com/cosmos/gaia/version"
 )
 
 // RootCmd is the entry point for this binary
@@ -75,7 +76,7 @@ func main() {
 		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
 		basecmd.GetTickStartCmd(getTickFnc()),
 		basecmd.UnsafeResetAllCmd,
-		client.VersionCmd,
+		version.VersionCmd,
 	)
 	basecmd.SetUpRoot(RootCmd)
 

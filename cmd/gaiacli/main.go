@@ -24,6 +24,7 @@ import (
 	rolecmd "github.com/cosmos/cosmos-sdk/modules/roles/commands"
 
 	stakecmd "github.com/cosmos/gaia/modules/stake/commands"
+	"github.com/cosmos/gaia/version"
 )
 
 // GaiaCli represents the base command when called without any subcommands
@@ -85,7 +86,7 @@ func main() {
 		query.RootCmd,
 		txcmd.RootCmd,
 		proxy.RootCmd,
-		commands.VersionCmd,
+		version.VersionCmd,
 		auto.AutoCompleteCmd,
 	)
 
