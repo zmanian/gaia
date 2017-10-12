@@ -12,7 +12,7 @@ import:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: 0.7.0
+  version: 0.7.1
 - package: github.com/tendermint/iavl
   version: develop
 - package: github.com/tendermint/go-crypto
@@ -48,7 +48,7 @@ import:
   - rpc/lib/types
   - types
 - package: github.com/tendermint/tmlibs
-  version: 096dcb90e60aa00b748b3fe49a4b95e48ebf1e13
+  version: develop
   subpackages:
   - cli
   - cli/flags

@@ -1,5 +1,5 @@
-hash: fe107361baadb79e91c7f2df72f71251b42866c18421d815c1f9e374833af756
-updated: 2017-10-11T21:51:15.566903713-04:00
+hash: 0167bf2f9b1f52a721bd15221d1bcf34409cc1c17afe01aacc3fda867223aae3
+updated: 2017-10-11T23:58:46.691747735-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -12,7 +12,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 9291a9ef1636b3aceebc67103720b9aea1c805c5
+  version: 098d17711aa2053b9abe30a29e9d0febd7c6f2a1
   subpackages:
   - app
   - client
@@ -214,7 +214,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: 096dcb90e60aa00b748b3fe49a4b95e48ebf1e13
+  version: 7166252a521951eb8b6bd26db28b2b90586941a9
   subpackages:
   - autofile
   - cli
