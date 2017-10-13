@@ -219,7 +219,7 @@ VotingPower reduce and your account balance increase.
 ```
 gaiacli tx unbond --amount 1strings --name $MYNAME
 gaiacli query validators
-gaiacli query account $MYNAME
+gaiacli query account $MYADDR
 ``` 
 
 Once you unbond enough, you will no longer be needed to make new blocks.
