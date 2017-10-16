@@ -28,7 +28,7 @@ gaiacli keys list
 MYADDR=<your newly generated address>
 ```
 
-Then get a hold of us through [Rocket Chat](https://cosmos.rocket.chat/home)
+Then get a hold of us through [Riot](https://riot.im/app/#/room/#cosmos:matrix.org)
 with your key address and we'll send you some `fermion` testnet tokens :)
 
 Fetch and navigate to the repository of testnet data 
@@ -38,25 +38,26 @@ GAIANET=$HOME/testnets/atlas/gaia
 cd $GAIANET
 ```
 
-Now we can start a new node in the background:
+Now we can start a new node in the background, note that it may take a decent 
+chunk of time to sync with the existing testnet... go brew a pot of coffee! 
 
 ```
-gaia start --home=$GAIANET  &> atlas1.log &
+gaia start --home=$GAIANET  &> atlas.log &
 ```
 
 The above command will automaticaly generate a validator private key found in
 `$GAIANET/priv_validator.json`. Let's get the pubkey data for our validator
-node
+node. The pubkey is located under `"pub_key"{"data":` within the json file
 
 ```
-cat $HOME/.atlas2/priv_validator.json 
-MYADDR=<your newly generated address>
+cat $GAIANET/priv_validator.json 
+PUBKEY=<your newly generated address>  
 ```
 
 If you have a json parser like `jq`, you can get just the pubkey:
 
 ```
-PUBKEY=cat $GAIANET/priv_validator.json | jq .pub_key.data
+PUBKEY=$(cat $GAIANET/priv_validator.json | jq -r .pub_key.data)
 ```
 
 Next let's initialize the gaia client to start interacting with the testnet:
@@ -74,7 +75,7 @@ gaiacli query account $MYADDR
 We are now ready to bond some tokens:
 
 ```
-gaiacli tx bond --amount 5fermion --name $MYNAME --pubkey <validator pubkey>
+gaiacli tx bond --amount=5fermion --name=$MYNAME --pubkey=$PUBKEY
 ```
 
 Bonding tokens means that your balance is tied up as _stake_. Don't worry,
@@ -90,7 +91,7 @@ gaiacli query validators
 Finally lets unbond to get back our tokens
 
 ```
-gaiacli tx unbond --amount 5fermion --name $MYNAME
+gaiacli tx unbond --amount=5fermion --name=$MYNAME
 ```
 
 Remember to unbond before stopping your node!
@@ -194,7 +195,7 @@ cat $HOME/.atlas2/priv_validator.json | jq .pub_key.data
 Now we can bond some coins to that pubkey:
 
 ```
-gaiacli tx bond --amount 10strings --name $MYNAME --pubkey <validator pubkey>
+gaiacli tx bond --amount=10strings --name=$MYNAME --pubkey=<validator pubkey>
 ```
 
 We should see our account balance decrement, and the pubkey get added to the app's list of bonds:
@@ -217,7 +218,7 @@ Finally, to relinquish all your power, unbond some coins. You should see your
 VotingPower reduce and your account balance increase.
 
 ```
-gaiacli tx unbond --amount 1strings --name $MYNAME
+gaiacli tx unbond --amount=1strings --name=$MYNAME
 gaiacli query validators
 gaiacli query account $MYADDR
 ``` 
