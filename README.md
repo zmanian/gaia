@@ -18,6 +18,9 @@ make all
 
 ### Atlas Test-Net Example
 
+Atlas is a community test-net which can be used to test setting up a cosmos validator node. 
+Supplimentary to this tutorial you can also follow [this video](https://www.youtube.com/watch?v=B-shjoqvnnY).
+
 To work on the Atlas you will need some tokens to get started. 
 To do this first generate a new key: 
 
