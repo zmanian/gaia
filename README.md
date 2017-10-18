@@ -29,23 +29,29 @@ MYADDR=<your newly generated address>
 ```
 
 Then get a hold of us through [Riot](https://riot.im/app/#/room/#cosmos:matrix.org)
-with your key address and we'll send you some `fermion` testnet tokens :)
+with your key address and we'll send you some `fermion` testnet tokens :).
+Fermions are the native staking token on Atlas - see below for how to check your balance.
 
-Fetch and navigate to the repository of testnet data 
+
+Now, to sync with the testnet, we need the genesis file and seeds.
+The easiest way to get them is to Fetch and navigate to the tendermint testnet repo:
 ```
 git clone https://github.com/tendermint/testnets $HOME/testnets
 GAIANET=$HOME/testnets/atlas/gaia
 cd $GAIANET
 ```
 
-Now we can start a new node in the background, note that it may take a decent 
+Now we can start a new node in the background - but note that it may take a decent 
 chunk of time to sync with the existing testnet... go brew a pot of coffee! 
 
 ```
 gaia start --home=$GAIANET  &> atlas.log &
 ```
 
-The above command will automaticaly generate a validator private key found in
+Of course, you can follow the logs to see progress with `tail -f atlas.log`.
+Once blocks slow down to about one block per second, you're all caught up.
+
+The `gaia start` command will automaticaly generate a validator private key found in
 `$GAIANET/priv_validator.json`. Let's get the pubkey data for our validator
 node. The pubkey is located under `"pub_key"{"data":` within the json file
 
@@ -54,7 +60,7 @@ cat $GAIANET/priv_validator.json
 PUBKEY=<your newly generated address>  
 ```
 
-If you have a json parser like `jq`, you can get just the pubkey:
+If you have a json parser like `jq`, you can get just the pubkey like so:
 
 ```
 PUBKEY=$(cat $GAIANET/priv_validator.json | jq -r .pub_key.data)
@@ -66,7 +72,7 @@ Next let's initialize the gaia client to start interacting with the testnet:
 gaiacli init --chain-id=atlas --node=tcp://localhost:46657
 ```
 
-First let's check out our balance
+And check our balance:
 
 ```
 gaiacli query account $MYADDR
