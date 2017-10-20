@@ -31,8 +31,8 @@ gaiacli keys list
 MYADDR=<your newly generated address>
 ```
 
-Then get a hold of us through [Riot](https://riot.im/app/#/room/#cosmos:matrix.org)
-with your key address and we'll send you some `fermion` testnet tokens :).
+Then enter your key into [this utility](http://www.cosmosvalidators.com/)
+with your key address and it will send you some `fermion` testnet tokens :).
 Fermions are the native staking token on Atlas - see below for how to check your balance.
 
 
