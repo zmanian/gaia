@@ -204,7 +204,7 @@ cat $HOME/.atlas2/priv_validator.json | jq .pub_key.data
 Now we can bond some coins to that pubkey:
 
 ```
-gaiacli tx bond --amount=10strings --name=$MYNAME --pubkey=<validator pubkey>
+gaiacli tx bond --amount=10fermion --name=$MYNAME --pubkey=<validator pubkey>
 ```
 
 We should see our account balance decrement, and the pubkey get added to the app's list of bonds:
@@ -227,7 +227,7 @@ Finally, to relinquish all your power, unbond some coins. You should see your
 VotingPower reduce and your account balance increase.
 
 ```
-gaiacli tx unbond --amount=1strings --name=$MYNAME
+gaiacli tx unbond --amount=fermion --name=$MYNAME
 gaiacli query validators
 gaiacli query account $MYADDR
 ``` 
