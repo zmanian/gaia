@@ -1,0 +1,15 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.8
+
+    working_directory: /go/src/github.com/cosmos/gaia
+
+    steps:
+      - checkout
+      - run: make get_vendor_deps
+
+      - run:
+          name: Run unit tests
+          command: make test

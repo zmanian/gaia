@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/cosmos/gaia/tree/master.svg?style=svg)](https://circleci.com/gh/cosmos/gaia/tree/master)
+
 # Cosmos-Hub Basic Staking
 
 This project is a demonstration of the Cosmos-Hub with basic staking
