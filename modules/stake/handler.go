@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	abci "github.com/tendermint/abci/types"
+
 	"github.com/tendermint/tmlibs/log"
 
 	"github.com/cosmos/cosmos-sdk"
@@ -15,7 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-//nolint
+// nolint
 const (
 	stakingModuleName = "stake"
 )
@@ -51,11 +52,12 @@ func (h Handler) InitState(l log.Logger, store state.SimpleDB,
 	return "", h.initState(module, key, value, store)
 }
 
-//separated for testing
+// separated for testing
 func (Handler) initState(module, key, value string, store state.SimpleDB) error {
 	if module != stakingModuleName {
 		return errors.ErrUnknownModule(module)
 	}
+
 	params := loadParams(store)
 	switch key {
 	case "allowed_bond_denom":
@@ -67,6 +69,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 		if err != nil {
 			return fmt.Errorf("input must be integer, Error: %v", err.Error())
 		}
+
 		switch key {
 		case "max_vals":
 			params.MaxVals = i
@@ -78,6 +81,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 	default:
 		return errors.ErrUnknownKey(key)
 	}
+
 	saveParams(store, params)
 	return nil
 }
@@ -107,6 +111,7 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 		return sdk.NewCheck(params.GasUnbond, ""),
 			checkTxUnbond(txInner, sender, store)
 	}
+
 	return res, errors.ErrUnknownTxType("GTH")
 }
 
@@ -123,14 +128,14 @@ func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
 	//acc.Coins, tx.Amount)
 	//}
 
-	//check denom
+	// check denom
 	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
 		return fmt.Errorf("Invalid coin denomination")
 	}
 
 	// check to see if the pubkey has been registered before,
-	//  if it has been used ensure that the validator account is same
-	//  to prevent accidentally bonding to validator other than you
+	// if it has been used ensure that the validator account is same
+	// to prevent accidentally bonding to validator other than you
 	bonds := LoadBonds(store)
 	_, bond := bonds.GetByPubKey(tx.PubKey)
 	if bond != nil {
@@ -145,13 +150,12 @@ func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
 }
 
 func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
-
-	//check denom
+	// check denom
 	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
 		return fmt.Errorf("Invalid coin denomination")
 	}
 
-	//check if have enough tokens to unbond
+	// check if have enough tokens to unbond
 	bonds := LoadBonds(store)
 	_, bond := bonds.Get(sender)
 	if bond.BondedTokens < uint64(tx.Amount.Amount) {
@@ -165,7 +169,7 @@ func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
 
-	// TODO: remove redunandcy
+	// TODO: remove redundancy
 	// also we don't need to check the res - gas is already deducted in sdk
 	_, err = h.CheckTx(ctx, store, tx, nil)
 	if err != nil {
@@ -181,7 +185,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	// holding account is just an sdk.Actor, with the sender's address shifted one byte right.
 	holder := getHoldAccount(sender)
 
-	//Run the transaction
+	// Run the transaction
 	switch _tx := tx.Unwrap().(type) {
 	case TxBond:
 		fn := defaultTransferFn(ctx, store, dispatch)
@@ -202,7 +206,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	return
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+// -------------------------------------------------------------
 // these functions assume everything has been authenticated,
 // now we just bond or unbond and save
 
@@ -263,6 +267,7 @@ func getTxSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	if len(senders) != 1 {
 		return sender, resMissingSignature
 	}
+
 	// TODO: ensure senders[0] matches tx.pubkey ...
 	// NOTE on TODO..  right now the PubKey doesn't need to match the sender
 	// and we actually don't have the means to construct the priv_validator.json

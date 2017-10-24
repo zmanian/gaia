@@ -25,10 +25,10 @@ func init() {
 	sdk.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
 }
 
-//Verify interface at compile time
+// Verify interface at compile time
 var _, _ sdk.TxInner = &TxBond{}, &TxUnbond{}
 
-/////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------
 // TxBond
 
 // TxBond - struct for bonding transactions

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/cosmos/cosmos-sdk"
-	"github.com/cosmos/cosmos-sdk/state"
 	abci "github.com/tendermint/abci/types"
 	cmn "github.com/tendermint/tmlibs/common"
+
+	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/state"
 )
 
 // Params defines the high level settings for staking
@@ -71,7 +72,7 @@ func (vb ValidatorBond) ABCIValidator() *abci.Validator {
 // ValidatorBonds - the set of all ValidatorBonds
 type ValidatorBonds []*ValidatorBond
 
-var _ sort.Interface = ValidatorBonds{} //enforce the sort interface at compile time
+var _ sort.Interface = ValidatorBonds{} // enforce the sort interface at compile time
 
 // nolint - sort interface functions
 func (vbs ValidatorBonds) Len() int      { return len(vbs) }
@@ -79,6 +80,7 @@ func (vbs ValidatorBonds) Swap(i, j int) { vbs[i], vbs[j] = vbs[j], vbs[i] }
 func (vbs ValidatorBonds) Less(i, j int) bool {
 	vp1, vp2 := vbs[i].VotingPower, vbs[j].VotingPower
 	d1, d2 := vbs[i].Sender, vbs[j].Sender
+
 	switch {
 	case vp1 != vp2:
 		return vp1 > vp2
@@ -97,9 +99,8 @@ func (vbs ValidatorBonds) Sort() {
 }
 
 // UpdateVotingPower - voting power based on bond tokens and exchange rate
-// TODO make not a function of ValidatorBonds as validatorbonds can be loaded from the store
+// TODO: make not a function of ValidatorBonds as validatorbonds can be loaded from the store
 func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
-
 	for _, vb := range vbs {
 		vb.VotingPower = vb.BondedTokens
 	}
@@ -111,6 +112,7 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 			vb.VotingPower = 0
 		}
 	}
+
 	saveBonds(store, vbs)
 	return
 }
@@ -151,9 +153,9 @@ func (vbs ValidatorBonds) GetValidators(store state.SimpleDB) []*abci.Validator 
 // ValidatorsDiff - get the difference in the validator set from the input validator set
 func ValidatorsDiff(previous, current []*abci.Validator, store state.SimpleDB) (diff []*abci.Validator) {
 
-	//TODO do something more efficient possibly by sorting first
+	//TODO: do something more efficient possibly by sorting first
 
-	//calculate any differences from the previous to the new validator set
+	// calculate any differences from the previous to the new validator set
 	// first loop through the previous validator set, and then catch any
 	// missed records in the new validator set
 	diff = make([]*abci.Validator, 0, loadParams(store).MaxVals)
@@ -175,14 +177,17 @@ func ValidatorsDiff(previous, current []*abci.Validator, store state.SimpleDB) (
 				}
 			}
 		}
+
 		if !found {
 			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
 		}
 	}
+
 	for _, curVal := range current {
 		if curVal == nil {
 			continue
 		}
+
 		found := false
 		for _, prevVal := range previous {
 			if prevVal == nil {
@@ -193,10 +198,12 @@ func ValidatorsDiff(previous, current []*abci.Validator, store state.SimpleDB) (
 				break
 			}
 		}
+
 		if !found {
 			diff = append(diff, &abci.Validator{curVal.PubKey, curVal.Power})
 		}
 	}
+
 	return
 }
 
@@ -207,6 +214,7 @@ func (vbs ValidatorBonds) Get(sender sdk.Actor) (int, *ValidatorBond) {
 			return i, vb
 		}
 	}
+
 	return 0, nil
 }
 
@@ -217,6 +225,7 @@ func (vbs ValidatorBonds) GetByPubKey(pubkey []byte) (int, *ValidatorBond) {
 			return i, vb
 		}
 	}
+
 	return 0, nil
 }
 

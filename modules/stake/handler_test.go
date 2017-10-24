@@ -166,7 +166,7 @@ func TestBondTxMultipleVals(t *testing.T) {
 		got := runTxUnbond(store, sender, getHoldAccount(sender), dummyTransferFn(accStore), txUnbond)
 		assert.True(got.IsOK(), "expected tx %d to be ok, got %v", i, got)
 
-		//Check that the account is unbonded
+		// Check that the account is unbonded
 		validators := LoadBonds(store)
 		val := validators[0]
 		validators.CleanupEmpty(store)

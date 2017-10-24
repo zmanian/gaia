@@ -30,8 +30,8 @@ var RootCmd = &cobra.Command{
 }
 
 // Tick - Called every block even if no transaction,
-//   process all queues, validator rewards, and calculate the validator set difference
-func getTickFnc() func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+// process all queues, validator rewards, and calculate the validator set difference
+func getTickFn() func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 	return func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
 
 		// First need to prefix the store, at this point it's a global store
@@ -74,7 +74,7 @@ func main() {
 
 	RootCmd.AddCommand(
 		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
-		basecmd.GetTickStartCmd(getTickFnc()),
+		basecmd.GetTickStartCmd(getTickFn()),
 		basecmd.UnsafeResetAllCmd,
 		version.VersionCmd,
 	)

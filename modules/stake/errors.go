@@ -1,4 +1,4 @@
-//nolint
+// nolint
 package stake
 
 import (

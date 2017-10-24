@@ -1,12 +1,14 @@
 package commands
 
 import (
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"github.com/cosmos/gaia/modules/stake"
+
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
 	"github.com/cosmos/cosmos-sdk/stack"
-	"github.com/cosmos/gaia/modules/stake"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 //nolint
@@ -25,7 +27,6 @@ var (
 )
 
 func cmdQueryValidators(cmd *cobra.Command, args []string) error {
-
 	var bonds stake.ValidatorBonds
 
 	prove := !viper.GetBool(commands.FlagTrustNode)

@@ -3,9 +3,10 @@ package stake
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -24,6 +25,7 @@ func TestBondUpdateValidateBasic(t *testing.T) {
 	type fields struct {
 		Amount coin.Coin
 	}
+
 	tests := []struct {
 		name    string
 		fields  fields
@@ -34,6 +36,7 @@ func TestBondUpdateValidateBasic(t *testing.T) {
 		{"zero coin", fields{coinZero}, true},
 		{"neg coin", fields{coinNeg}, true},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx := TxBond{

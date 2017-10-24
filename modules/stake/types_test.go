@@ -16,10 +16,11 @@ func newActors(n int) (actors []sdk.Actor) {
 		actors = append(actors, sdk.Actor{
 			"testChain", "testapp", []byte(fmt.Sprintf("addr%d", i))})
 	}
+
 	return
 }
 
-//NOTE PubKey is supposed to be the binaryBytes of the crypto.PubKey
+// NOTE: PubKey is supposed to be the binaryBytes of the crypto.PubKey
 // instead this is just being set the address here for testing purposes
 func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
 	for i, a := range actors {
@@ -31,8 +32,8 @@ func bondsFromActors(actors []sdk.Actor, amts []int) (bonds []*ValidatorBond) {
 			VotingPower:  uint64(amts[i]),
 		})
 	}
-	return
 
+	return
 }
 
 func TestValidatorBondsMaxVals(t *testing.T) {
@@ -70,7 +71,7 @@ func TestValidatorBondsSort(t *testing.T) {
 	bonds := ValidatorBonds(bondsFromActors(actors, []int{10, 300, 123, 4, 200}))
 	expectedOrder := []int{1, 4, 2, 0, 3}
 
-	//test basic sort
+	// test basic sort
 	bonds.Sort()
 
 	vals := bonds.GetValidators(store)

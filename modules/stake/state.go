@@ -1,11 +1,13 @@
 package stake
 
 import (
+	abci "github.com/tendermint/abci/types"
+
+	"github.com/tendermint/go-wire"
+
 	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
-	abci "github.com/tendermint/abci/types"
-	"github.com/tendermint/go-wire"
 )
 
 // transfer coins
@@ -22,11 +24,12 @@ func defaultTransferFn(ctx sdk.Context, store state.SimpleDB, dispatch sdk.Deliv
 		if err != nil {
 			return abci.ErrInsufficientFunds.AppendLog(err.Error())
 		}
+
 		return
 	}
 }
 
-//BondKey - state key for the bond bytes
+// BondKey - state key for the bond bytes
 var (
 	BondKey  = []byte{0x00}
 	ParamKey = []byte{0x01}
@@ -42,9 +45,11 @@ func LoadBonds(store state.SimpleDB) (validatorBonds ValidatorBonds) {
 		return
 	}
 	err := wire.ReadBinaryBytes(b, &validatorBonds)
+
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
+
 	return
 }
 
@@ -59,10 +64,12 @@ func loadParams(store state.SimpleDB) (params Params) {
 	if b == nil {
 		return defaultParams()
 	}
+
 	err := wire.ReadBinaryBytes(b, &params)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
+
 	return
 }
 func saveParams(store state.SimpleDB, params Params) {
