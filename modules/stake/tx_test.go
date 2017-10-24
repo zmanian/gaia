@@ -7,6 +7,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
+
+	crypto "github.com/tendermint/go-crypto"
 )
 
 var (
@@ -23,7 +25,8 @@ var (
 
 func TestBondUpdateValidateBasic(t *testing.T) {
 	type fields struct {
-		Amount coin.Coin
+		PubKey crypto.PubKey
+		Bond   coin.Coin
 	}
 
 	tests := []struct {
@@ -31,18 +34,20 @@ func TestBondUpdateValidateBasic(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
-		{"basic good", fields{coinPos}, false},
-		{"empty delegator", fields{coinPos}, false},
-		{"zero coin", fields{coinZero}, true},
-		{"neg coin", fields{coinNeg}, true},
+		{"basic good", fields{pk1, coinPos}, false},
+		{"empty delegator", fields{crypto.PubKey{}, coinPos}, true},
+		{"zero coin", fields{pk1, coinZero}, true},
+		{"neg coin", fields{pk1, coinNeg}, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := TxBond{
-				Amount: tt.fields.Amount,
-			}
-			assert.Equal(t, tt.wantErr, tx.ValidateBasic() != nil, tt.name)
+			tx := TxDelegate{BondUpdate{
+				PubKey: tt.fields.PubKey,
+				Bond:   tt.fields.Bond,
+			}}
+			assert.Equal(t, tt.wantErr, tx.ValidateBasic() != nil,
+				"test: %v, tx.ValidateBasic: %v", tt.name, tx.ValidateBasic())
 		})
 	}
 }

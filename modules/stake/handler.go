@@ -104,63 +104,59 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	params := loadParams(store)
 	// return the fee for each tx type
 	switch txInner := tx.Unwrap().(type) {
-	case TxBond:
+	case TxDeclareCandidacy:
+		return sdk.NewCheck(params.GasDeclareCandidacy, ""),
+			checkTxDeclareCandidacy(txInner, sender, store)
+	case TxDelegate:
 		return sdk.NewCheck(params.GasBond, ""),
-			checkTxBond(txInner, sender, store)
-	case TxUnbond:
+			checkTxDelegate(txInner, sender, store)
+	case TxUndelegate:
 		return sdk.NewCheck(params.GasUnbond, ""),
-			checkTxUnbond(txInner, sender, store)
+			checkTxUndelegate(txInner, sender, store)
 	}
 
 	return res, errors.ErrUnknownTxType("GTH")
 }
 
-func checkTxBond(tx TxBond, sender sdk.Actor, store state.SimpleDB) error {
+func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store state.SimpleDB) error {
 	// TODO check the sender has enough coins to bond
-	//acc := coin.Account{}
-	//// vvv this causes nil pointer ref error INSIDE of GetParsed
-	//_, err := query.GetParsed(sender.Address, &acc, true) //NOTE we are not using proof queries
-	//if err != nil {
-	//return err
-	//}
-	//if acc.Coins.IsGTE(coin.Coins{tx.Amount}) {
-	//return fmt.Errorf("not enough coins to bond, have %v, trying to bond %v",
-	//acc.Coins, tx.Amount)
-	//}
 
-	// check denom
-	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
-		return fmt.Errorf("Invalid coin denomination")
+	// check to see if the pubkey or sender has been registered before,
+	//  if it has been used ensure that the associated account is same
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate != nil {
+		return fmt.Errorf("cannot bond to pubkey which is already declared candidacy"+
+			" PubKey %v already registered with %v candidate address",
+			candidate.PubKey, candidate.Owner)
 	}
 
-	// check to see if the pubkey has been registered before,
-	// if it has been used ensure that the validator account is same
-	// to prevent accidentally bonding to validator other than you
-	bonds := LoadBonds(store)
-	_, bond := bonds.GetByPubKey(tx.PubKey)
-	if bond != nil {
-		if !bond.Sender.Equals(sender) {
-			return fmt.Errorf("cannot bond tokens to pubkey used by another validator"+
-				" PubKey %v already registered with %v validator address",
-				bond.PubKey, bond.Sender)
-		}
-	}
-
-	return nil
+	return checkDenom(tx.BondUpdate, store)
 }
 
-func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
-	// check denom
-	if tx.Amount.Denom != loadParams(store).AllowedBondDenom {
-		return fmt.Errorf("Invalid coin denomination")
-	}
+func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) error {
+	// TODO check the sender has enough coins to bond
 
-	// check if have enough tokens to unbond
-	bonds := LoadBonds(store)
-	_, bond := bonds.Get(sender)
-	if bond.BondedTokens < uint64(tx.Amount.Amount) {
-		return fmt.Errorf("not enough bond tokens to unbond, have %v, trying to unbond %v",
-			bond.BondedTokens, tx.Amount)
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate == nil { // does PubKey exist
+		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
+	}
+	return checkDenom(tx.BondUpdate, store)
+}
+
+func checkTxUndelegate(tx TxUndelegate, sender sdk.Actor, store state.SimpleDB) error {
+
+	//check if have enough shares to unbond
+	bond := loadDelegatorBond(store, sender, tx.PubKey)
+	if bond.Shares < uint64(tx.Bond.Amount) {
+		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
+			bond.Shares, tx.Bond)
+	}
+	return checkDenom(tx.BondUpdate, store)
+}
+
+func checkDenom(tx BondUpdate, store state.SimpleDB) error {
+	if tx.Bond.Denom != loadParams(store).AllowedBondDenom {
+		return fmt.Errorf("Invalid coin denomination")
 	}
 	return nil
 }
@@ -181,20 +177,20 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		return res, abciRes
 	}
 
-	// get the holding account for the sender's bond.
-	// holding account is just an sdk.Actor, with the sender's address shifted one byte right.
-	holder := getHoldAccount(sender)
-
 	// Run the transaction
 	switch _tx := tx.Unwrap().(type) {
-	case TxBond:
+	case TxDeclareCandidacy:
 		fn := defaultTransferFn(ctx, store, dispatch)
-		abciRes = runTxBond(store, sender, holder, fn, _tx)
-	case TxUnbond:
+		abciRes = runTxDeclareCandidacy(store, sender, fn, _tx)
+	case TxDelegate:
+		fn := defaultTransferFn(ctx, store, dispatch)
+		abciRes = runTxDelegate(store, sender, fn, _tx)
+	case TxUndelegate:
 		//context with hold account permissions
-		ctx2 := ctx.WithPermissions(holder)
+		params := loadParams(store)
+		ctx2 := ctx.WithPermissions(params.HoldAccount)
 		fn := defaultTransferFn(ctx2, store, dispatch)
-		abciRes = runTxUnbond(store, sender, holder, fn, _tx)
+		abciRes = runTxUndelegate(store, sender, fn, _tx)
 	}
 
 	res = sdk.DeliverResult{
@@ -206,58 +202,122 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	return
 }
 
-// -------------------------------------------------------------
-// these functions assume everything has been authenticated,
-// now we just bond or unbond and save
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// These functions assume everything has been authenticated,
+// now we just perform action and save
 
-func runTxBond(store state.SimpleDB, sender, holder sdk.Actor,
-	transferFn transferFn, tx TxBond) (res abci.Result) {
+func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
+	transferFn transferFn, tx TxDeclareCandidacy) (res abci.Result) {
 
-	// Get amount of coins to bond
-	bondCoin := tx.Amount
-
-	// Get the validator bond accounts, and bond and index for this sender
-	bonds := LoadBonds(store)
-	idx, bond := bonds.Get(sender)
-	if bond == nil { //if it doesn't yet exist create it
-		bonds = bonds.Add(NewValidatorBond(sender, holder, tx.PubKey))
-		idx = len(bonds) - 1
+	// create and save the empty candidate
+	bond := LoadCandidate(store, tx.PubKey)
+	if bond != nil {
+		return resCandidateExistsAddr
 	}
+	candidate := NewCandidate(tx.PubKey, sender)
+	saveCandidate(store, candidate)
+	//panic(fmt.Sprintf("debug GetCandidateKey: %v\n", candidate))
 
-	// Move coins from the sender account to the holder account
-	res = transferFn(sender, holder, coin.Coins{bondCoin})
+	// move coins from the sender account to a (self-bond) delegator account
+	// the candidate account will be updated automatically here
+	txDeligate := TxDelegate{tx.BondUpdate}
+	res = runTxDelegate(store, sender, transferFn, txDeligate)
 	if res.IsErr() {
 		return res
 	}
-
-	// Update the bond and save to store
-	bonds[idx].BondedTokens += uint64(bondCoin.Amount)
-	saveBonds(store, bonds)
 
 	return abci.OK
 }
 
-func runTxUnbond(store state.SimpleDB, sender, holder sdk.Actor,
-	transferFn transferFn, tx TxUnbond) (res abci.Result) {
+func runTxDelegate(store state.SimpleDB, sender sdk.Actor,
+	transferFn transferFn, tx TxDelegate) (res abci.Result) {
 
-	//get validator bond
-	bonds := LoadBonds(store)
-	_, bond := bonds.Get(sender)
-	if bond == nil {
-		return resNoValidatorForAddress
+	// Get the pubKey bond account
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate == nil {
+		return resBondNotNominated
+	}
+	if candidate.Owner.Empty() { //candidate has been rejected
+		return resBondNotNominated
 	}
 
-	// transfer coins back to account
-	unbondCoin := tx.Amount
-	unbondAmt := uint64(unbondCoin.Amount)
-	res = transferFn(holder, sender, coin.Coins{unbondCoin})
+	// Move coins from the delegator account to the pubKey lock account
+	params := loadParams(store)
+	res = transferFn(sender, params.HoldAccount, coin.Coins{tx.Bond})
 	if res.IsErr() {
 		return res
 	}
 
-	bond.BondedTokens -= unbondAmt
+	// Get or create the delegator bond
+	bond := loadDelegatorBond(store, sender, tx.PubKey)
+	if bond == nil {
+		bond = &DelegatorBond{
+			PubKey: tx.PubKey,
+			Shares: 0,
+		}
+	}
 
-	saveBonds(store, bonds)
+	// Add shares to delegator bond and candidate
+	bond.Shares += uint64(tx.Bond.Amount)
+	candidate.Shares += uint64(tx.Bond.Amount)
+
+	// Save to store
+	saveCandidate(store, candidate)
+	saveDelegatorBond(store, sender, *bond)
+
+	return abci.OK
+}
+
+func runTxUndelegate(store state.SimpleDB, sender sdk.Actor,
+	transferFn transferFn, tx TxUndelegate) (res abci.Result) {
+
+	//get delegator bond
+	bond := loadDelegatorBond(store, sender, tx.PubKey)
+	if bond == nil {
+		return resNoDelegatorForAddress
+	}
+
+	//get pubKey candidate
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate == nil {
+		return resNoCandidateForAddress
+	}
+
+	// subtract bond tokens from bond
+	if bond.Shares < uint64(tx.Bond.Amount) {
+		return resInsufficientFunds
+	}
+	bond.Shares -= uint64(tx.Bond.Amount)
+
+	if bond.Shares == 0 {
+
+		// if the bond is the owner of the candidate then
+		// trigger a reject candidacy by setting Owner to Empty Actor
+		if sender.Equals(candidate.Owner) {
+			candidate.Owner = sdk.Actor{}
+		}
+
+		//remove the bond
+		removeDelegatorBond(store, sender, tx.PubKey)
+	} else {
+		saveDelegatorBond(store, sender, *bond)
+	}
+
+	// deduct shares from the candidate
+	candidate.Shares -= uint64(tx.Bond.Amount)
+	if candidate.Shares == 0 {
+		removeCandidate(store, tx.PubKey)
+	} else {
+		saveCandidate(store, candidate)
+	}
+
+	// transfer coins back to account
+	params := loadParams(store)
+	res = transferFn(params.HoldAccount, sender, coin.Coins{tx.Bond})
+	if res.IsErr() {
+		return res
+	}
+
 	return abci.OK
 }
 
@@ -279,9 +339,4 @@ func getTxSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
 	// to use two different keys, one for validating and one with coins on it...
 	// so this point may never be relevant
 	return senders[0], abci.OK
-}
-
-func getHoldAccount(sender sdk.Actor) sdk.Actor {
-	holdAddr := append([]byte{0x00}, sender.Address[1:]...) //shift and prepend a zero
-	return sdk.NewActor(stakingModuleName, holdAddr)
 }

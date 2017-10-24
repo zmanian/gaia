@@ -37,15 +37,14 @@ func tickFn(ctx sdk.Context, store state.SimpleDB) (diffVal []*abci.Validator, e
 	store = stack.PrefixedStore(stake.Name(), store)
 
 	// Determine the validator set changes
-	validatorBonds := stake.LoadBonds(store)
-	startVal := validatorBonds.GetValidators(store)
-	changed := validatorBonds.UpdateVotingPower(store)
+	candidates := stake.LoadCandidates(store)
+	startVal := candidates.GetValidators(store)
+	changed := candidates.UpdateVotingPower(store)
 	if !changed {
 		return
 	}
-	newVal := validatorBonds.GetValidators(store)
+	newVal := candidates.GetValidators(store)
 	diffVal = stake.ValidatorsDiff(startVal, newVal, store)
-	validatorBonds.CleanupEmpty(store)
 	return
 }
 
