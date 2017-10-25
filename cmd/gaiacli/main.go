@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/commands/proxy"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
 	rpccmd "github.com/cosmos/cosmos-sdk/client/commands/rpc"
-	"github.com/cosmos/cosmos-sdk/client/commands/seeds"
+	"github.com/cosmos/cosmos-sdk/client/commands/commits"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	authcmd "github.com/cosmos/cosmos-sdk/modules/auth/commands"
 	basecmd "github.com/cosmos/cosmos-sdk/modules/base/commands"
@@ -81,7 +81,7 @@ func main() {
 		commands.InitCmd,
 		commands.ResetCmd,
 		keys.RootCmd,
-		seeds.RootCmd,
+		commits.RootCmd,
 		rpccmd.RootCmd,
 		query.RootCmd,
 		txcmd.RootCmd,
