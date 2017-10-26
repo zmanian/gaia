@@ -19,7 +19,6 @@ func TestState(t *testing.T) {
 	validatorBonds := ValidatorBonds{
 		&ValidatorBond{
 			Sender:       validator1,
-			PubKey:       []byte{},
 			BondedTokens: 9,
 			HoldAccount:  sdk.Actor{"testChain", "testapp", []byte("addresslockedtoapp")},
 		}}
