@@ -8,6 +8,7 @@ import (
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/tmlibs/cli"
 
+	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
 	"github.com/cosmos/cosmos-sdk/modules/base"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -31,22 +32,19 @@ var RootCmd = &cobra.Command{
 
 // Tick - Called every block even if no transaction,
 // process all queues, validator rewards, and calculate the validator set difference
-func getTickFn() func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
-	return func(store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+func tickFn(ctx sdk.Context, store state.SimpleDB) (diffVal []*abci.Validator, err error) {
+	// First need to prefix the store, at this point it's a global store
+	store = stack.PrefixedStore(stake.Name(), store)
 
-		// First need to prefix the store, at this point it's a global store
-		store = stack.PrefixedStore(stake.Name(), store)
+	// Determine the validator set changes
+	validatorBonds := stake.LoadBonds(store)
+	startVal := validatorBonds.GetValidators(store)
+	validatorBonds.UpdateVotingPower(store)
+	newVal := validatorBonds.GetValidators(store)
+	diffVal = stake.ValidatorsDiff(startVal, newVal, store)
+	validatorBonds.CleanupEmpty(store)
 
-		// Determine the validator set changes
-		validatorBonds := stake.LoadBonds(store)
-		startVal := validatorBonds.GetValidators(store)
-		validatorBonds.UpdateVotingPower(store)
-		newVal := validatorBonds.GetValidators(store)
-		diffVal = stake.ValidatorsDiff(startVal, newVal, store)
-		validatorBonds.CleanupEmpty(store)
-
-		return
-	}
+	return
 }
 
 func main() {
@@ -74,7 +72,7 @@ func main() {
 
 	RootCmd.AddCommand(
 		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
-		basecmd.GetTickStartCmd(getTickFn()),
+		basecmd.GetTickStartCmd(sdk.TickerFunc(tickFn)),
 		basecmd.UnsafeResetAllCmd,
 		version.VersionCmd,
 	)
