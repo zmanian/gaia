@@ -1,5 +1,5 @@
-hash: 6bd76e32ab6f095051bb4ddfae8d5836a6dcbeeda5a7ced442151f3665591938
-updated: 2017-10-26T20:04:27.387907291+02:00
+hash: 696bbcdf085780b2c512e1df52e2dfeb3be37e5e4fdacb57187fbfdd56fd807d
+updated: 2017-10-27T17:08:28.464359229+02:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: c514176abc084c73892362b7d1e9beea735f6899
+  version: aa878581035b55062fd32e92a9ee63cfc438b44a
   subpackages:
   - app
   - client
@@ -45,7 +45,7 @@ imports:
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/ethanfrey/hid
-  version: f379bda1dbc8e79333b04563f71a12e86206efe5
+  version: f89256ce77ab004deb0de7eea795e69ad44ac2ad
 - name: github.com/ethanfrey/ledger
   version: 3689ce9be93e1a5bef836b1cc2abb18381c79176
 - name: github.com/fsnotify/fsnotify
@@ -141,14 +141,14 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/tendermint/abci
-  version: a0e38dc58374f485481ea07b23659d85f670a694
+  version: 66de53292e37f30d2375543e32c7a19a65d22f94
   subpackages:
   - client
   - example/dummy
   - server
   - types
 - name: github.com/tendermint/ed25519
-  version: 1f52c6f8b8a5c7908aff4497c186af344b428925
+  version: d8387025d2b9d158cf4efb07e7ebf814bcce2057
   subpackages:
   - edwards25519
   - extra25519
@@ -163,7 +163,7 @@ imports:
   - keys/wordlist
   - nano
 - name: github.com/tendermint/go-wire
-  version: 3180c867ca52bcd9ba6c905ce63613f8d8e9837c
+  version: 8ee84b5b2581530168daf66fc89c548d27403c57
   subpackages:
   - data
   - data/base58
@@ -213,7 +213,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: b30e3ba26d4077edeed83c50a4e0c38b0ec9ddb3
+  version: 092eb701c7276907cdbed258750e22ce895b6735
   subpackages:
   - autofile
   - cli
