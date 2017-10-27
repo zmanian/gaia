@@ -100,9 +100,17 @@ func (vbs ValidatorBonds) Sort() {
 
 // UpdateVotingPower - voting power based on bond tokens and exchange rate
 // TODO: make not a function of ValidatorBonds as validatorbonds can be loaded from the store
-func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
+func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) (changed bool) {
 	for _, vb := range vbs {
-		vb.VotingPower = vb.BondedTokens
+		if vb.VotingPower != vb.BondedTokens {
+			changed = true
+			vb.VotingPower = vb.BondedTokens
+		}
+	}
+
+	// we don't write anything if nothing changes
+	if !changed {
+		return false
 	}
 
 	// Now sort and truncate the power
@@ -114,7 +122,7 @@ func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) {
 	}
 
 	saveBonds(store, vbs)
-	return
+	return true
 }
 
 // CleanupEmpty - removes all validators which have no bonded atoms left
