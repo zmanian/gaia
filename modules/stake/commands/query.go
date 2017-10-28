@@ -31,7 +31,7 @@ func cmdQueryValidators(cmd *cobra.Command, args []string) error {
 
 	prove := !viper.GetBool(commands.FlagTrustNode)
 	key := stack.PrefixedKey(stake.Name(), stake.BondKey)
-	h, err := query.GetParsed(key, &bonds, prove)
+	h, err := query.GetParsed(key, &bonds, query.GetHeight(), prove)
 	if err != nil {
 		return err
 	}
