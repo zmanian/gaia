@@ -1,16 +1,16 @@
-hash: 3f3f967d720dd82840be3413b083521e62474ca990e9a9c42973909bdefa585b
-updated: 2017-10-27T15:56:24.495404566-04:00
+hash: 714a1efa5711cf3d2039befb39536c42f73d7807f7d13edc732ae476335068be
+updated: 2017-10-28T10:09:52.36427795-04:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
 - name: github.com/btcsuite/btcd
-  version: c7588cbf7690cd9f047a28efa2dcd8f2435a4e5e
+  version: 8cea3866d0f7fb12d567a20744942c0d078c7d15
   subpackages:
   - btcec
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: aa878581035b55062fd32e92a9ee63cfc438b44a
+  version: f9dde9f685a1dddfbf31afa740ba44aaff7e120d
   subpackages:
   - app
   - client
@@ -51,7 +51,7 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/go-kit/kit
-  version: 4dc7be5d2d12881735283bcab7352178e190fc71
+  version: e2b298466b32c7cd5579a9b9b07e968fc9d9452c
   subpackages:
   - log
   - log/level
@@ -100,7 +100,7 @@ imports:
 - name: github.com/magiconair/properties
   version: 8d7837e64d3c1ee4e54a880c5a920ab4316fc90a
 - name: github.com/mattn/go-isatty
-  version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
+  version: a5cdd64afdee435007ee3e9f6ed4684af949d568
 - name: github.com/mitchellh/mapstructure
   version: 06020f85339e21b2478f756a78e295255ffa4d6a
 - name: github.com/pelletier/go-toml
@@ -139,21 +139,20 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/tendermint/abci
-  version: 66de53292e37f30d2375543e32c7a19a65d22f94
+  version: c9612f094b8181c3986a07f85cd8a8a07c9676c8
   subpackages:
   - client
   - example/dummy
   - server
   - types
 - name: github.com/tendermint/ed25519
-  version: 1f52c6f8b8a5c7908aff4497c186af344b428925
+  version: d8387025d2b9d158cf4efb07e7ebf814bcce2057
   subpackages:
   - edwards25519
   - extra25519
 - name: github.com/tendermint/go-crypto
-  version: db5603e37435933c13665a708055fadd18222f5f
+  version: dd20358a264c772b4a83e477b0cfce4c88a7001d
   subpackages:
-  - bcrypt
   - cmd
   - keys
   - keys/cryptostore
@@ -161,26 +160,19 @@ imports:
   - keys/wordlist
   - nano
 - name: github.com/tendermint/go-wire
-  version: 8ee84b5b2581530168daf66fc89c548d27403c57
+  version: 2baffcb6b690057568bc90ef1d457efb150b979a
   subpackages:
   - data
   - data/base58
 - name: github.com/tendermint/iavl
   version: 595f3dcd5b6cd4a292e90757ae6d367fd7a6e653
-- name: github.com/tendermint/light-client
-  version: 76313d625e662ed7b284d066d68ff71edd7a9fac
-  subpackages:
-  - certifiers
-  - certifiers/client
-  - certifiers/files
-  - proofs
 - name: github.com/tendermint/merkleeyes
   version: 2f6e5d31e7a35045d8d0a5895cb1fec33dd4d32b
   subpackages:
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: e81768b688004ce3c091fc0ede064e21da23b638
+  version: e236302256b8b0b75441e8e44c6d0d3f5b5152c6
   subpackages:
   - blockchain
   - certifiers
@@ -211,7 +203,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: 092eb701c7276907cdbed258750e22ce895b6735
+  version: d9525c0fb671204450b160807480e1263053fb20
   subpackages:
   - autofile
   - cli
@@ -227,7 +219,6 @@ imports:
 - name: golang.org/x/crypto
   version: 2509b142fb2b797aa7587dad548f113b2c0f20ce
   subpackages:
-  - blowfish
   - curve25519
   - nacl/box
   - nacl/secretbox
@@ -237,7 +228,7 @@ imports:
   - ripemd160
   - salsa20/salsa
 - name: golang.org/x/net
-  version: 4b14673ba32bee7f5ac0f990a48f033919fd418b
+  version: c73622c77280266305273cb545f54516ced95b93
   subpackages:
   - context
   - http2
@@ -247,7 +238,7 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 176de7413414c01569163271c745672ff04a7267
+  version: 661970f62f5897bc0cd5fdca7e087ba8a98a8fa1
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -286,7 +277,7 @@ imports:
   version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
@@ -294,7 +285,7 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 2aa2c176b9dab406a6970f6a55f513e8a8c8b18f
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
   - require

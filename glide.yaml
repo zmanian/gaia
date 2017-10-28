@@ -12,32 +12,25 @@ import:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: bugfix/stable-app-hash
+  version: develop
 - package: github.com/tendermint/iavl
   version: develop
 - package: github.com/tendermint/go-crypto
-  version: develop
+  version: v0.4.1
   subpackages:
   - cmd
   - keys
 - package: github.com/tendermint/go-wire
-  version: develop
+  version: v0.7.1
   subpackages:
   - data
-- package: github.com/tendermint/light-client
-  version: develop
-  subpackages:
-  - proofs
-  - certifiers
-  - certifiers/client
-  - certifiers/files
 - package: github.com/tendermint/merkleeyes
   version: develop
   subpackages:
   - client
   - iavl
 - package: github.com/tendermint/tendermint
-  version: release-v0.12.0
+  version: v0.12.0
   subpackages:
   - config
   - node
