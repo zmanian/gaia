@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (October 28, 2017)
+
+BREAKING CHANGES:
+
+* dont change AppHash every block
+
 ## 0.2.0 (October 12, 2017)
 
 BREAKING CHANGES:
