@@ -229,7 +229,7 @@ Finally, to relinquish all your power, unbond some coins. You should see your
 VotingPower reduce and your account balance increase.
 
 ```
-gaiacli tx unbond --amount=fermion --name=$MYNAME
+gaiacli tx unbond --amount=10fermion --name=$MYNAME
 gaiacli query validators
 gaiacli query account $MYADDR
 ``` 
