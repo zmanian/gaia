@@ -1,10 +1,20 @@
 # Changelog
 
+## 0.4.0 (November 6, 2017)
+
+Added delegation to existing validators
+
+BREAKING CHANGES:
+
+* Bonding replaced with DeclareCandidacy
+* Unbonding used for both delegation and candidates self-bonding
+* Unbonding must use the `--pubkey` flag
+
 ## 0.3.0 (October 28, 2017)
 
 BREAKING CHANGES:
 
-* dont change AppHash every block
+* don't change AppHash every block
 
 ## 0.2.0 (October 12, 2017)
 
