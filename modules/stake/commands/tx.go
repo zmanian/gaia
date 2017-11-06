@@ -65,7 +65,7 @@ func cmdBond(cmd *cobra.Command, args []string) error {
 }
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
-	return cmdBondUpdate(cmd, args, stake.NewTxUndelegate)
+	return cmdBondUpdate(cmd, args, stake.NewTxUnbond)
 }
 
 func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx makeTx) error {

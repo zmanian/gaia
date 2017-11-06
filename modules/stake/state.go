@@ -109,9 +109,9 @@ func loadDelegatorBond(store state.SimpleDB,
 	return bond
 }
 
-func saveDelegatorBond(store state.SimpleDB, delegator sdk.Actor, bond DelegatorBond) {
+func saveDelegatorBond(store state.SimpleDB, delegator sdk.Actor, bond *DelegatorBond) {
 
-	b := wire.BinaryBytes(bond)
+	b := wire.BinaryBytes(*bond)
 	store.Set(getDelegatorBondKey(delegator, bond.PubKey), b)
 }
 

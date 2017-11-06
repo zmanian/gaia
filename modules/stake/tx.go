@@ -16,18 +16,18 @@ import (
 // so it gets routed properly
 const (
 	ByteTxDelegate   = 0x55
-	ByteTxUndelegate = 0x56
+	ByteTxUnbond = 0x56
 	TypeTxDelegate   = stakingModuleName + "/bond"
-	TypeTxUndelegate = stakingModuleName + "/unbond"
+	TypeTxUnbond = stakingModuleName + "/unbond"
 )
 
 func init() {
 	sdk.TxMapper.RegisterImplementation(TxDelegate{}, TypeTxDelegate, ByteTxDelegate)
-	sdk.TxMapper.RegisterImplementation(TxUndelegate{}, TypeTxUndelegate, ByteTxUndelegate)
+	sdk.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
 }
 
 //Verify interface at compile time
-var _, _ sdk.TxInner = &TxDelegate{}, &TxUndelegate{}
+var _, _ sdk.TxInner = &TxDelegate{}, &TxUnbond{}
 
 // BondUpdate - struct for bonding or unbonding transactions
 type BondUpdate struct {
@@ -67,12 +67,12 @@ func NewTxDelegate(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
 	}}.Wrap()
 }
 
-// TxUndelegate - struct for unbonding transactions
-type TxUndelegate struct{ BondUpdate }
+// TxUnbond - struct for unbonding transactions
+type TxUnbond struct{ BondUpdate }
 
-// NewTxUndelegate - new TxUndelegate
-func NewTxUndelegate(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
-	return TxUndelegate{BondUpdate{
+// NewTxUnbond - new TxUnbond
+func NewTxUnbond(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
+	return TxUnbond{BondUpdate{
 		PubKey: pubKey,
 		Bond:   bond,
 	}}.Wrap()

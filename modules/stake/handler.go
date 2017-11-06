@@ -110,9 +110,9 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	case TxDelegate:
 		return sdk.NewCheck(params.GasBond, ""),
 			checkTxDelegate(txInner, sender, store)
-	case TxUndelegate:
+	case TxUnbond:
 		return sdk.NewCheck(params.GasUnbond, ""),
-			checkTxUndelegate(txInner, sender, store)
+			checkTxUnbond(txInner, sender, store)
 	}
 
 	return res, errors.ErrUnknownTxType("GTH")
@@ -143,7 +143,7 @@ func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) erro
 	return checkDenom(tx.BondUpdate, store)
 }
 
-func checkTxUndelegate(tx TxUndelegate, sender sdk.Actor, store state.SimpleDB) error {
+func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
 
 	//check if have enough shares to unbond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
@@ -185,12 +185,12 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	case TxDelegate:
 		fn := defaultTransferFn(ctx, store, dispatch)
 		abciRes = runTxDelegate(store, sender, fn, _tx)
-	case TxUndelegate:
+	case TxUnbond:
 		//context with hold account permissions
 		params := loadParams(store)
 		ctx2 := ctx.WithPermissions(params.HoldAccount)
 		fn := defaultTransferFn(ctx2, store, dispatch)
-		abciRes = runTxUndelegate(store, sender, fn, _tx)
+		abciRes = runTxUnbond(store, sender, fn, _tx)
 	}
 
 	res = sdk.DeliverResult{
@@ -216,7 +216,6 @@ func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
 	}
 	candidate := NewCandidate(tx.PubKey, sender)
 	saveCandidate(store, candidate)
-	//panic(fmt.Sprintf("debug GetCandidateKey: %v\n", candidate))
 
 	// move coins from the sender account to a (self-bond) delegator account
 	// the candidate account will be updated automatically here
@@ -263,13 +262,13 @@ func runTxDelegate(store state.SimpleDB, sender sdk.Actor,
 
 	// Save to store
 	saveCandidate(store, candidate)
-	saveDelegatorBond(store, sender, *bond)
+	saveDelegatorBond(store, sender, bond)
 
 	return abci.OK
 }
 
-func runTxUndelegate(store state.SimpleDB, sender sdk.Actor,
-	transferFn transferFn, tx TxUndelegate) (res abci.Result) {
+func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
+	transferFn transferFn, tx TxUnbond) (res abci.Result) {
 
 	//get delegator bond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
@@ -300,7 +299,7 @@ func runTxUndelegate(store state.SimpleDB, sender sdk.Actor,
 		//remove the bond
 		removeDelegatorBond(store, sender, tx.PubKey)
 	} else {
-		saveDelegatorBond(store, sender, *bond)
+		saveDelegatorBond(store, sender, bond)
 	}
 
 	// deduct shares from the candidate
