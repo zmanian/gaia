@@ -17,7 +17,6 @@ var (
 
 	resBadValidatorAddr      = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
 	resCandidateExistsAddr   = abci.ErrBaseInvalidInput.AppendLog("Candidate already exist, cannot re-declare candidacy")
-	resCandidateDoesntExist  = abci.ErrBaseInvalidInput.AppendLog("Candidate doesn't exist, cannot revoke candidacy")
 	resMissingSignature      = abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
 	resBondNotNominated      = abci.ErrBaseInvalidOutput.AppendLog("Cannot bond to non-nominated account")
 	resNoCandidateForAddress = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")

@@ -3,7 +3,7 @@ package stake
 import (
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk"
+	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 	crypto "github.com/tendermint/go-crypto"
 )
@@ -15,29 +15,27 @@ import (
 // make sure to use the name of the handler as the prefix in the tx type,
 // so it gets routed properly
 const (
-	ByteTxDelegate   = 0x55
-	ByteTxUnbond = 0x56
-	TypeTxDelegate   = stakingModuleName + "/bond"
-	TypeTxUnbond = stakingModuleName + "/unbond"
+	ByteTxDelegate         = 0x55
+	ByteTxDelegate         = 0x56
+	ByteTxUnbond           = 0x57
+	TypeTxDeclareCandidacy = stakingModuleName + "/declareCandidacy"
+	TypeTxDelegate         = stakingModuleName + "/delegate"
+	TypeTxUnbond           = stakingModuleName + "/unbond"
 )
 
 func init() {
+	sdk.TxMapper.RegisterImplementation(TxDeclareCandidacy{}, TypeTxDeclareCandidacy, ByteTxDeclareCandidacy)
 	sdk.TxMapper.RegisterImplementation(TxDelegate{}, TypeTxDelegate, ByteTxDelegate)
 	sdk.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
 }
 
 //Verify interface at compile time
-var _, _ sdk.TxInner = &TxDelegate{}, &TxUnbond{}
+var _, _, _ sdk.TxInner = &TxDeclareCandidacy, &TxDelegate{}, &TxUnbond{}
 
 // BondUpdate - struct for bonding or unbonding transactions
 type BondUpdate struct {
 	PubKey crypto.PubKey `json:"pubKey"`
 	Bond   coin.Coin     `json:"amount"`
-}
-
-// Wrap - Wrap a Tx as a Basecoin Tx
-func (tx BondUpdate) Wrap() sdk.Tx {
-	return sdk.Tx{tx}
 }
 
 // ValidateBasic - Check for non-empty actor, and valid coins
@@ -67,6 +65,9 @@ func NewTxDelegate(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
 	}}.Wrap()
 }
 
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxDelegate) Wrap() sdk.Tx { return sdk.Tx{tx} }
+
 // TxUnbond - struct for unbonding transactions
 type TxUnbond struct{ BondUpdate }
 
@@ -77,6 +78,9 @@ func NewTxUnbond(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
 		Bond:   bond,
 	}}.Wrap()
 }
+
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxUnbond) Wrap() sdk.Tx { return sdk.Tx{tx} }
 
 // TxDeclareCandidacy - struct for unbonding transactions
 type TxDeclareCandidacy struct{ BondUpdate }
@@ -89,7 +93,5 @@ func NewTxDeclareCandidacy(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
 	}}.Wrap()
 }
 
-// TxRevokeCandidacy - struct for unbonding transactions
-type TxRevokeCandidacy struct {
-	PubKey crypto.PubKey `json:"pubKey"`
-}
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxDeclareCandidacy) Wrap() sdk.Tx { return sdk.Tx{tx} }

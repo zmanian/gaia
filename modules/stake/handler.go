@@ -65,6 +65,8 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 	case "max_vals",
 		"gas_bond",
 		"gas_unbond":
+
+		// TODO: enforce non-negative integers in input
 		i, err := strconv.Atoi(value)
 		if err != nil {
 			return fmt.Errorf("input must be integer, Error: %v", err.Error())
@@ -115,11 +117,11 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 			checkTxUnbond(txInner, sender, store)
 	}
 
-	return res, errors.ErrUnknownTxType("GTH")
+	return res, errors.ErrUnknownTxType(tx)
 }
 
 func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store state.SimpleDB) error {
-	// TODO check the sender has enough coins to bond
+	// TODO: check the sender has enough coins to bond
 
 	// check to see if the pubkey or sender has been registered before,
 	//  if it has been used ensure that the associated account is same
@@ -130,6 +132,7 @@ func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store stat
 			candidate.PubKey, candidate.Owner)
 	}
 
+	// TODO: also check the account has enough coins to declare
 	return checkDenom(tx.BondUpdate, store)
 }
 
@@ -140,6 +143,7 @@ func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) erro
 	if candidate == nil { // does PubKey exist
 		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
 	}
+	// TODO: also check the account has enough to bond
 	return checkDenom(tx.BondUpdate, store)
 }
 
@@ -206,6 +210,9 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 // These functions assume everything has been authenticated,
 // now we just perform action and save
 
+// TODO: why not just return (sdk.DeliverResult, error)?
+// that is why the other interface is such, and err != nil
+// is more idiomatic than res.IsErr()
 func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
 	transferFn transferFn, tx TxDeclareCandidacy) (res abci.Result) {
 
@@ -319,6 +326,8 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 
 	return abci.OK
 }
+
+// TODO: why don't you return a non-abci error, eg. normal error case here?
 
 // get the sender from the ctx and ensure it matches the tx pubkey
 func getTxSender(ctx sdk.Context) (sender sdk.Actor, res abci.Result) {
