@@ -1,5 +1,5 @@
-hash: 714a1efa5711cf3d2039befb39536c42f73d7807f7d13edc732ae476335068be
-updated: 2017-10-28T10:09:52.36427795-04:00
+hash: cb9e61f4708a66d39336db685529d8f655871593e9fd10b5b9fd033bb574bb7e
+updated: 2017-11-06T21:14:21.889482998Z
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -22,6 +22,7 @@ imports:
   - client/commands/query
   - client/commands/rpc
   - client/commands/txs
+  - client/rest
   - errors
   - genesis
   - modules/auth
@@ -30,14 +31,17 @@ imports:
   - modules/base/commands
   - modules/coin
   - modules/coin/commands
+  - modules/coin/rest
   - modules/fee
   - modules/fee/commands
   - modules/ibc
   - modules/ibc/commands
   - modules/nonce
   - modules/nonce/commands
+  - modules/nonce/rest
   - modules/roles
   - modules/roles/commands
+  - modules/roles/rest
   - server/commands
   - stack
   - state
@@ -76,6 +80,10 @@ imports:
   - ptypes/timestamp
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
+- name: github.com/gorilla/context
+  version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
+- name: github.com/gorilla/mux
+  version: 24fca303ac6da784b9e8269f724ddeb0b2eea5e7
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/hashicorp/hcl
@@ -166,6 +174,8 @@ imports:
   - data/base58
 - name: github.com/tendermint/iavl
   version: 595f3dcd5b6cd4a292e90757ae6d367fd7a6e653
+- name: github.com/tendermint/light-client
+  version: ac2e4bf47b31aaf5d3d336691ac786ec751bfc32
 - name: github.com/tendermint/merkleeyes
   version: 2f6e5d31e7a35045d8d0a5895cb1fec33dd4d32b
   subpackages:
@@ -203,7 +213,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: d9525c0fb671204450b160807480e1263053fb20
+  version: ac0cf0b2e2e5246f331628a38e50ea7f0db54f8b
   subpackages:
   - autofile
   - cli

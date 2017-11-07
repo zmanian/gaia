@@ -22,8 +22,8 @@ var (
 	}
 
 	CmdQueryCandidate = &cobra.Command{
-		Use:   "validator",
-		Short: "Query a validator account",
+		Use:   "candidate",
+		Short: "Query a validator-candidate account",
 		RunE:  cmdQueryCandidate,
 	}
 )
@@ -42,29 +42,29 @@ func cmdQueryCandidates(cmd *cobra.Command, args []string) error {
 
 	prove := !viper.GetBool(commands.FlagTrustNode)
 	key := stack.PrefixedKey(stake.Name(), stake.CandidatesPubKeysKey)
-	h, err := query.GetParsed(key, &pks, query.GetHeight(), prove)
+	height, err := query.GetParsed(key, &pks, query.GetHeight(), prove)
 	if err != nil {
 		return err
 	}
 
-	return query.OutputProof(pks, h)
+	return query.OutputProof(pks, height)
 }
 
 func cmdQueryCandidate(cmd *cobra.Command, args []string) error {
 
 	var candidate stake.Candidate
 
-	pk, err := getPubKey()
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
 	if err != nil {
 		return err
 	}
 
 	prove := !viper.GetBool(commands.FlagTrustNode)
 	key := stack.PrefixedKey(stake.Name(), stake.GetCandidateKey(pk))
-	h, err := query.GetParsed(key, &candidate, query.GetHeight(), prove)
+	height, err := query.GetParsed(key, &candidate, query.GetHeight(), prove)
 	if err != nil {
 		return err
 	}
 
-	return query.OutputProof(candidate, h)
+	return query.OutputProof(candidate, height)
 }

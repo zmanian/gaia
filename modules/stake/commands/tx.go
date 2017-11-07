@@ -74,28 +74,27 @@ func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx makeTx) error {
 		return err
 	}
 
-	pubKey, err := getPubKey()
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
 	if err != nil {
 		return err
 	}
 
-	tx := makeTx(amount, pubKey)
+	tx := makeTx(amount, pk)
 	return txcmd.DoTx(tx)
 }
 
-func getPubKey() (pk crypto.PubKey, err error) {
-	// Get the pubkey
-	pubkeyStr := viper.GetString(FlagPubKey)
-	if len(pubkeyStr) == 0 {
+func GetPubKey(pubKeyStr string) (pk crypto.PubKey, err error) {
+
+	if len(pubKeyStr) == 0 {
 		err = fmt.Errorf("must use --pubkey flag")
 		return
 	}
-	if len(pubkeyStr) != 64 { //if len(pkBytes) != 32 {
+	if len(pubKeyStr) != 64 { //if len(pkBytes) != 32 {
 		err = fmt.Errorf("pubkey must be Ed25519 hex encoded string which is 64 characters long")
 		return
 	}
 	var pkBytes []byte
-	pkBytes, err = hex.DecodeString(pubkeyStr)
+	pkBytes, err = hex.DecodeString(pubKeyStr)
 	if err != nil {
 		return
 	}
