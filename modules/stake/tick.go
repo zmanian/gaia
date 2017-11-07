@@ -156,19 +156,20 @@ func processValidatorRewards(creditAcc func(receiver sdk.Actor, amount coin.Coin
 		//
 		// NOTE this can be a bit confusing best to work
 		// on paper yourself, but the general proof to
-		// arrive at the commTok2Val eqn is:
+		// arrive at the newValidatorShares eqn is:
 		//
-		//   oldTok = oldDelTok + oldValTok
-		//   newCoins = totalNewCoin - totalOldCoin
-		//   commissionCoins = (newCoins) * OldDelTok/OldTok * CommissionRate
+		// oldShares = delegatorShares + oldValidatorShares
+		// totalNewCoins = totalOldCoins + createdCoins
 		//
-		//   ExRate*(oldTok + newTok) = totalNewCoin
-		//   ExRate*(oldDelTok) = totalNewCoin * oldDelTok/oldTok - commissionCoins
+		// commissionCoins = (createdCoins) * delegatorShares/oldShares * CommissionRate
+		// totalNewCoins = ExchangeRate*(oldShares + newValidatorShares)
+		// ExchangeRate*(delegatorShares) = totalNewCoin * delegatorShares/oldShares - commissionCoins
 		//
-		//   :.
-		//   newTok = (totalNewCoin) /
-		//             (totalNewCoin/OldTok - commissionCoins/oldDelTok))
-		//             - oldTok
+		// The solution can then be solved as:
+		//
+		// newValidatorShares = (totalNewCoins) /
+		// (totalNewCoins/oldShares - commissionCoins/delegatorShares))
+		// - oldShares
 
 		//start by loading the bond account of the validator to itself
 		delegators, err := loadDelegatorBonds(store, validator.Delegatee)
