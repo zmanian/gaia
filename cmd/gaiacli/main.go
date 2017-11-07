@@ -76,6 +76,7 @@ func main() {
 		stakecmd.CmdDeclareCandidacy,
 		stakecmd.CmdDelegate,
 		stakecmd.CmdUnbond,
+		stakecmd.CmdDeclareCandidacy,
 	)
 
 	// Set up the various commands to use
