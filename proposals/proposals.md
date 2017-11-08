@@ -154,19 +154,47 @@ type QueueElemUnbond struct {
 }
 ```
 
-## Rewards, Commission, Fee Pool
+## Validation Rewards
 
-Collected fees are payed directly to a global hold account and reflected in the
-`HoldCoins` during each reward cycle.
+In this phase validation rewards are introduced as the incentive mechanism
+for atoms holders to keep their atoms bonded.  All bonded atom holders will benefit 
+by being rewarded newly minted atoms proportional to their bonded atom supply. The 
+intention of validation rewards is not to increase the proportion of atoms held by
+validators as opposed to delegators, therefor it is not intended that commission 
+be charged on validation reward.
 
-Each validator will now have the opportunity to charge commission on the fees
-collected which are to be forwarded to their delegators to their delegators.
+Validation rewards are payed directly to a global hold account and reflected
+in the `HoldCoins` during each reward cycle. 
+
+``` golang
+type Candidate struct {
+	PubKey       crypto.PubKey
+	Owner        sdk.Actor
+	Shares       uint64    
+	HoldCoins    uint64   
+	VotingPower  uint64   
+}
+```
+
+With this model the exchange rate for a candidates shares can be calculated as
+the candidates `HoldCoins/Shares`.  It then follows that when unbonding coins,
+the coins to withdraw per share can be calculated as the following:
+
+```
+unbondCoins = unbondShares * candidate.HoldCoins / candidate.Shares 
+```
+
+## Commission, Fee Pool
+
+Similar to validation rewards collected fees are pooled globally and paid out
+lazily to validators and delegators. Each validator will now have the
+opportunity to charge commission to the delegators on the fees collected on
+behalf of the deligators by the validators. The presence of a commission
+mechanism creates incentization for the validators to run validator nodes as
+opposed to just delegating themselves. 
+
 Validators must specify the rate and the maximum value of the commission
-charged to delegators as an act of self-regualtion.  Although the rate
-
-In addition, within this development phase the total supply of atoms increases
-with each reward cycle, however commisions is not charged to the atoms supply 
-which is provided by the
+charged to delegators as an act of self-regulation.  
  
 ``` golang
 type Candidate struct {
@@ -182,9 +210,7 @@ type Candidate struct {
 }
 ```
 
-Several new parameters are introduced:
- - HoldCoins: Total number of coins held by this validator, distinct from
-   shares, this term is used 
+Here several new parameters are introduced:
  - Commission: The current commission rate currently being charged by the
    validator
  - Commission:  The commission percent of fees charged to any delegators
@@ -193,14 +219,6 @@ Several new parameters are introduced:
    can change their commission by
  - FeeAccum: Cumulative counter for the amount of fees the candidate and its
    deligators are entitled too
-
-With this model the exchange rate can be calculated as `HoldCoins/Shares`.  It
-then follows that when unbonding coins, the coins to withdraw per share can be
-calculated as the following:
-
-```
-unbondCoins = unbondShares / candidate.Shares * HoldCoins
-```
 
 `TxDeclareCandidacy` should be updated to include new relavent terms:
 
@@ -213,24 +231,9 @@ type TxDeclareCandidacy struct {
 }
 ```
 
-During each reward cycle the amount of validator rewards will remain costant
-by the delegators will remain constant during this process. The change in
-validator self-delegated shares can be calculated solving from some fundamental
-equations. 
-
-In addition to the validator shares which each delegator holds, they also hold
-a fee pool account which increases based on the amount of time or number of
-blocks which have passed since the last withdrawal.
-
- - The piggy bank account can only be emptied out entirely every time it is
-   withdrawn from 
- - Cannot add to an existing delegation until the piggy bank is emptied - maybe
-   it is automatically emptied each time there is a delegation (if that is
-   possible)
- - Piggy bank calculated on withdraw based on the delegation "shares" as well
-   as block height or timestamp 
-
-Depending, DelegatorBond may now look as follows: 
+Similarly to the candidate account the delegator bond must integrate an accum
+for fee pool accounting. The accum can be accounted lazily for the delegators
+as the number of blocks which have passed since the last withdrawal.
 
 ``` golang
 type DelegatorBond struct {
@@ -241,26 +244,20 @@ type DelegatorBond struct {
 } 
 ```
 
-Additionally some new terms will need to be added into the Candidate:
+Some basic rules for the use of the fee pool are as following:
 
-``` golang
-type Candidate struct {
-	PubKey       crypto.PubKey
-	Owner        sdk.Actor
-	Shares       uint64    
-	VotingPower  uint64   
-    FeePool      []coin.Coin
-    FeeAccum     uint64
-}
-```
+ - When a either a delegator or a validator is withdrawing from the fee pool
+   they must withdrawal the maximum amount they are entitled too
+ - When bonding or unbonding atoms to an existing account  a full withdrawl of
+   the fees must occur (as the rules for lazy accounting change)
 
-Here a separate `PiggyBank` exists per candidate for every fee asset held by 
-a validator. The `SumOfHeights` increments each time the rewards are given
+Here a separate fee pool exists per candidate for every fee asset held by 
+a validator. The candidate accum increments each time the rewards are given
 
 ```
-PiggyBank.SumOfHeights = PiggyBank.SumOfHeights + 
-                         (CurrentHeight - LastFeeRewardHeight)
+candidate.FeeAccum += (CurrentHeight - LastFeeRewardHeight)
 ```
+
 
 For each fee token the calculation for the amount of withdrawal from the piggy
 bank is: 
