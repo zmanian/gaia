@@ -30,10 +30,10 @@ var (
 		Short: "create new validator/candidate account and delegate some coins to it",
 		RunE:  cmdDeclareCandidacy,
 	}
-	CmdBond = &cobra.Command{
-		Use:   "bond",
+	CmdDelegate = &cobra.Command{
+		Use:   "delegate",
 		Short: "delegate coins to an existing validator/candidate",
-		RunE:  cmdBond,
+		RunE:  cmdDelegate,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "unbond",
@@ -50,7 +50,7 @@ func init() {
 	fs.String(FlagAmount, "1fermion", "Amount of coins to bond")
 
 	CmdDeclareCandidacy.Flags().AddFlagSet(fs)
-	CmdBond.Flags().AddFlagSet(fs)
+	CmdDelegate.Flags().AddFlagSet(fs)
 	CmdUnbond.Flags().AddFlagSet(fs)
 }
 
@@ -60,7 +60,7 @@ func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 	return cmdBondUpdate(cmd, args, stake.NewTxDeclareCandidacy)
 }
 
-func cmdBond(cmd *cobra.Command, args []string) error {
+func cmdDelegate(cmd *cobra.Command, args []string) error {
 	return cmdBondUpdate(cmd, args, stake.NewTxDelegate)
 }
 
@@ -83,6 +83,7 @@ func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx makeTx) error {
 	return txcmd.DoTx(tx)
 }
 
+// GetPubKey - create the pubkey from a pubkey string
 func GetPubKey(pubKeyStr string) (pk crypto.PubKey, err error) {
 
 	if len(pubKeyStr) == 0 {
