@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
@@ -14,17 +15,12 @@ import (
 	noncerest "github.com/cosmos/cosmos-sdk/modules/nonce/rest"
 	rolerest "github.com/cosmos/cosmos-sdk/modules/roles/rest"
 
-	//"github.com/tendermint/tmlibs/cli"
+	"github.com/tendermint/tmlibs/cli"
 
 	stakerest "github.com/cosmos/gaia/modules/stake/rest"
 )
 
-// XXX [zr] how/where to configure...?
-
-// this should share the dir with gaiacli, so you can use the cli and
-// the api interchangeably
-// cmd := cli.PrepareMainCmd(srvCli, "BC", os.ExpandEnv("$HOME/.gaiacli"))
-
+// todo fix
 var portFlag = "port"
 
 const defaultAlgo = "ed25519"
@@ -33,7 +29,13 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Light REST client for tendermint",
 	Long:  `Gaiaserver presents  a nice (not raw hex) interface to the gaia blockchain structure.`,
-	Run:   func(cmd *cobra.Command, args []string) { cmd.Help() },
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// this should share the dir with gaiacli, so you can use the cli and
+		// the api interchangeably
+		_ = cli.PrepareMainCmd(cmd, "BC", os.ExpandEnv("$HOME/.gaiacli"))
+	},
+
+	Run: func(cmd *cobra.Command, args []string) { cmd.Help() },
 }
 
 var serveCmd = &cobra.Command{

@@ -22,8 +22,8 @@ func Execute() {
 
 func addGlobalCommands() {
 
-	//nodeCommands()
-	//GaiaCmd.AddCommand(nodeCmd)
+	nodeCommands()
+	GaiaCmd.AddCommand(nodeCmd)
 
 	serverCommands()
 	GaiaCmd.AddCommand(serverCmd)
