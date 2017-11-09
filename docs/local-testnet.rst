@@ -1,25 +1,41 @@
-Local-Test Example
-==================
+Local Testnet Example
+=====================
 
-Here is a quick example to get you off your feet:
+This tutorial demonstrates the basics of setting up a gaia
+testnet locally
 
 First, generate a new key with a name, and save the address:
 
 ::
 
-    MYNAME=<your name>
-    gaiacli keys new $MYNAME
-    gaiacli keys list
-    MYADDR=<your newly generated address>
+    gaia keys new alice
+    gaia keys list
+
+This will output:
+
+::
+
+    Enter a passphrase:
+    Repeat the passphrase:
+    alice	    E9E103F788AADD9C0842231E496B2139C118FA60
+    **Important** write this seed phrase in a safe place.
+    It is the only way to recover your account if you ever forget your password.
+
+    inject position weather divorce shine immense middle affair piece oval silver type until spike educate abandon
+
+which has your address and will be re-used throughout this tutorial.
+We recommend doing something like ``MYADDR=<your address>``. Writing 
+down the recovery phrase is crucial for production keys, however,
+for the tutorial you can skip this step.
 
 Now initialize a gaia chain:
 
 ::
 
-    gaia init $MYADDR --home=$HOME/.atlas1 --chain-id=test 
+    gaia node init E9E103F788AADD9C0842231E496B2139C118FA60 --home=$HOME/.gaia1 --chain-id=gaia-test
 
 This will create all the files necessary to run a single node chain in
-``$HOME/.atlas1``: a ``priv_validator.json`` file with the validators
+``$HOME/.gaia1``: a ``priv_validator.json`` file with the validators
 private key, and a ``genesis.json`` file with the list of validators and
 accounts. In this case, we have one random validator, and ``$MYADDR`` is
 an independent account that has a bunch of coins.
@@ -29,10 +45,10 @@ new directory, and copying in the genesis:
 
 ::
 
-    gaia init $MYADDR --home=$HOME/.atlas2 --chain-id=test
-    cp $HOME/.atlas1/genesis.json $HOME/.atlas2/genesis.json
+    gaia node init E9E103F788AADD9C0842231E496B2139C118FA60 --home=$HOME/.gaia2 --chain-id=test
+    cp $HOME/.gaia1/genesis.json $HOME/.gaia2/genesis.json
 
-We need to also modify ``$HOME/.atlas2/config.toml`` to set new seeds
+We need to also modify ``$HOME/.gaia2/config.toml`` to set new seeds
 and ports. It should look like:
 
 ::
@@ -50,34 +66,28 @@ and ports. It should look like:
     laddr = "tcp://0.0.0.0:46666"
     seeds = "0.0.0.0:46656"
 
-Great, now that we've initialized the chains, we can start both nodes in
-the background:
+Great, now that we've initialized the chains, we can start both nodes:
+
+NOTE: each command below must be started in seperate terminal windows.
 
 ::
 
-    gaia start --home=$HOME/.atlas1  &> atlas1.log &
-    NODE1_PID=$!
-    gaia start --home=$HOME/.atlas2  &> atlas2.log &
-    NODE2_PID=$!
-
-Note we save the ``PID`` so we can later kill the processes.
-
-Of course, you can peak at your logs with ``tail atlas1.log``, or follow
-them for a bit with ``tail -f atlas1.log``.
+    gaia node start --home=$HOME/.gaia1
+    gaia node start --home=$HOME/.gaia2
 
 Now we can initialize a client for the first node, and look up our
 account:
 
 ::
 
-    gaiacli init --chain-id=test --node=tcp://localhost:46657
-    gaiacli query account $MYADDR
+    gaia init --chain-id=test --node=tcp://localhost:46657
+    gaia query account E9E103F788AADD9C0842231E496B2139C118FA60
 
 Nice. We can also lookup the validator set:
 
 ::
 
-    gaiacli query validators
+    gaia query validators
 
 Notice it's empty! This is because the initial validators are special -
 the app doesn't know about them, so they can't be removed. To see what
@@ -92,27 +102,27 @@ data:
 
 ::
 
-    cat $HOME/.atlas2/priv_validator.json 
+    cat $HOME/.gaia2/priv_validator.json 
 
 If you have a json parser like ``jq``, you can get just the pubkey:
 
 ::
 
-    cat $HOME/.atlas2/priv_validator.json | jq .pub_key.data
+    cat $HOME/.gaia2/priv_validator.json | jq .pub_key.data
 
 Now we can bond some coins to that pubkey:
 
 ::
 
-    gaiacli tx bond --amount=10fermion --name=$MYNAME --pubkey=<validator pubkey>
+    gaia tx bond --amount=10fermion --name=alice --pubkey=<validator pubkey>
 
 We should see our account balance decrement, and the pubkey get added to
 the app's list of bonds:
 
 ::
 
-    gaiacli query account $MYADDR
-    gaiacli query validators
+    gaia query account E9E103F788AADD9C0842231E496B2139C118FA60
+    gaia query validators
 
 To confirm for certain the new validator is active, check tendermint:
 
@@ -121,7 +131,7 @@ To confirm for certain the new validator is active, check tendermint:
     curl localhost:46657/validators
 
 If you now kill your second node, blocks will stop streaming in, because
-there aren't enough validators online. Turn her back on and they will
+there aren't enough validators online. Turn it back on and they will
 start streaming again.
 
 Finally, to relinquish all your power, unbond some coins. You should see
@@ -129,8 +139,10 @@ your VotingPower reduce and your account balance increase.
 
 ::
 
-    gaiacli tx unbond --amount=10fermion --name=$MYNAME
-    gaiacli query validators
-    gaiacli query account $MYADDR
+    gaia tx unbond --amount=10fermion --name=alice
+    gaia query validators
+    gaia query account E9E103F788AADD9C0842231E496B2139C118FA60
 
 Once you unbond enough, you will no longer be needed to make new blocks.
+
+That concludes an overview of the ``gaia`` tooling for local testing.
