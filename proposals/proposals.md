@@ -156,37 +156,40 @@ type QueueElemUnbond struct {
 
 ## Validation Prevision Atoms
 
-In this phase validation rewards are introduced as the incentive mechanism for
-atoms holders to keep their atoms bonded.  All bonded atom holders will benefit
-by being rewarded newly minted atoms proportional to their bonded atom supply.
-The intention of validation rewards is not to increase the proportion of atoms
-held by validators as opposed to delegators, therefor validators are not
-permitted to charge validators a commission on their stake of the validation
-rewards.
+In this phase validation provision atoms are introduced as the incentive
+mechanism for atoms holders to keep their atoms bonded.  All atom holders are
+incentivized to keep their atoms bonded as newly minted atom are provided to
+the bonded atom supply. These atom provisions are assigned  proportionally to
+the each bonded atom.  The intention of validation rewards is not to increase
+the proportion of atoms held by validators as opposed to delegators, therefor
+validators are not permitted to charge validators a commission on their stake
+of the validation rewards.
 
-Validation rewards are payed directly to a global hold account and reflected
-in the `HoldCoins` during each reward cycle. 
+Validation provisions are payed directly to a global hold account
+(`BondedAtomPool`) and proportions of that hold account owned by each validator
+is defined as the `GlobalStake`
 
 ``` golang
 type Candidate struct {
-	PubKey       crypto.PubKey
-	Owner        sdk.Actor
-	Shares       uint64    
-	HoldCoins    uint64   
-	VotingPower  uint64   
+	PubKey             crypto.PubKey
+	Owner              sdk.Actor
+	Shares             uint64    
+	GlobalStakeShares  uint64  
+	VotingPower        uint64   
 }
 ```
 
-With this model the exchange rate for a candidates shares can be calculated as
-the candidates `HoldCoins/Shares`.  It then follows that when unbonding coins,
-the coins to withdraw per share can be calculated as the following:
+With this model the coins to withdraw per share of a candidates can be
+calculated as:
 
 ```
-unbondCoins = unbondShares * candidate.HoldCoins / candidate.Shares 
+exchangeRate = (candidate.GlobalStakeShares * BondedAtomsPool) / candidate.Shares 
+unbondingCoins = unbondingShares * exchangeRate 
 ```
 
-Validator rewards are minted on an hourly basis (the first block of a new hour). 
-The annual target of the
+Validator provisions are minted on an hourly basis (the first block of a new
+hour).  The annual target of between 7% and 20%. The longterm target ratio of
+bonded atoms to unbonded atoms is 67%. I
 
 ```
 rewards = unbondShares * candidate.HoldCoins / candidate.Shares 
@@ -250,7 +253,6 @@ type TxDeclareCandidacy struct {
 	CommissionMaxChange uint64 
 }
 ```
-
 
 Some basic rules for the use of the fee pool are as following:
 
