@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	rest "github.com/cosmos/cosmos-sdk/client/rest"
@@ -16,7 +14,7 @@ import (
 	noncerest "github.com/cosmos/cosmos-sdk/modules/nonce/rest"
 	rolerest "github.com/cosmos/cosmos-sdk/modules/roles/rest"
 
-	"github.com/tendermint/tmlibs/cli"
+	//"github.com/tendermint/tmlibs/cli"
 
 	stakerest "github.com/cosmos/gaia/modules/stake/rest"
 )
@@ -55,8 +53,9 @@ func serverCommands() {
 }
 
 func addServerFlags() {
-	commands.AddBasicFlags(srvCli)
-	serveCmd.PersistentFlags().Int(envPortFlag, 8998, "port to run the server on")
+	commands.AddBasicFlags(serveCmd)
+	// this was read in from viper config ... ?
+	//serveCmd.PersistentFlags().IntVarP(&portFlag, 8998, "port to run the server on")
 }
 
 func cmdServe(cmd *cobra.Command, args []string) error {

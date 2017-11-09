@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"os"
 
@@ -95,4 +96,4 @@ func main() {
 
 	cmd := cli.PrepareMainCmd(GaiaCli, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
 	cmd.Execute()
-}
+}*/

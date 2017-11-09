@@ -1,12 +1,10 @@
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
 	abci "github.com/tendermint/abci/types"
-	"github.com/tendermint/tmlibs/cli"
+	//"github.com/tendermint/tmlibs/cli"
 
 	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/modules/auth"
@@ -25,9 +23,10 @@ import (
 )
 
 // RootCmd is the entry point for this binary
-var RootCmd = &cobra.Command{
-	Use:   "gaia",
+var NodeCmd = &cobra.Command{
+	Use:   "node",
 	Short: "The Cosmos Network delegation-game blockchain test",
+	Run:   func(cmd *cobra.Command, args []string) { cmd.Help() },
 }
 
 // Tick - Called every block even if no transaction,
@@ -48,7 +47,7 @@ func tickFn(ctx sdk.Context, store state.SimpleDB) (diffVal []*abci.Validator, e
 	return
 }
 
-func main() {
+func cmdNode(cmd *cobra.Command, args []string) error {
 	// require all fees in strings - change this in your app!
 	basecmd.Handler = stack.New(
 		base.Logger{},
@@ -71,14 +70,15 @@ func main() {
 			stake.NewHandler(),
 		)
 
-	RootCmd.AddCommand(
+	NodeCmd.AddCommand(
 		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
 		basecmd.GetTickStartCmd(sdk.TickerFunc(tickFn)),
 		basecmd.UnsafeResetAllCmd,
 		version.VersionCmd,
 	)
-	basecmd.SetUpRoot(RootCmd)
+	basecmd.SetUpRoot(NodeCmd)
 
-	cmd := cli.PrepareMainCmd(RootCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia"))
-	cmd.Execute()
+	return nil
+	// XXX zr ??
+	//cmd := cli.PrepareMainCmd(NodeCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia"))
 }

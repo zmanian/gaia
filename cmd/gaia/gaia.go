@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -11,7 +9,8 @@ var GaiaCmd = &cobra.Command{
 	Use:   "gaia",
 	Short: "The Cosmos Network delegation-game blockchain test",
 	Long:  "", //TODO re-work
-	PersistenPreRunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }
 

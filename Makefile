@@ -4,7 +4,7 @@ test:
 	@go test `glide novendor`
 
 install:
-	go install ./cmd/...
+	go install ./cmd/gaia
 
 get_vendor_deps:
 	go get github.com/Masterminds/glide
