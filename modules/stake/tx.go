@@ -15,7 +15,7 @@ import (
 // make sure to use the name of the handler as the prefix in the tx type,
 // so it gets routed properly
 const (
-	ByteTxDelegate         = 0x55
+	ByteTxDeclareCandidacy = 0x55
 	ByteTxDelegate         = 0x56
 	ByteTxUnbond           = 0x57
 	TypeTxDeclareCandidacy = stakingModuleName + "/declareCandidacy"
@@ -30,7 +30,7 @@ func init() {
 }
 
 //Verify interface at compile time
-var _, _, _ sdk.TxInner = &TxDeclareCandidacy, &TxDelegate{}, &TxUnbond{}
+var _, _, _ sdk.TxInner = &TxDeclareCandidacy{}, &TxDelegate{}, &TxUnbond{}
 
 // BondUpdate - struct for bonding or unbonding transactions
 type BondUpdate struct {

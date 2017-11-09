@@ -21,29 +21,45 @@ import (
 	stakerest "github.com/cosmos/gaia/modules/stake/rest"
 )
 
-var srvCli = &cobra.Command{
-	Use:   "gaiaserver",
+// XXX [zr] how/where to configure...?
+
+// this should share the dir with gaiacli, so you can use the cli and
+// the api interchangeably
+// cmd := cli.PrepareMainCmd(srvCli, "BC", os.ExpandEnv("$HOME/.gaiacli"))
+
+var portFlag = "port"
+
+const defaultAlgo = "ed25519"
+
+var serverCmd = &cobra.Command{
+	Use:   "server",
 	Short: "Light REST client for tendermint",
 	Long:  `Gaiaserver presents  a nice (not raw hex) interface to the gaia blockchain structure.`,
+	Run:   func(cmd *cobra.Command, args []string) { cmd.Help() },
 }
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Serve the light REST client for tendermint",
 	Long:  "Access gaia via REST",
-	RunE:  serve,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmdServe(cmd, args)
+	},
 }
 
-const (
-	envPortFlag = "port"
-	defaultAlgo = "ed25519"
-)
-
-func init() {
-	_ = serveCmd.PersistentFlags().Int(envPortFlag, 8998, "the port to run the server on")
+func serverCommands() {
+	serverCmd.AddCommand(commands.InitCmd)
+	serverCmd.AddCommand(commands.VersionCmd)
+	serverCmd.AddCommand(serveCmd)
+	addServerFlags()
 }
 
-func serve(cmd *cobra.Command, args []string) error {
+func addServerFlags() {
+	commands.AddBasicFlags(srvCli)
+	serveCmd.PersistentFlags().Int(envPortFlag, 8998, "port to run the server on")
+}
+
+func cmdServe(cmd *cobra.Command, args []string) error {
 	router := mux.NewRouter()
 
 	routeRegistrars := []func(*mux.Router) error{
@@ -76,26 +92,8 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	port := viper.GetInt(envPortFlag)
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", portFlag)
 
 	log.Printf("Serving on %q", addr)
 	return http.ListenAndServe(addr, router)
-}
-
-func main() {
-	commands.AddBasicFlags(srvCli)
-
-	srvCli.AddCommand(
-		commands.InitCmd,
-		commands.VersionCmd,
-		serveCmd,
-	)
-
-	// this should share the dir with gaiacli, so you can use the cli and
-	// the api interchangeably
-	cmd := cli.PrepareMainCmd(srvCli, "BC", os.ExpandEnv("$HOME/.gaiacli"))
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
 }
