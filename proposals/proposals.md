@@ -154,14 +154,15 @@ type QueueElemUnbond struct {
 }
 ```
 
-## Validation Rewards
+## Validation Prevision Atoms
 
-In this phase validation rewards are introduced as the incentive mechanism
-for atoms holders to keep their atoms bonded.  All bonded atom holders will benefit 
-by being rewarded newly minted atoms proportional to their bonded atom supply. The 
-intention of validation rewards is not to increase the proportion of atoms held by
-validators as opposed to delegators, therefor it is not intended that commission 
-be charged on validation reward.
+In this phase validation rewards are introduced as the incentive mechanism for
+atoms holders to keep their atoms bonded.  All bonded atom holders will benefit
+by being rewarded newly minted atoms proportional to their bonded atom supply.
+The intention of validation rewards is not to increase the proportion of atoms
+held by validators as opposed to delegators, therefor validators are not
+permitted to charge validators a commission on their stake of the validation
+rewards.
 
 Validation rewards are payed directly to a global hold account and reflected
 in the `HoldCoins` during each reward cycle. 
@@ -183,6 +184,14 @@ the coins to withdraw per share can be calculated as the following:
 ```
 unbondCoins = unbondShares * candidate.HoldCoins / candidate.Shares 
 ```
+
+Validator rewards are minted on an hourly basis (the first block of a new hour). 
+The annual target of the
+
+```
+rewards = unbondShares * candidate.HoldCoins / candidate.Shares 
+```
+
 
 ## Commission, Fee Pool
 
@@ -211,14 +220,25 @@ type Candidate struct {
 ```
 
 Here several new parameters are introduced:
- - Commission: The current commission rate currently being charged by the
-   validator
  - Commission:  The commission percent of fees charged to any delegators
  - CommissionMax:  The maximum commission rate which this validator can charge
  - CommissionChangeRate: The maximum change per reward cycle which the validator
    can change their commission by
  - FeeAccum: Cumulative counter for the amount of fees the candidate and its
    deligators are entitled too
+
+Similarly, the delegator bond must integrate an accum for fee pool accounting.
+
+``` golang
+type DelegatorBond struct {
+	Candidate      crypto.PubKey
+	Shares         uint64
+    FeeAccumHeight uint64
+} 
+```
+
+Where FeeAccumHeight is the last height which fees were withdrawn from. The accum 
+for this bond can be be accounted for lazily. 
 
 `TxDeclareCandidacy` should be updated to include new relavent terms:
 
@@ -231,18 +251,6 @@ type TxDeclareCandidacy struct {
 }
 ```
 
-Similarly to the candidate account the delegator bond must integrate an accum
-for fee pool accounting. The accum can be accounted lazily for the delegators
-as the number of blocks which have passed since the last withdrawal.
-
-``` golang
-type DelegatorBond struct {
-	Candidate      crypto.PubKey
-	Shares         uint64
-    FeeAccumHeight uint64
-    FeeAccum       uint64
-} 
-```
 
 Some basic rules for the use of the fee pool are as following:
 
@@ -255,7 +263,10 @@ Here a separate fee pool exists per candidate for every fee asset held by
 a validator. The candidate accum increments each time the rewards are given
 
 ```
-candidate.FeeAccum += (CurrentHeight - LastFeeRewardHeight)
+candidate.FeeAccum += (CurrentHeight - LastFeeRewardHeight) * VotingPower/TotalVotingPower 
+
+where, 
+TotalVotingPower is the sum of all validators' voting power. 
 ```
 
 
