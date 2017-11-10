@@ -90,7 +90,6 @@ will be equal to the number of coins bonded to this candidate. In later phases
 when staking reward is introduced, the shares will not be equal to the number 
 of coins bonded to the candidate. 
 
-
 DelegatorBond represents some bond tokens held by an account. It is owned by
 one delegator, and is associated with the voting power of one delegatee.
 
@@ -100,6 +99,7 @@ type DelegatorBond struct {
 	Shares uint64
 } 
 ```
+
 The sender of the transaction is considered to be the owner of the bond being
 sent.  In this backend the client is expected to keep track of the list of
 pubkeys which the delegator has delegated to. 
@@ -167,15 +167,17 @@ of the validation rewards.
 
 Validation provisions are payed directly to a global hold account
 (`BondedAtomPool`) and proportions of that hold account owned by each validator
-is defined as the `GlobalStake`
+is defined as the `GlobalStakeBonded`. The atoms are payed as 67%
+illiquid/bonded and 33% liquid/unbonded. The unbonded atoms may be withdrawn at 
 
 ``` golang
 type Candidate struct {
-	PubKey             crypto.PubKey
-	Owner              sdk.Actor
-	Shares             uint64    
-	GlobalStakeShares  uint64  
-	VotingPower        uint64   
+	PubKey              crypto.PubKey
+	Owner               sdk.Actor
+	Shares              uint64    
+	GlobalStakeBonded   uint64  
+	ProvisionAccum      uint64  
+	VotingPower         uint64   
 }
 ```
 
@@ -189,12 +191,28 @@ unbondingCoins = unbondingShares * exchangeRate
 
 Validator provisions are minted on an hourly basis (the first block of a new
 hour).  The annual target of between 7% and 20%. The longterm target ratio of
-bonded atoms to unbonded atoms is 67%. I
+bonded atoms to unbonded atoms is 67%.  
+
+The target annual inflation rate is recalculated for each reward cycle. The
+inflation is also subject to a rate change (positive of negative) depending or
+the distance from the desired ratio (67%). The maximum rate change possible is
+defined to be 10% per year, however the annual inflation is capped as between
+7% and 20%.
 
 ```
-rewards = unbondShares * candidate.HoldCoins / candidate.Shares 
-```
+inflationRateChange(0) = 0
+annualInflation(0) = 0.07
 
+bondedRatio = bondedAtomPool / totalAtomSupply
+AnnualInflationRateChange = (1 - bondedRatio / 0.67) * 0.10
+
+annualInflation += AnnualInflationRateChange
+
+if annualInflation > 0.20 then annualInflation = 0.20
+if annualInflation < 0.07 then annualInflation = 0.07
+
+provisionAtomsHourly = totalAtomSupply * annualInflation / (365.25*24)
+```
 
 ## Commission, Fee Pool
 
@@ -202,7 +220,7 @@ Similar to validation rewards collected fees are pooled globally and paid out
 lazily to validators and delegators. Each validator will now have the
 opportunity to charge commission to the delegators on the fees collected on
 behalf of the deligators by the validators. The presence of a commission
-mechanism creates incentization for the validators to run validator nodes as
+mechanism creates incentivization for the validators to run validator nodes as
 opposed to just delegating themselves. 
 
 Validators must specify the rate and the maximum value of the commission
