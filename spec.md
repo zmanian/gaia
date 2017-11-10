@@ -147,10 +147,10 @@ The queue element struct for unbonding should look like this:
 
 ``` golang
 type QueueElemUnbond struct {
-	Candidate    crypto.PubKey
-	Payout       sdk.Actor // account to pay out to
-	HeightAtInit uint64    // when the queue was initiated
-	BondShares   uint64    // amount of shares which are unbonding
+	Candidate   crypto.PubKey
+	Payout      sdk.Actor // account to pay out to
+	InitHeight  uint64    // when the queue was initiated
+    Shares      uint64    // amount of shares which are unbonding
 }
 ```
 
@@ -175,54 +175,100 @@ are introduced in the persistent object `Params`.
 
 ``` golang
 type Param struct {
-	GlobalStakeBonded uint64  // sum of all the validators stakes
-	BondedAtomPool    uint64  // reserve of all bonded atoms  
-	LiquidAtomPool    uint64  // reserve of claimable liquid atoms  
-	HoldAccountBonded    sdk.Actor  // Protocol account for bonded atoms 
-	HoldAccountLiquid    sdk.Actor  // Protocol actor liquid atoms
+	CycleNo                uint64  // reward cycle number
+	SumGlobalBondedShares  uint64  // sum of all the validators bonded shares
+	BondedAtomPool         uint64  // reserve of all bonded atoms  
+	LiquidAtomPool         uint64  // reserve of claimable liquid atoms  
+	HoldAccountBonded      sdk.Actor  // Protocol account for bonded atoms 
+	HoldAccountLiquid      sdk.Actor  // Protocol actor liquid atoms
 }
 ```
 
-The candidate struct must now be expanded
+The candidate struct must now be expanded:
 
 ``` golang
 type Candidate struct {
-	PubKey               crypto.PubKey
-	Owner                sdk.Actor
-	Shares               uint64    
-	GlobalStakeBonded    uint64  
-	ProvisionAccum       uint64  
-	ProvisionAccumHeight uint64  
-	VotingPower          uint64   
+	PubKey                          crypto.PubKey
+	Owner                           sdk.Actor
+	SumDelBondedShares              uint64    
+	GlobalBondedShares              uint64  
+	VotingPower                     uint64   
+	GlobalLiquidAtoms               uint64  
+	LastLiquidWithdrawlCycleNo      uint64  
 }
 ```
 
-The delegator struct will also need to have account for the provision accum:
+The delegator struct will also need to account for the last liquid withdrawal:
 
 ``` golang
 type DelegatorBond struct {
-	PubKey         crypto.PubKey
-	Shares         uint64
-    ProvisionAccum uint64
+	PubKey                     crypto.PubKey
+	BondedShares               uint64
+	LastLiquidWithdrawlCycleNo uint64  
 } 
 ```
 
-Here, the total bonded atoms that a validator has can be calculated as:
+Here, the bonded/unbonded atoms that a validator has can be calculated as:
 
 ```
-exchangeRate = (candidate.GlobalStakeShares * BondedAtomsPool) / candidate.Shares 
-bondedCoins = candidate.Shares * exchangeRate 
+globalBondedExRate = params.BondedAtomPool / params.SumGlobalBondedShares
+
+validatorBondedCoins = candidate.GlobalBondedShares * globalBondedExRate 
+validatorLiquidCoins = GlobalLiquidAtoms + 
 ```
 
-Similiarly, if a delegator wanted to unbond coins, the amount of coins to unbond 
-would be calculated as following:
+Calculation for a delegator withdrawing liquid atoms from a validator:
 
 ```
-coins = delegator.Shares * exchangeRate 
+delLiquidExRate = validatorUnbondedCoins / candidate.validatorUnbondedCoins 
+cyclesSinceLastWithdrawl 
+coinsWithdrawn = delegator.LiquidShares * delLiquidExRate
+
+destroyedGlobalUnbondedShares =  XXXXXXXXXXXXXXXXxxx * coinsWithdrawn
+validator.GlobalLiquidShares -= destroyedGlobalLiquidShares
+params.SumGlobalLiquidShares -= destroyedGlobalLiquidShares
+params.LiquidAtomPool -= coinsWithdrawn
 ```
 
-With each reward cycle the provision accum is increased
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+If a delegator chooses to add more coins to a validator then the amount of
+validator shares distributed is calculated on exchange rate (aka every
+delegators shares do not change value at that moment. The validator's
+accounting of distributed shares to delegators must also increased at every
+deposit. Note that in order to use lazy accounting of liquid atoms, any
+delegator changing their bonded stake must simultaniously withdrawal their
+liquid atoms.
+
+```
+delBondedExRate = validatorBondedCoins / candidate.SumDelBondedShares 
+createShares = coinsDeposited / delBondedExRate 
+candidate.SumDelBondedShares += createShares
+```
+
+Whenever a validator has new tokens added to it, the `BondedAtomPool` is
+increased and must be reflected in the global parameter as well as the
+validators `GlobalBondedShares`.  This calculation ensures that the worth of
+the `GlobalBondedShares` of other validators remains worth a constant absolute
+amount of the `BondedAtomPool`
+
+```
+GlobalStakeExRate = params.BondedAtomPool / params.SumGlobalBondedShares
+createdGlobalStakeShares +=  GlobalStakeExRate * coinsDeposited
+validator.GlobalBondedShares +=  createdGlobalStakeShares
+params.SumGlobalBondedShares +=  createdGlobalStakeShares
+
+params.BondedAtomPool += coinsDeposited
+```
+
+Similarly, if a delegator wanted to unbond coins:
+
+```
+coinsWithdrawn = withdrawlShares * delBondedExRate
+
+destroyedGlobalStakeShares =  GlobalStakeExRate * coinsWithdrawn
+validator.GlobalBondedShares -= destroyedGlobalStakeShares
+params.SumGlobalBondedShares -= destroyedGlobalStakeShares
+params.BondedAtomPool -= coinsWithdrawn
+```
 
 Validator provisions are minted on an hourly basis (the first block of a new
 hour).  The annual target of between 7% and 20%. The longterm target ratio of
@@ -251,9 +297,20 @@ provisionAtomsHourlyBonded = provisionAtomsHourly * 0.67
 provisionAtomsHourlyUnbonded = provisionAtomsHourly * 0.33
 ```
 
-Because of the relative stake that each of the validators have, to add more bonded
-atoms to the global atom stake is only requires depositing atoms in the bonded
-atom pool - each validator will now have a total amount of bonded atoms  
+Because the validators hold a relative bonded share (`GlobalStakeShare`), when
+more bonded atoms are added proportionally to all validators the only term
+which needs to be updated is the `BondedAtomPool`. So for each reward cycle:
+
+```
+params.BondedAtomPool += provisionAtomsHourlyBonded
+```
+
+The calculation for the unbonded/liquid provisions is slighly more complicated. 
+To begin each reward 
+
+```
+params.BondedAtomPool += provisionAtomsHourlyBonded
+```
 
 ## Commission, Fee Pool
 
@@ -302,7 +359,7 @@ type DelegatorBond struct {
 Where FeeAccumHeight is the last height which fees were withdrawn from. The accum 
 for this bond can be be accounted for lazily. 
 
-`TxDeclareCandidacy` should be updated to include new relavent terms:
+`TxDeclareCandidacy` should be updated to include new relevant terms:
 
 ``` golang
 type TxDeclareCandidacy struct {
@@ -367,7 +424,7 @@ delegation. Within the old validator, the atoms have already been removed its
 hold account but a separate mechanism applied to the re-delegation queue item -
 in the rebonding queue - the fraction of all historical slashings on that
 validator are recorded. When this queue reaches maturity if that total
-slashings applied is greater on the old validator then the difference (amount
+slashing applied is greater on the old validator then the difference (amount
 that should have been slashed from the first validator) is assigned as debt to
 the delegator addresses. If a delegator address has dept - the only operation
 they are permitted to perform is an unbond operation, additionally they cannot
