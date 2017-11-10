@@ -64,11 +64,11 @@ type TxUnbond struct {
 
 ## Delegation
 
-The next phase of development includes delegation functionality. All transactions
-are still instantaneous in this development level.
+The next phase of development includes delegation functionality. All
+transactions are still instantaneous in this development level.
 
-The previous struct `ValidatorBond` is now split up into two structs which represent
-the candidate account or the bond to a candidate account.
+The previous struct `ValidatorBond` is now split up into two structs which
+represent the candidate account or the bond to a candidate account.
 
 Each validator-candidate bond is defined as the object below. 
  - Pubkey: Candidate PubKey
@@ -85,10 +85,10 @@ type Candidate struct {
 }
 ```
 
-At this phase in development the number of shares issued to each account 
-will be equal to the number of coins bonded to this candidate. In later phases
-when staking reward is introduced, the shares will not be equal to the number 
-of coins bonded to the candidate. 
+At this phase in development the number of shares issued to each account will
+be equal to the number of coins bonded to this candidate. In later phases when
+staking reward is introduced, the shares will not be equal to the number of
+coins bonded to the candidate. 
 
 DelegatorBond represents some bond tokens held by an account. It is owned by
 one delegator, and is associated with the voting power of one delegatee.
@@ -101,7 +101,7 @@ type DelegatorBond struct {
 ```
 
 The sender of the transaction is considered to be the owner of the bond being
-sent.  In this backend the client is expected to keep track of the list of
+sent. In this backend the client is expected to keep track of the list of
 pubkeys which the delegator has delegated to. 
 
 The transactions types must be renamed. `TxBond` is now effectively
@@ -149,8 +149,8 @@ The queue element struct for unbonding should look like this:
 type QueueElemUnbond struct {
 	Candidate    crypto.PubKey
 	Payout       sdk.Actor // account to pay out to
-	HeightAtInit uint64 // when the queue was initiated
-	BondShares   uint64    // amount of bond tokens which are unbonding
+	HeightAtInit uint64    // when the queue was initiated
+	BondShares   uint64    // amount of shares which are unbonding
 }
 ```
 
@@ -168,26 +168,61 @@ of the validation rewards.
 Validation provisions are payed directly to a global hold account
 (`BondedAtomPool`) and proportions of that hold account owned by each validator
 is defined as the `GlobalStakeBonded`. The atoms are payed as 67%
-illiquid/bonded and 33% liquid/unbonded. The unbonded atoms may be withdrawn at 
+illiquid/bonded and 33% liquid/unbonded. The unbonded atoms may be withdrawn at
+any point with no wait from a liquid pool which is allocated based on the 
+`ProvisionAccum` Term. The global params used to account for the fee pools 
+are introduced in the persistent object `Params`. 
 
 ``` golang
-type Candidate struct {
-	PubKey              crypto.PubKey
-	Owner               sdk.Actor
-	Shares              uint64    
-	GlobalStakeBonded   uint64  
-	ProvisionAccum      uint64  
-	VotingPower         uint64   
+type Param struct {
+	GlobalStakeBonded uint64  // sum of all the validators stakes
+	BondedAtomPool    uint64  // reserve of all bonded atoms  
+	LiquidAtomPool    uint64  // reserve of claimable liquid atoms  
+	HoldAccountBonded    sdk.Actor  // Protocol account for bonded atoms 
+	HoldAccountLiquid    sdk.Actor  // Protocol actor liquid atoms
 }
 ```
 
-With this model the coins to withdraw per share of a candidates can be
-calculated as:
+The candidate struct must now be expanded
+
+``` golang
+type Candidate struct {
+	PubKey               crypto.PubKey
+	Owner                sdk.Actor
+	Shares               uint64    
+	GlobalStakeBonded    uint64  
+	ProvisionAccum       uint64  
+	ProvisionAccumHeight uint64  
+	VotingPower          uint64   
+}
+```
+
+The delegator struct will also need to have account for the provision accum:
+
+``` golang
+type DelegatorBond struct {
+	PubKey         crypto.PubKey
+	Shares         uint64
+    ProvisionAccum uint64
+} 
+```
+
+Here, the total bonded atoms that a validator has can be calculated as:
 
 ```
 exchangeRate = (candidate.GlobalStakeShares * BondedAtomsPool) / candidate.Shares 
-unbondingCoins = unbondingShares * exchangeRate 
+bondedCoins = candidate.Shares * exchangeRate 
 ```
+
+Similiarly, if a delegator wanted to unbond coins, the amount of coins to unbond 
+would be calculated as following:
+
+```
+coins = delegator.Shares * exchangeRate 
+```
+
+With each reward cycle the provision accum is increased
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Validator provisions are minted on an hourly basis (the first block of a new
 hour).  The annual target of between 7% and 20%. The longterm target ratio of
@@ -212,7 +247,13 @@ if annualInflation > 0.20 then annualInflation = 0.20
 if annualInflation < 0.07 then annualInflation = 0.07
 
 provisionAtomsHourly = totalAtomSupply * annualInflation / (365.25*24)
+provisionAtomsHourlyBonded = provisionAtomsHourly * 0.67
+provisionAtomsHourlyUnbonded = provisionAtomsHourly * 0.33
 ```
+
+Because of the relative stake that each of the validators have, to add more bonded
+atoms to the global atom stake is only requires depositing atoms in the bonded
+atom pool - each validator will now have a total amount of bonded atoms  
 
 ## Commission, Fee Pool
 
