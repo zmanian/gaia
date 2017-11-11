@@ -462,8 +462,17 @@ params.IssuedFeeShares -= FeeCommissionShares
 If a delegator is attempting to switch validators, using an unbonding command
 followed by a bond command will reduce the amount of validation reward than
 having just stayed with the same validator. Because we do not want to
-disincentive delegators from switching validators, we may introduce a re-delegate
-command which provides equal reward to as if you had never unbonded. 
+disincentive delegators from switching validators, the re-delegate command is
+introduced. This command provides a delegator who wishes to switch validators
+equal reward to as if you had never unbonded. Transactions structs of the
+re-delegation command may looks like this: 
+
+``` golang 
+type TxRedelegate struct { 
+    BondUpdate 
+    NewValidator crypto.PubKey 
+} 
+```
 
 The moment you are re-delegation the old validator loses your voting power, and
 the new validator gains this voting power. For the duration of the unbonding
@@ -474,32 +483,74 @@ The mechanism for double slashability is as follows. When re-delegating the
 hold account atoms are automatically moved from the old validator to the new
 validator. Within the new validator - the atoms are treated as a regular
 delegation. Within the old validator, the atoms have already been removed its
-hold account but a separate mechanism applied to the re-delegation queue item -
-in the re-delegating queue - the fraction of all historical slashings on that
-validator are recorded. When this queue reaches maturity if that total
-slashing applied is greater on the old validator then the difference (amount
-that should have been slashed from the first validator) is assigned as debt to
-the delegator addresses. If a delegator address has dept - the only operation
-they are permitted to perform is an unbond operation, additionally they cannot
-vote, or accrue and new fees from the time the debt was added.
-
-Transactions structs of the re-delegation command may looks like this: 
-
-``` golang 
-type TxRedelegate struct { 
-    BondUpdate 
-    NewValidator crypto.PubKey 
-} 
-```
-
-Within the delegation bond we will need to now add a debt as explained above:
+hold account but a separate mechanism applied to the re-delegation queue item:
 
 ``` golang
-type DelegatorBond struct {
-	PubKey           crypto.PubKey
-	Shares           uint64
-	Debt             uint64
-    LastFeeWithdrawl time.Time
+type QueueElemRedelegation struct {
+	QueueElem
+	LiableActor      sdk.Actor // liable account under slashability of old actor
+    Amount           uint64    // amount of re-delegated coins
+    StartSlashRatio  uint64    // old candidate slash ratio at start of re-delegation
+}
+```
+
+In the re-delegating queue - the fraction of all historical slashings on that
+validator are recorded (`StartSlashRatio`). When this queue reaches maturity if
+that total slashing applied is greater on the old validator then the difference
+(amount that should have been slashed from the first validator) is assigned as
+debt to the delegator addresses. As so, the `SlashRatio` is accounted in the 
+candidate account.
+
+``` golang
+type Candidate struct {
+	Status                 byte       
+	PubKey                 crypto.PubKey
+	Owner                  sdk.Actor
+	IssuedDelegatorShares  uint64    
+	GlobalStakeShares      uint64  
+	VotingPower            uint64   
+    Commission             uint64
+    CommissionMax          uint64
+    CommissionChangeRate   uint64
+    CommissionChangeToday  uint64
+    FeeShares              uint64
+    FeeCommissionShares    uint64
+    SlashRatio             uint64  // multiplicative slash ratio for this candidate
+	Notes                  string   
+}
+```
+
+A candidates slash ratio changes each time a candidate is slashed: 
+
+```
+candidate.SlashRatio *= slashPercent
+```
+
+The potential debt incurred due to slashing of the old validator can then
+be calculated based on the difference in slash ratios. 
+
+```
+debt = candidate.SlashRatio / queueElemRedelegation.StartSlashRatio 
+       * queueElemRedelegation.Amount
+```
+
+If a delegator address has debt - the only operations they are permitted to
+perform is an unbond operation, additionally they cannot vote, or accrue and
+new fees from the time the debt was added. To account for debt a new delegator
+struct must be added which is accountable to all the delegations from an actor.  
+
+``` golang
+type Delegator struct {
+	delegator  sdk.Account
+	Debt       uint64
+}
+```
+
+Debt can be reconsilliated by sending a debt relief transation. 
+
+``` golang
+type TxPayDebt struct {
+	Amount coin.Coin       
 }
 ```
 
