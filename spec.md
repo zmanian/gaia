@@ -10,7 +10,6 @@ Overall the Staking module should be rolled out in the following steps
 2. Delegation
 4. Unbonding period
 5. Fee Pool, Commission
-6. Delegator Rebonding
 
 ## Self-Bonding
 
@@ -37,6 +36,15 @@ The VotingPower is proportional to the amount of bonded tokens which the validat
 has if the validator is within the top 100 validators. At the launch of 
 cosmos hub we will have a maximum of 100 validators.
 
+BondedTokens are held in a global account.  
+
+``` golang
+type Param struct {
+	BondedAtomPool    uint64     // reserve of all bonded atoms  
+	HoldAccountBonded sdk.Actor  // Protocol account for bonded atoms 
+}
+```
+
 TxBond is the self-bond SDK transaction for self-bonding tokens to a PubKey
 which you designate.  Here the PubKey bytes are the serialized bytes of the
 PubKey struct as defined by `tendermint/go-crypto`.
@@ -52,7 +60,6 @@ type TxBond struct {
 Similarity, `TxUnbond` can is used to unbond tokens from the validators bond
 account. The key difference is from `TxBond` is that the PubKey does not need
 to be included as it has already been associated with the sender account.
-
 
 ``` golang
 type TxUnbond struct {
@@ -146,6 +153,7 @@ type Queue interface {
     Peek() []byte 
 }
 ```
+
 The queue element struct for unbonding delegator bond should look like this: 
 
 ``` golang
@@ -173,25 +181,26 @@ type QueueElemUnbondCandidate struct {
 }
 ```
 
-An additional parameter (Status) must now be introduced into the Candidate
-struct to deal with this unbonding and unbonded state of a candidate 
+A new parameter (`Status`) is now introduced into the Candidate struct to
+signal that the candidate is either active, unbonding, or unbonded. Also
+`DelCoinsUnbonding` is introduced to account for delegators unbonding.  
 
 ``` golang
 type Candidate struct {
-	Status       byte          // 0x00 active, 0x01 unbonding, 0x02 unbonded
-	PubKey       crypto.PubKey
-	Owner        sdk.Actor
-	Shares       uint64    
-	VotingPower  uint64   
-	Notes        string   
+	Status             byte          // 0x00 active, 0x01 unbonding, 0x02 unbonded
+	PubKey             crypto.PubKey
+	Owner              sdk.Actor
+	Shares             uint64    
+	DelSharesUnbonding uint64   
+	VotingPower        uint64   
+	Notes              string   
 }
 ```
 
-While unbonding or unbonded a candidate nolong collects validation provisions.
-Additionally a delegator may choose to initiate an unbond of their delegated
-tokens while a candidate full unbond is commencing. This an unbond from an
-unbonding candidate will already have completed some of the unbonding period
-and is therefor subject to a reduced unbonding period when is is begun. 
+A delegator may choose to initiate an unbond of their delegated tokens while a
+candidate full unbond is commencing. This an unbond from an unbonding candidate
+will already have completed some of the unbonding period and is therefor
+subject to a reduced unbonding period when is is begun. 
 
 Additionally at this point `TxDeclareCandidacy` can be used to reinstate an
 unbonding or unbonded validator while providing any additionally required
@@ -203,16 +212,14 @@ In this phase validation provision atoms are introduced as the incentive
 mechanism for atoms holders to keep their atoms bonded.  All atom holders are
 incentivized to keep their atoms bonded as newly minted atom are provided to
 the bonded atom supply. These atom provisions are assigned  proportionally to
-the each bonded atom.  The intention of validation previsions is not to increase
-the proportion of atoms held by validators as opposed to delegators, therefor
-validators are not permitted to charge validators a commission on their stake
-of the validation previsions.
+the each slashible bonded atom, this includes unbonding atoms.  The intention
+of validation previsions is not to increase the proportion of atoms held by
+validators as opposed to delegators, therefor validators are not permitted to
+charge validators a commission on their stake of the validation previsions.
 
 Validation provisions are payed directly to a global hold account
 (`BondedAtomPool`) and proportions of that hold account owned by each validator
-is defined as the `GlobalStakeBonded`. The atoms are payed as bonded atoms. The
-The global params used to account for the fee pools are introduced in the
-persistent object `Params`. 
+is defined as the `GlobalStakeBonded`. The atoms are payed as bonded atoms.
 
 ``` golang
 type Param struct {
@@ -329,10 +336,7 @@ delegators. Each validator will now have the opportunity to charge commission
 to the delegators on the fees collected on behalf of the deligators by the
 validators. The presence of a commission mechanism creates incentivization for
 the validators to run validator nodes as opposed to just purely delegating to
-others. 
-
-Validators must specify the rate and the maximum value of the commission
-charged to delegators as an act of self-regulation.  
+others. Fees are paid directly into a global fee pool 
  
 ``` golang
 type Candidate struct {
@@ -456,106 +460,3 @@ withdrawalEntitlement := candidate.FeeCommissionShares / params.IssuedFeeShares
 candidate.FeeCommissionShares = 0  
 params.IssuedFeeShares -= FeeCommissionShares
 ```
-
-## Re-delegation
-
-If a delegator is attempting to switch validators, using an unbonding command
-followed by a bond command will reduce the amount of validation reward than
-having just stayed with the same validator. Because we do not want to
-disincentive delegators from switching validators, the re-delegate command is
-introduced. This command provides a delegator who wishes to switch validators
-equal reward to as if you had never unbonded. Transactions structs of the
-re-delegation command may looks like this: 
-
-``` golang 
-type TxRedelegate struct { 
-    BondUpdate 
-    NewValidator crypto.PubKey 
-} 
-```
-
-The moment you are re-delegation the old validator loses your voting power, and
-the new validator gains this voting power. For the duration of the unbonding
-period any re-delegating account will be slashable by both the old validator and
-the new validator. 
-
-The mechanism for double slashability is as follows. When re-delegating the
-hold account atoms are automatically moved from the old validator to the new
-validator. Within the new validator - the atoms are treated as a regular
-delegation. Within the old validator, the atoms have already been removed its
-hold account but a separate mechanism applied to the re-delegation queue item:
-
-``` golang
-type QueueElemRedelegation struct {
-	QueueElem
-	LiableActor      sdk.Actor // liable account under slashability of old actor
-    Amount           uint64    // amount of re-delegated coins
-    StartSlashRatio  uint64    // old candidate slash ratio at start of re-delegation
-}
-```
-
-In the re-delegating queue - the fraction of all historical slashings on that
-validator are recorded (`StartSlashRatio`). When this queue reaches maturity if
-that total slashing applied is greater on the old validator then the difference
-(amount that should have been slashed from the first validator) is assigned as
-debt to the delegator addresses. As so, the `SlashRatio` is accounted in the 
-candidate account.
-
-``` golang
-type Candidate struct {
-	Status                 byte       
-	PubKey                 crypto.PubKey
-	Owner                  sdk.Actor
-	IssuedDelegatorShares  uint64    
-	GlobalStakeShares      uint64  
-	VotingPower            uint64   
-    Commission             uint64
-    CommissionMax          uint64
-    CommissionChangeRate   uint64
-    CommissionChangeToday  uint64
-    FeeShares              uint64
-    FeeCommissionShares    uint64
-    SlashRatio             uint64  // multiplicative slash ratio for this candidate
-	Notes                  string   
-}
-```
-
-A candidates slash ratio changes each time a candidate is slashed: 
-
-```
-candidate.SlashRatio *= slashPercent
-```
-
-The potential debt incurred due to slashing of the old validator can then
-be calculated based on the difference in slash ratios. 
-
-```
-debt = candidate.SlashRatio / queueElemRedelegation.StartSlashRatio 
-       * queueElemRedelegation.Amount
-```
-
-If a delegator address has debt - the only operations they are permitted to
-perform is an unbond operation, additionally they cannot vote, or accrue and
-new fees from the time the debt was added. To account for debt a new delegator
-struct must be added which is accountable to all the delegations from an actor.  
-
-``` golang
-type Delegator struct {
-	delegator  sdk.Account
-	Debt       uint64
-}
-```
-
-Debt can be reconsilliated by sending a debt relief transation. 
-
-``` golang
-type TxPayDebt struct {
-	Amount coin.Coin       
-}
-```
-
-Lastly it should also be noted that the TxRedelegate function can be performed
-during a candidate unbond as outlined in earlier phase _Unbonding Period_. This
-would allow a delegator who is bonded to an inactive candidate to immediately
-join a working validator. Any re-delegation from an unbonding candidate would
-be subject to a smaller time in the redelegation queue. 
