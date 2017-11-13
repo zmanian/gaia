@@ -28,13 +28,20 @@ type ValidatorBond struct {
 	Notes        string         // arbitrary information for the UI 
 }
 ```
+
 Note that the Validator PubKey is not necessarily the PubKey of the sender of
 the transaction, but is defined by the transaction. This way a separated key
-can be used for holding tokens and participating in consensus. 
+can be used for holding tokens and participating in consensus.
 
 The VotingPower is proportional to the amount of bonded tokens which the validator
 has if the validator is within the top 100 validators. At the launch of 
-cosmos hub we will have a maximum of 100 validators.
+cosmos hub we will have a maximum of 100 validators. 
+
+Within the store, each `ValidatorBond` is stored by validator-pubkey. A second
+key-value pair is also maintained by the store in order to quickly sort though
+the store, where the key is the `BondedTokens` and the key is the validator
+`PubKey`. When the set of all validators needs to be determined, the top 100
+values can be taken from this list and voting power computed. 
 
 BondedTokens are held in a global account.  
 
@@ -94,7 +101,8 @@ staking provisions is introduced, the shares will not be equal to the number of
 coins bonded to the candidate. 
 
 DelegatorBond represents some bond shares held by an account. It is owned by
-one delegator, and is associated with the voting power of one delegatee.
+one delegator, and is associated with the voting power of one delegatee. The
+sender of the transaction is considered to be the owner of the bond being sent. 
 
 ``` golang
 type DelegatorBond struct {
@@ -103,8 +111,8 @@ type DelegatorBond struct {
 } 
 ```
 
-The sender of the transaction is considered to be the owner of the bond being
-sent. 
+Within the store each `DelegatorBond` is individually stored by candidate
+pubkey and sender actor.  
 
 The transactions types must be renamed. `TxBond` is now effectively
 `TxDeclareCandidacy` and but is only used to become a new validator. For all
@@ -129,7 +137,8 @@ type TxDeclareCandidacy struct {
 }
 
 type TxUnbond struct { 
-    BondUpdate 
+	PubKey crypto.PubKey
+	Shares uint64       
 }
 ```
 
@@ -168,6 +177,13 @@ type QueueElemUnbondDelegation struct {
     Shares      uint64    // amount of shares which are unbonding
 }
 ```
+
+The queue is ordered so the next to unbond is at the head.  Every tick the head
+of the queue is checked and if the unbonding period has passed since
+`InitHeight` commence with final settlment of the unbonding and pop the queue.
+Currently the each share to unbond is equivelent to a single unbonding token,
+although in later phases shares are used along with other terms to calculate
+the coins.
 
 Additionally within this phase unbonding of entire candidates to temporary
 liquid accounts is introduced. This full candidate unbond is used when a
@@ -356,12 +372,12 @@ params.BondedTokenPool += provisionTokensHourly
 
 ## Fee Pool, Commission
 
-Collected fees are pooled globally and paid out lazily to validators and
-delegators. Each validator will now have the opportunity to charge commission
-to the delegators on the fees collected on behalf of the deligators by the
-validators. The presence of a commission mechanism creates incentivization for
-the validators to run validator nodes as opposed to just purely delegating to
-others. Fees are paid directly into a global fee pool 
+Collected fees are pooled globally and divided out actively to validators and
+passively to delegators. Each validator will now have the opportunity to charge
+commission to the delegators on the fees collected on behalf of the deligators
+by the validators. The presence of a commission mechanism creates
+incentivization for the validators to run validator nodes as opposed to just
+purely delegating to others. Fees are paid directly into a global fee pool 
  
 ``` golang
 type Candidate struct {
