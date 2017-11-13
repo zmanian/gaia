@@ -8,7 +8,7 @@ Overall the Staking module should be rolled out in the following steps
 
 1. Self-Bonding
 2. Delegation
-4. Unbonding period
+4. Unbonding Period, Re-Delegation
 5. Fee Pool, Commission
 
 ## Self-Bonding
@@ -40,8 +40,8 @@ BondedTokens are held in a global account.
 
 ``` golang
 type Param struct {
-	BondedAtomPool    uint64     // reserve of all bonded atoms  
-	HoldAccountBonded sdk.Actor  // Protocol account for bonded atoms 
+	BondedTokenPool    uint64     // reserve of all bonded tokens  
+	HoldAccountBonded sdk.Actor  // Protocol account for bonded tokens 
 }
 ```
 
@@ -93,7 +93,7 @@ be equal to the number of coins bonded to this candidate. In later phases when
 staking provisions is introduced, the shares will not be equal to the number of
 coins bonded to the candidate. 
 
-DelegatorBond represents some bond tokens held by an account. It is owned by
+DelegatorBond represents some bond shares held by an account. It is owned by
 one delegator, and is associated with the voting power of one delegatee.
 
 ``` golang
@@ -133,7 +133,7 @@ type TxUnbond struct {
 }
 ```
 
-## Unbonding Period
+## Unbonding Period, Re-Delegation
 
 A staking-module state parameter will be introduced which defines the number of
 blocks to unbond from a validator. Once complete unbonding as a validator or a
@@ -171,7 +171,7 @@ type QueueElemUnbondDelegation struct {
 
 Additionally within this phase unbonding of entire candidates to temporary
 liquid accounts is introduced. This full candidate unbond is used when a
-candidate unbonds all of their atoms, is kicked from the validator set for
+candidate unbonds all of their tokens, is kicked from the validator set for
 liveliness issues, or crosses a self-imposed safety threshold (defined in later
 sections) 
 
@@ -183,49 +183,68 @@ type QueueElemUnbondCandidate struct {
 
 A new parameter (`Status`) is now introduced into the Candidate struct to
 signal that the candidate is either active, unbonding, or unbonded. Also
-`DelCoinsUnbonding` is introduced to account for delegators unbonding.  
+`UnbondingDelegatorShares` is introduced to account for delegators unbonding.  
 
 ``` golang
 type Candidate struct {
-	Status             byte          // 0x00 active, 0x01 unbonding, 0x02 unbonded
-	PubKey             crypto.PubKey
-	Owner              sdk.Actor
-	Shares             uint64    
-	DelSharesUnbonding uint64   
-	VotingPower        uint64   
-	Notes              string   
+	Status                    byte          // 0x00 active, 0x01 unbonding, 0x02 unbonded
+	PubKey                    crypto.PubKey
+	Owner                     sdk.Actor
+	Shares                    uint64    
+	UnbondingDelegatorShares  uint64        // Delegator shares currently unbonding  
+	VotingPower               uint64   
+	Notes                     string   
 }
 ```
 
-A delegator may choose to initiate an unbond of their delegated tokens while a
-candidate full unbond is commencing. This an unbond from an unbonding candidate
-will already have completed some of the unbonding period and is therefor
-subject to a reduced unbonding period when is is begun. 
+When unbonding is initiated, delegator shares remain accounted for within the
+`Candidate.Shares` and the term `UnbondingDelegatorShares` is incremented.
+During the unbonding period all unbonding shares do not count towards the
+voting power of a validator. Once the `QueueElemUnbondDelegation` has reached
+maturity, the appropriate unbonding shares are removed from the `Shares` and
+`UnbondingDelegatorShares` term.   
+
+Similarly, A delegator may choose to initiate an unbond of their delegated
+shares while a candidate full unbond is commencing. This an unbond from an
+unbonding candidate will already have completed some of the unbonding period
+and is therefor subject to a reduced unbonding period when is is begun. 
 
 Additionally at this point `TxDeclareCandidacy` can be used to reinstate an
 unbonding or unbonded validator while providing any additionally required
-atoms.  
+tokens. 
+
+Re-delegation is defined as an unbond followed by an immediate bond at the 
+maturity of the unbonding. 
+
+```
+type QueueElemReDelegate struct {
+	QueueElem
+	Payout       sdk.Actor     // account to pay out to
+    Shares       uint64        // amount of shares which are unbonding
+    NewCandidate crypto.PubKey // validator to bond to after unbond
+}
+```
 
 ## Validation Prevision Atoms
 
-In this phase validation provision atoms are introduced as the incentive
-mechanism for atoms holders to keep their atoms bonded.  All atom holders are
-incentivized to keep their atoms bonded as newly minted atom are provided to
-the bonded atom supply. These atom provisions are assigned  proportionally to
-the each slashible bonded atom, this includes unbonding atoms.  The intention
-of validation previsions is not to increase the proportion of atoms held by
+In this phase validation provision tokens are introduced as the incentive
+mechanism for tokens holders to keep their tokens bonded. All token holders are
+incentivized to keep their tokens bonded as newly minted token are provided to
+the bonded token supply. These token provisions are assigned proportionally to
+the each slashable bonded token, this includes unbonding tokens. The intention
+of validation previsions is not to increase the proportion of tokens held by
 validators as opposed to delegators, therefor validators are not permitted to
 charge validators a commission on their stake of the validation previsions.
 
 Validation provisions are payed directly to a global hold account
-(`BondedAtomPool`) and proportions of that hold account owned by each validator
-is defined as the `GlobalStakeBonded`. The atoms are payed as bonded atoms.
+(`BondedTokenPool`) and proportions of that hold account owned by each validator
+is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 
 ``` golang
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
-	BondedAtomPool           uint64  // reserve of all bonded atoms  
-	HoldAccountBonded        sdk.Actor  // Protocol account for bonded atoms 
+	BondedTokenPool           uint64  // reserve of all bonded tokens  
+	HoldAccountBonded        sdk.Actor  // Protocol account for bonded tokens 
 }
 ```
 
@@ -233,13 +252,14 @@ The candidate struct must now be expanded:
 
 ``` golang
 type Candidate struct {
-	Status                 byte       
-	PubKey                 crypto.PubKey
-	Owner                  sdk.Actor
-	IssuedDelegatorShares  uint64    
-	GlobalStakeShares      uint64  
-	VotingPower            uint64   
-	Notes                  string   
+	Status                    byte       
+	PubKey                    crypto.PubKey
+	Owner                     sdk.Actor
+	IssuedDelegatorShares     uint64    
+	UnbondingDelegatorShares  uint64    
+	GlobalStakeShares         uint64  
+	VotingPower               uint64   
+	Notes                     string   
 }
 ```
 
@@ -252,14 +272,14 @@ type DelegatorBond struct {
 } 
 ```
 
-Here, the bonded atoms that a validator has can be calculated as:
+Here, the bonded tokens that a validator has can be calculated as:
 
 ```
-globalStakeExRate = params.BondedAtomPool / params.IssuedGlobalStakeShares
+globalStakeExRate = params.BondedTokenPool / params.IssuedGlobalStakeShares
 validatorCoins = candidate.GlobalStakeShares * globalStakeExRate 
 ```
 
-If a delegator chooses to add more coins to a validator then the amount of
+If a delegator chooses to add more tokens to a validator then the amount of
 validator shares distributed is calculated on exchange rate (aka every
 delegators shares do not change value at that moment. The validator's
 accounting of distributed shares to delegators must also increased at every
@@ -271,18 +291,18 @@ createShares = coinsDeposited / delegatorExRate
 candidate.IssuedDelegatorShares += createShares
 ```
 
-Whenever a validator has new tokens added to it, the `BondedAtomPool` is
+Whenever a validator has new tokens added to it, the `BondedTokenPool` is
 increased and must be reflected in the global parameter as well as the
 validators `GlobalStakeShares`.  This calculation ensures that the worth of
 the `GlobalStakeShares` of other validators remains worth a constant absolute
-amount of the `BondedAtomPool`
+amount of the `BondedTokenPool`
 
 ```
 createdGlobalStakeShares += coinsDeposited / globalStakeExRate 
 validator.GlobalStakeShares +=  createdGlobalStakeShares
 params.IssuedGlobalStakeShares +=  createdGlobalStakeShares
 
-params.BondedAtomPool += coinsDeposited
+params.BondedTokenPool += coinsDeposited
 ```
 
 Similarly, if a delegator wanted to unbond coins:
@@ -293,12 +313,17 @@ coinsWithdrawn = withdrawlShares * delegatorExRate
 destroyedGlobalStakeShares = coinsWithdrawn / globalStakeExRate 
 validator.GlobalStakeShares -= destroyedGlobalStakeShares
 params.IssuedGlobalStakeShares -= destroyedGlobalStakeShares
-params.BondedAtomPool -= coinsWithdrawn
+params.BondedTokenPool -= coinsWithdrawn
 ```
+
+Note that when an unbond occurs the shares to withdraw are placed in an
+unbonding queue where they continue to collect validator provisions until queue
+element matures. Although provisions are collected during unbonding unbonding
+tokens do not contribute to the voting power of a validator. 
 
 Validator provisions are minted on an hourly basis (the first block of a new
 hour).  The annual target of between 7% and 20%. The long-term target ratio of
-bonded atoms to unbonded atoms is 67%.  
+bonded tokens to unbonded tokens is 67%.  
 
 The target annual inflation rate is recalculated for each previsions cycle. The
 inflation is also subject to a rate change (positive of negative) depending or
@@ -310,7 +335,7 @@ defined to be 13% per year, however the annual inflation is capped as between
 inflationRateChange(0) = 0
 annualInflation(0) = 0.07
 
-bondedRatio = bondedAtomPool / totalAtomSupply
+bondedRatio = bondedTokenPool / totalTokenSupply
 AnnualInflationRateChange = (1 - bondedRatio / 0.67) * 0.13
 
 annualInflation += AnnualInflationRateChange
@@ -318,15 +343,15 @@ annualInflation += AnnualInflationRateChange
 if annualInflation > 0.20 then annualInflation = 0.20
 if annualInflation < 0.07 then annualInflation = 0.07
 
-provisionAtomsHourly = totalAtomSupply * annualInflation / (365.25*24)
+provisionTokensHourly = totalTokenSupply * annualInflation / (365.25*24)
 ```
 
 Because the validators hold a relative bonded share (`GlobalStakeShare`), when
-more bonded atoms are added proportionally to all validators the only term
-which needs to be updated is the `BondedAtomPool`. So for each previsions cycle:
+more bonded tokens are added proportionally to all validators the only term
+which needs to be updated is the `BondedTokenPool`. So for each previsions cycle:
 
 ```
-params.BondedAtomPool += provisionAtomsHourly
+params.BondedTokenPool += provisionTokensHourly
 ```
 
 ## Fee Pool, Commission
@@ -361,7 +386,7 @@ Here several new parameters are introduced:
  - CommissionMax:  The maximum commission rate which this candidate can charge
  - CommissionChangeRate: The maximum daily change of the candidate commission
  - CommissionChangeToday: Counter for the amount of change to commission rate 
-   which has occured today, reset on the first block of each day (UTC time)
+   which has occurred today, reset on the first block of each day (UTC time)
  - FeeShares: Cumulative counter for the amount of fees the candidate and its
    deligators are entitled too
  - FeeCommissionShares: Fee shares reserved for the candidate charged as
@@ -399,9 +424,9 @@ calculation fee portions
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
 	IssuedFeeShares          uint64  // sum of all fee pool shares issued 
-	BondedAtomPool           uint64  // reserve of all bonded atoms  
+	BondedTokenPool           uint64  // reserve of all bonded tokens  
 	FeePool                  coin.Coins // fee pool
-	HoldAccountBonded        sdk.Actor  // Protocol account for bonded atoms 
+	HoldAccountBonded        sdk.Actor  // Protocol account for bonded tokens 
 	HoldAccountFeePool       sdk.Actor  // Protocol account for the fee pool 
 	DateLastCommissionReset  uint64     // Unix Timestamp for last commission accounting reset
 }
@@ -411,12 +436,12 @@ Some basic rules for the fee pool are as following:
 
  - When a either a delegator or a validator is withdrawing from the fee pool
    they must withdrawal the maximum amount they are entitled too
- - When bonding or unbonding atoms to an existing account  a full withdrawal of
+ - When bonding or unbonding tokens to an existing account  a full withdrawal of
    the fees must occur (as the rules for lazy accounting change)
 
-Here a separate fee pool exists per candidate for every fee asset held by a
-validator. The candidate accum increments each block as fees are collected.  If
-the validator is the proposer of the round then a skew factor is provided to
+Here a separate fee pool exists per candidate containing all fee asset held by
+a validator. The candidate accum increments each block as fees are collected.
+If the validator is the proposer of the round then a skew factor is provided to
 give this validator an incentive to provide non-empty blocks. The skew factor
 is passed in through Tendermint core and will be 1 for proposer nodes and
 between 1.01 and 1.05 for proposer nodes.  
@@ -460,3 +485,8 @@ withdrawalEntitlement := candidate.FeeCommissionShares / params.IssuedFeeShares
 candidate.FeeCommissionShares = 0  
 params.IssuedFeeShares -= FeeCommissionShares
 ```
+
+Finally, note that when a delegator chooses to unbond shares, fees continue to
+accumulate until the unbond queue reaches maturity. At the block which the
+queue reaches maturity and shares are unbonded all available fees are
+simultaneously withdrawn. 
