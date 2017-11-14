@@ -26,41 +26,56 @@ import (
 	"github.com/cosmos/gaia/version"
 )
 
-// GaiaCmd is the entry point for this binary
-var GaiaCmd = &cobra.Command{
-	Use:   "gaia",
-	Short: "The Cosmos Network delegation-game blockchain test",
-	Long:  "", //TODO re-work
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
-}
+func main() {
+	// disable sorting
+	cobra.EnableCommandSorting = false
 
-// Execute - execute the main commands
-func Execute() {
-	addGlobalCommands()
+	// add commands
+	prepareNodeCommands()
+	prepareServerCommands()
+	prepareClientCommands()
+
+	GaiaCmd.AddCommand(
+		nodeCmd,
+		proxy.RootCmd,
+		serverCmd,
+		lineBreak,
+
+		txcmd.RootCmd,
+		query.RootCmd,
+		rpccmd.RootCmd,
+		lineBreak,
+
+		keys.RootCmd,
+		commands.InitCmd,
+		commands.ResetCmd,
+		commits.RootCmd,
+		lineBreak,
+		version.VersionCmd,
+		//auto.AutoCompleteCmd,
+	)
+
+	// prepare and add flags
+	_ = cli.PrepareMainCmd(GaiaCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
+	commands.AddBasicFlags(GaiaCmd)
+
 	GaiaCmd.Execute()
 }
 
-func addGlobalCommands() {
+// GaiaCmd is the entry point for this binary
+var (
+	GaiaCmd = &cobra.Command{
+		Use:   "gaia",
+		Short: "The Cosmos Network delegation-game test",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
+	}
 
-	nodeCommands()
-	GaiaCmd.AddCommand(nodeCmd)
+	lineBreak = &cobra.Command{Run: func(*cobra.Command, []string) {}}
+)
 
-	serverCommands()
-	GaiaCmd.AddCommand(serverCmd)
-
-	cliCommands()
-
-	addGlobalFlags()
-}
-
-func addGlobalFlags() {
-	commands.AddBasicFlags(GaiaCmd)
-	//GaiaCmd.PersistentFlags().StringVarP()
-}
-
-func cliCommands() {
+func prepareClientCommands() {
 	// Prepare queries
 	query.RootCmd.AddCommand(
 		// These are default parsers, but optional in your app (you can remove key)
@@ -104,19 +119,4 @@ func cliCommands() {
 		stakecmd.CmdDeclareCandidacy,
 	)
 
-	// Set up the various commands to use
-	GaiaCmd.AddCommand(
-		commands.InitCmd,
-		commands.ResetCmd,
-		keys.RootCmd,
-		commits.RootCmd,
-		rpccmd.RootCmd,
-		query.RootCmd,
-		txcmd.RootCmd,
-		proxy.RootCmd,
-		version.VersionCmd,
-		//auto.AutoCompleteCmd,
-	)
-
-	_ = cli.PrepareMainCmd(GaiaCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
 }

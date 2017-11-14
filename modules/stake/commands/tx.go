@@ -54,7 +54,7 @@ func init() {
 	CmdUnbond.Flags().AddFlagSet(fs)
 }
 
-type makeTx func(coin.Coin, crypto.PubKey) sdk.Tx
+type MakeTx func(coin.Coin, crypto.PubKey) sdk.Tx
 
 func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 	return cmdBondUpdate(cmd, args, stake.NewTxDeclareCandidacy)
@@ -68,7 +68,7 @@ func cmdUnbond(cmd *cobra.Command, args []string) error {
 	return cmdBondUpdate(cmd, args, stake.NewTxUnbond)
 }
 
-func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx makeTx) error {
+func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx MakeTx) error {
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err

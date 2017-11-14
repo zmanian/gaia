@@ -34,7 +34,7 @@ var nodeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) { cmd.Help() },
 }
 
-func nodeCommands() {
+func prepareNodeCommands() {
 	nodeCmd.AddCommand(
 		basecmd.GetInitCmd("fermion", []string{"stake/allowed_bond_denom/fermion"}),
 		basecmd.GetTickStartCmd(sdk.TickerFunc(tickFn)),

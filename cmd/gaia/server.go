@@ -27,12 +27,12 @@ const defaultAlgo = "ed25519"
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
-	Short: "Light REST client for tendermint",
+	Short: "REST client for gaia commands",
 	Long:  `Gaiaserver presents  a nice (not raw hex) interface to the gaia blockchain structure.`,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// this should share the dir with gaiacli, so you can use the cli and
 		// the api interchangeably
-		_ = cli.PrepareMainCmd(cmd, "BC", os.ExpandEnv("$HOME/.gaiacli"))
+		_ = cli.PrepareMainCmd(cmd, "GA", os.ExpandEnv("$HOME/.gaiacli"))
 	},
 
 	Run: func(cmd *cobra.Command, args []string) { cmd.Help() },
@@ -40,14 +40,13 @@ var serverCmd = &cobra.Command{
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Serve the light REST client for tendermint",
-	Long:  "Access gaia via REST",
+	Short: "Serve the REST client",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdServe(cmd, args)
 	},
 }
 
-func serverCommands() {
+func prepareServerCommands() {
 	serverCmd.AddCommand(commands.InitCmd)
 	serverCmd.AddCommand(commands.VersionCmd)
 	serverCmd.AddCommand(serveCmd)
