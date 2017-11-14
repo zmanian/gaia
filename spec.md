@@ -18,8 +18,6 @@ which is defined as an array and persisted in the application state.  Each
 validator bond is defined as the object below. 
 
 ``` golang
-type ValidatorBonds []*ValidatorBond
-
 type ValidatorBond struct {
 	PubKey       crypto.PubKey  // validator PubKey
 	Owner        sdk.Actor      // account coins are bonded from and unbonded to
@@ -37,11 +35,20 @@ The VotingPower is proportional to the amount of bonded tokens which the validat
 has if the validator is within the top 100 validators. At the launch of 
 cosmos hub we will have a maximum of 100 validators. 
 
-Within the store, each `ValidatorBond` is stored by validator-pubkey. A second
-key-value pair is also maintained by the store in order to quickly sort though
-the store, where the key is the `BondedTokens` and the key is the validator
-`PubKey`. When the set of all validators needs to be determined, the top 100
-values can be taken from this list and voting power computed. 
+Within the store, each `ValidatorBond` is stored by validator-pubkey.
+
+ - key: validator-pubkey
+ - value: `ValidatorBond` object
+
+A second key-value pair is also maintained by the store in order to quickly
+sort though the the group of all validator-candidates: 
+
+ - key: `ValidatorBond.BondedTokens`
+ - value: `ValidatorBond.PubKey`
+
+When the set of all validators needs to be determined from the group of all
+candidates, the top 100 candidates, sorted by BondedTokens can be retrieved
+from this sorting without the need to retrieve the entire group of candidates. 
 
 BondedTokens are held in a global account.  
 
