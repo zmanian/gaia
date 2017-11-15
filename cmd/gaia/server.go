@@ -20,8 +20,7 @@ import (
 	stakerest "github.com/cosmos/gaia/modules/stake/rest"
 )
 
-// todo fix
-var portFlag = "port"
+var portFlag int
 
 const defaultAlgo = "ed25519"
 
@@ -55,8 +54,7 @@ func prepareServerCommands() {
 
 func addServerFlags() {
 	commands.AddBasicFlags(serveCmd)
-	// this was read in from viper config ... ?
-	//serveCmd.PersistentFlags().IntVarP(&portFlag, 8998, "port to run the server on")
+	serveCmd.PersistentFlags().IntVarP(&portFlag, "port", "p", 8998, "port to run the server on")
 }
 
 func cmdServe(cmd *cobra.Command, args []string) error {
