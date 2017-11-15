@@ -1,10 +1,11 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/spf13/viper"
 	"github.com/tendermint/tmlibs/common"
 
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -32,7 +33,7 @@ func RegisterDelegate(r *mux.Router) error {
 // POST method access on route /tx/stake/unbond to create a
 // transaction for unbonding delegated coins
 func RegisterUnbond(r *mux.Router) error {
-	r.HandleFunc("/tx/stake/unbond/{pubkey}/{amount}", unbond).Methods("POST")
+	r.HandleFunc("/tx/stake/unbond/{pubkey}/{shares}", unbond).Methods("POST")
 	return nil
 }
 
@@ -41,9 +42,6 @@ func declareCandidacy(w http.ResponseWriter, r *http.Request) {
 }
 func delegate(w http.ResponseWriter, r *http.Request) {
 	bondUpdate(w, r, stake.NewTxDelegate)
-}
-func unbond(w http.ResponseWriter, r *http.Request) {
-	bondUpdate(w, r, stake.NewTxUnbond)
 }
 
 func bondUpdate(w http.ResponseWriter, r *http.Request, makeTx scmds.MakeTx) {
@@ -60,12 +58,37 @@ func bondUpdate(w http.ResponseWriter, r *http.Request, makeTx scmds.MakeTx) {
 
 	// get the amount
 	amountArg := args["amount"]
-	amount, err := coin.ParseCoin(viper.GetString(amountArg))
+	amount, err := coin.ParseCoin(amountArg)
 	if err != nil {
 		common.WriteError(w, err)
 		return
 	}
 
 	tx := makeTx(amount, pk)
+	common.WriteSuccess(w, tx)
+}
+
+func unbond(w http.ResponseWriter, r *http.Request) {
+	// get the arguments object
+	args := mux.Vars(r)
+
+	// get the pubkey
+	pkArg := args["pubkey"]
+	pk, err := scmds.GetPubKey(pkArg)
+	if err != nil {
+		common.WriteError(w, err)
+		return
+	}
+
+	// get the shares
+	sharesArg := args["shares"]
+	shares, err := strconv.ParseInt(sharesArg, 10, 64)
+	if shares <= 0 {
+		common.WriteError(w, fmt.Errorf("shares must be positive interger"))
+		return
+	}
+	sharesU := uint64(shares)
+
+	tx := stake.NewTxUnbond(sharesU, pk)
 	common.WriteSuccess(w, tx)
 }

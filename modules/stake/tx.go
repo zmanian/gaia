@@ -54,6 +54,20 @@ func (tx BondUpdate) ValidateBasic() error {
 	return nil
 }
 
+// TxDeclareCandidacy - struct for unbonding transactions
+type TxDeclareCandidacy struct{ BondUpdate }
+
+// NewTxDeclareCandidacy - new TxDeclareCandidacy
+func NewTxDeclareCandidacy(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
+	return TxDeclareCandidacy{BondUpdate{
+		PubKey: pubKey,
+		Bond:   bond,
+	}}.Wrap()
+}
+
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxDeclareCandidacy) Wrap() sdk.Tx { return sdk.Tx{tx} }
+
 // TxDelegate - struct for bonding transactions
 type TxDelegate struct{ BondUpdate }
 
@@ -69,29 +83,30 @@ func NewTxDelegate(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
 func (tx TxDelegate) Wrap() sdk.Tx { return sdk.Tx{tx} }
 
 // TxUnbond - struct for unbonding transactions
-type TxUnbond struct{ BondUpdate }
+type TxUnbond struct {
+	PubKey crypto.PubKey `json:"pubKey"`
+	Shares uint64        `json:"amount"`
+}
 
 // NewTxUnbond - new TxUnbond
-func NewTxUnbond(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
-	return TxUnbond{BondUpdate{
+func NewTxUnbond(shares uint64, pubKey crypto.PubKey) sdk.Tx {
+	return TxUnbond{
 		PubKey: pubKey,
-		Bond:   bond,
-	}}.Wrap()
+		Shares: shares,
+	}.Wrap()
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
 func (tx TxUnbond) Wrap() sdk.Tx { return sdk.Tx{tx} }
 
-// TxDeclareCandidacy - struct for unbonding transactions
-type TxDeclareCandidacy struct{ BondUpdate }
+// ValidateBasic - Check for non-empty actor, positive shares
+func (tx TxUnbond) ValidateBasic() error {
+	if tx.PubKey.Empty() { // TODO will an empty validator actually have len 0?
+		return errCandidateEmpty
+	}
 
-// NewTxDeclareCandidacy - new TxDeclareCandidacy
-func NewTxDeclareCandidacy(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
-	return TxDeclareCandidacy{BondUpdate{
-		PubKey: pubKey,
-		Bond:   bond,
-	}}.Wrap()
+	if tx.Shares == 0 {
+		return fmt.Errorf("Shares must be > 0")
+	}
+	return nil
 }
-
-// Wrap - Wrap a Tx as a Basecoin Tx
-func (tx TxDeclareCandidacy) Wrap() sdk.Tx { return sdk.Tx{tx} }

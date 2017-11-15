@@ -54,6 +54,7 @@ func init() {
 	CmdUnbond.Flags().AddFlagSet(fs)
 }
 
+// MakeTx function type for cmd consolidation
 type MakeTx func(coin.Coin, crypto.PubKey) sdk.Tx
 
 func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
@@ -62,10 +63,6 @@ func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 
 func cmdDelegate(cmd *cobra.Command, args []string) error {
 	return cmdBondUpdate(cmd, args, stake.NewTxDelegate)
-}
-
-func cmdUnbond(cmd *cobra.Command, args []string) error {
-	return cmdBondUpdate(cmd, args, stake.NewTxUnbond)
 }
 
 func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx MakeTx) error {
@@ -80,6 +77,23 @@ func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx MakeTx) error {
 	}
 
 	tx := makeTx(amount, pk)
+	return txcmd.DoTx(tx)
+}
+
+func cmdUnbond(cmd *cobra.Command, args []string) error {
+
+	sharesRaw := viper.GetInt64(FlagAmount)
+	if sharesRaw <= 0 {
+		return fmt.Errorf("shares must be positive interger")
+	}
+	shares := uint64(sharesRaw)
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
+	}
+
+	tx := stake.NewTxUnbond(shares, pk)
 	return txcmd.DoTx(tx)
 }
 

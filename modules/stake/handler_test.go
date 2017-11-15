@@ -46,11 +46,11 @@ func newTxDelegate(amt int64, pubKey crypto.PubKey) TxDelegate {
 	}}
 }
 
-func newTxUnbond(amt int64, pubKey crypto.PubKey) TxUnbond {
-	return TxUnbond{BondUpdate{
+func newTxUnbond(shares uint64, pubKey crypto.PubKey) TxUnbond {
+	return TxUnbond{
 		PubKey: pubKey,
-		Bond:   coin.Coin{"fermion", amt},
-	}}
+		Shares: shares,
+	}
 }
 
 func newPubKey(pk string) crypto.PubKey {
@@ -140,7 +140,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	assert.True(got.IsOK(), "expected initial bond tx to be ok, got %v", got)
 
 	// just send the same txunbond multiple times
-	unbondAmount := int64(10)
+	unbondAmount := uint64(10)
 	txUndeligate := newTxUnbond(unbondAmount, pk1)
 	for i := 0; i < 5; i++ {
 		got := runTxUnbond(store, sender, dummyTransferFn(accStore), txUndeligate)
@@ -148,7 +148,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 		//Check that the accounts and the bond account have the appropriate values
 		candidates := LoadCandidates(store)
-		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
+		expectedBond := initBond - int64(i+1)*int64(unbondAmount) // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
 		gotBonded := int64(candidates[0].Shares)
 		gotHolder := accStore[string(holder.Address)]

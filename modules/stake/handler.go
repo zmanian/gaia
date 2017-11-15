@@ -121,7 +121,6 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 }
 
 func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store state.SimpleDB) error {
-	// TODO: check the sender has enough coins to bond
 
 	// check to see if the pubkey or sender has been registered before,
 	//  if it has been used ensure that the associated account is same
@@ -132,18 +131,15 @@ func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store stat
 			candidate.PubKey, candidate.Owner)
 	}
 
-	// TODO: also check the account has enough coins to declare
 	return checkDenom(tx.BondUpdate, store)
 }
 
 func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) error {
-	// TODO check the sender has enough coins to bond
 
 	candidate := LoadCandidate(store, tx.PubKey)
 	if candidate == nil { // does PubKey exist
 		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
 	}
-	// TODO: also check the account has enough to bond
 	return checkDenom(tx.BondUpdate, store)
 }
 
@@ -151,11 +147,11 @@ func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
 
 	//check if have enough shares to unbond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
-	if bond.Shares < uint64(tx.Bond.Amount) {
+	if bond.Shares < uint64(tx.Shares) {
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
-			bond.Shares, tx.Bond)
+			bond.Shares, tx.Shares)
 	}
-	return checkDenom(tx.BondUpdate, store)
+	return nil
 }
 
 func checkDenom(tx BondUpdate, store state.SimpleDB) error {
@@ -290,10 +286,10 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 	}
 
 	// subtract bond tokens from bond
-	if bond.Shares < uint64(tx.Bond.Amount) {
+	if bond.Shares < uint64(tx.Shares) {
 		return resInsufficientFunds
 	}
-	bond.Shares -= uint64(tx.Bond.Amount)
+	bond.Shares -= uint64(tx.Shares)
 
 	if bond.Shares == 0 {
 
@@ -310,7 +306,7 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 	}
 
 	// deduct shares from the candidate
-	candidate.Shares -= uint64(tx.Bond.Amount)
+	candidate.Shares -= uint64(tx.Shares)
 	if candidate.Shares == 0 {
 		removeCandidate(store, tx.PubKey)
 	} else {
@@ -319,7 +315,9 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 
 	// transfer coins back to account
 	params := loadParams(store)
-	res = transferFn(params.HoldAccount, sender, coin.Coins{tx.Bond})
+	returnCoins := int64(tx.Shares) //currently each share is worth one coin
+	res = transferFn(params.HoldAccount, sender,
+		coin.Coins{{params.AllowedBondDenom, returnCoins}})
 	if res.IsErr() {
 		return res
 	}
