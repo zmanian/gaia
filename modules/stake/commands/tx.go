@@ -10,7 +10,6 @@ import (
 
 	crypto "github.com/tendermint/go-crypto"
 
-	sdk "github.com/cosmos/cosmos-sdk"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 
@@ -19,16 +18,27 @@ import (
 
 // nolint
 const (
-	FlagAmount = "amount"
 	FlagPubKey = "pubkey"
+	FlagAmount = "amount"
+	FlagShares = "shares"
+
+	FlagName    = "name"
+	FlagKeybase = "keybase-sig"
+	FlagWebsite = "website"
+	FlagDetails = "details"
 )
 
 // nolint
 var (
 	CmdDeclareCandidacy = &cobra.Command{
 		Use:   "declare-candidacy",
-		Short: "create new validator/candidate account and delegate some coins to it",
+		Short: "create new validator-candidate account and delegate some coins to it",
 		RunE:  cmdDeclareCandidacy,
+	}
+	CmdEditCandidacy = &cobra.Command{
+		Use:   "edit-candidacy",
+		Short: "edit and existing validator-candidate account",
+		RunE:  cmdEditCandidacy,
 	}
 	CmdDelegate = &cobra.Command{
 		Use:   "delegate",
@@ -44,28 +54,38 @@ var (
 
 func init() {
 
-	//Add Flags to commands
-	fs := flag.NewFlagSet("", flag.ContinueOnError)
-	fs.String(FlagPubKey, "", "PubKey of the validator-candidate")
-	fs.String(FlagAmount, "1fermion", "Amount of coins to bond")
+	// define the flags
+	fsPk := flag.NewFlagSet("", flag.ContinueOnError)
+	fsPk.String(FlagPubKey, "", "PubKey of the validator-candidate")
 
-	CmdDeclareCandidacy.Flags().AddFlagSet(fs)
-	CmdDelegate.Flags().AddFlagSet(fs)
-	CmdUnbond.Flags().AddFlagSet(fs)
+	fsAmount := flag.NewFlagSet("", flag.ContinueOnError)
+	fsAmount.String(FlagAmount, "1fermion", "Amount of coins to bond")
+
+	fsShares := flag.NewFlagSet("", flag.ContinueOnError)
+	fsShares.Int64(FlagShares, 0, "Amount of shares to unbond")
+
+	fsCandidate := flag.NewFlagSet("", flag.ContinueOnError)
+	fsCandidate.String(FlagName, "", "validator-candidate name")
+	fsCandidate.String(FlagKeybase, "", "optional keybase signature")
+	fsCandidate.String(FlagWebsite, "", "optional website")
+	fsCandidate.String(FlagDetails, "", "optional detailed description space")
+
+	// add the flags
+	CmdDelegate.Flags().AddFlagSet(fsPk)
+	CmdDelegate.Flags().AddFlagSet(fsAmount)
+
+	CmdUnbond.Flags().AddFlagSet(fsPk)
+	CmdUnbond.Flags().AddFlagSet(fsShares)
+
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsPk)
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsAmount)
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsCandidate)
+
+	CmdEditCandidacy.Flags().AddFlagSet(fsPk)
+	CmdEditCandidacy.Flags().AddFlagSet(fsCandidate)
 }
-
-// MakeTx function type for cmd consolidation
-type MakeTx func(coin.Coin, crypto.PubKey) sdk.Tx
 
 func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
-	return cmdBondUpdate(cmd, args, stake.NewTxDeclareCandidacy)
-}
-
-func cmdDelegate(cmd *cobra.Command, args []string) error {
-	return cmdBondUpdate(cmd, args, stake.NewTxDelegate)
-}
-
-func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx MakeTx) error {
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err
@@ -76,7 +96,51 @@ func cmdBondUpdate(cmd *cobra.Command, args []string, makeTx MakeTx) error {
 		return err
 	}
 
-	tx := makeTx(amount, pk)
+	if viper.GetString(FlagName) == "" {
+		return fmt.Errorf("please enter a name for the validator-candidate using --name")
+	}
+
+	description := stake.Description{
+		Name:    viper.GetString(FlagName),
+		Keybase: viper.GetString(FlagKeybase),
+		Website: viper.GetString(FlagWebsite),
+		Details: viper.GetString(FlagDetails),
+	}
+
+	tx := stake.NewTxDeclareCandidacy(amount, pk, description)
+	return txcmd.DoTx(tx)
+}
+
+func cmdEditCandidacy(cmd *cobra.Command, args []string) error {
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
+	}
+
+	description := stake.Description{
+		Name:    viper.GetString(FlagName),
+		Keybase: viper.GetString(FlagKeybase),
+		Website: viper.GetString(FlagWebsite),
+		Details: viper.GetString(FlagDetails),
+	}
+
+	tx := stake.NewTxEditCandidacy(pk, description)
+	return txcmd.DoTx(tx)
+}
+
+func cmdDelegate(cmd *cobra.Command, args []string) error {
+	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
+	if err != nil {
+		return err
+	}
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
+	}
+
+	tx := stake.NewTxDelegate(amount, pk)
 	return txcmd.DoTx(tx)
 }
 

@@ -72,7 +72,7 @@ func TestAllAreTx(t *testing.T) {
 	_, ok = ubndTx.Unwrap().(TxUnbond)
 	assert.True(ok, "%#v", ubndTx)
 
-	declTx := NewTxDeclareCandidacy(bond, pubKey)
+	declTx := NewTxDeclareCandidacy(bond, pubKey, Description{})
 	_, ok = declTx.Unwrap().(TxDeclareCandidacy)
 	assert.True(ok, "%#v", declTx)
 
@@ -95,8 +95,8 @@ func TestSerializeTx(t *testing.T) {
 		tx sdk.Tx
 	}{
 		{NewTxUnbond(bondAmt, pubKey)},
-		{NewTxDeclareCandidacy(bond, pubKey)},
-		{NewTxDeclareCandidacy(bond, pubKey)},
+		{NewTxDeclareCandidacy(bond, pubKey, Description{})},
+		{NewTxDeclareCandidacy(bond, pubKey, Description{})},
 		// {NewTxRevokeCandidacy(pubKey)},
 	}
 

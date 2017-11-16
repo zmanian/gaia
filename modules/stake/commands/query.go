@@ -36,6 +36,12 @@ var (
 		RunE:  cmdQueryDelegatorBond,
 	}
 
+	CmdQueryDelegatorBonds = &cobra.Command{
+		Use:   "delegator-bonds",
+		Short: "Query all delegators bonds based on address",
+		RunE:  cmdQueryDelegatorBond,
+	}
+
 	FlagDelegatorAddress = "delegator-address"
 )
 
@@ -49,7 +55,7 @@ func init() {
 	CmdQueryCandidate.Flags().AddFlagSet(fsPk)
 	CmdQueryDelegatorBond.Flags().AddFlagSet(fsPk)
 	CmdQueryDelegatorBond.Flags().AddFlagSet(fsAddr)
-	//CmdQueryDelegatorBonds.Flags().AddFlagSet(fsAddr)
+	CmdQueryDelegatorBonds.Flags().AddFlagSet(fsAddr)
 }
 
 func cmdQueryCandidates(cmd *cobra.Command, args []string) error {
@@ -110,27 +116,22 @@ func cmdQueryDelegatorBond(cmd *cobra.Command, args []string) error {
 	return query.OutputProof(bond, height)
 }
 
-//func cmdQueryDelegatorBonds(cmd *cobra.Command, args []string) error {
+func cmdQueryDelegatorBonds(cmd *cobra.Command, args []string) error {
 
-//var bond []stake.DelegatorBond
+	var bonds []*stake.DelegatorBond
 
-//pk, err := GetPubKey(viper.GetString(FlagPubKey))
-//if err != nil {
-//return err
-//}
+	delegatorAddr, err := hex.DecodeString(viper.GetString(FlagDelegatorAddress))
+	if err != nil {
+		return err
+	}
+	delegator := sdk.NewActor(stake.Name(), delegatorAddr)
 
-//delegatorAddr, err := hex.DecodeString(viper.GetString(FlagDelegatorAddress))
-//if err != nil {
-//return err
-//}
-//delegator := sdk.NewActor(stake.Name(), delegatorAddr)
+	prove := !viper.GetBool(commands.FlagTrustNode)
+	key := stack.PrefixedKey(stake.Name(), stake.GetDelegatorBondsKey(delegator))
+	height, err := query.GetParsed(key, &bonds, query.GetHeight(), prove)
+	if err != nil {
+		return err
+	}
 
-//prove := !viper.GetBool(commands.FlagTrustNode)
-//key := stack.PrefixedKey(stake.Name(), stake.GetDelegatorBondKey(delegator, pk))
-//height, err := query.GetParsed(key, &bond, query.GetHeight(), prove)
-//if err != nil {
-//return err
-//}
-
-//return query.OutputProof(bond, height)
-//}
+	return query.OutputProof(bonds, height)
+}

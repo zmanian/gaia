@@ -33,10 +33,13 @@ func initAccounts(n int, amount int64) ([]sdk.Actor, map[string]int64) {
 }
 
 func newTxDeclareCandidacy(amt int64, pubKey crypto.PubKey) TxDeclareCandidacy {
-	return TxDeclareCandidacy{BondUpdate{
-		PubKey: pubKey,
-		Bond:   coin.Coin{"fermion", amt},
-	}}
+	return TxDeclareCandidacy{
+		BondUpdate{
+			PubKey: pubKey,
+			Bond:   coin.Coin{"fermion", amt},
+		},
+		Description{},
+	}
 }
 
 func newTxDelegate(amt int64, pubKey crypto.PubKey) TxDelegate {

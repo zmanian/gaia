@@ -76,7 +76,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 		case "max_vals":
 			params.MaxVals = i
 		case "gas_bond":
-			params.GasBond = uint64(i)
+			params.GasDelegate = uint64(i)
 		case "gas_unbound":
 			params.GasUnbond = uint64(i)
 		}
@@ -109,8 +109,11 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	case TxDeclareCandidacy:
 		return sdk.NewCheck(params.GasDeclareCandidacy, ""),
 			checkTxDeclareCandidacy(txInner, sender, store)
+	case TxEditCandidacy:
+		return sdk.NewCheck(params.GasEditCandidacy, ""),
+			checkTxEditCandidacy(txInner, sender, store)
 	case TxDelegate:
-		return sdk.NewCheck(params.GasBond, ""),
+		return sdk.NewCheck(params.GasDelegate, ""),
 			checkTxDelegate(txInner, sender, store)
 	case TxUnbond:
 		return sdk.NewCheck(params.GasUnbond, ""),
@@ -122,8 +125,7 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 
 func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store state.SimpleDB) error {
 
-	// check to see if the pubkey or sender has been registered before,
-	//  if it has been used ensure that the associated account is same
+	// check to see if the pubkey or sender has been registered before
 	candidate := LoadCandidate(store, tx.PubKey)
 	if candidate != nil {
 		return fmt.Errorf("cannot bond to pubkey which is already declared candidacy"+
@@ -132,6 +134,16 @@ func checkTxDeclareCandidacy(tx TxDeclareCandidacy, sender sdk.Actor, store stat
 	}
 
 	return checkDenom(tx.BondUpdate, store)
+}
+
+func checkTxEditCandidacy(tx TxEditCandidacy, sender sdk.Actor, store state.SimpleDB) error {
+
+	// candidate must already be registered
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate == nil { // does PubKey exist
+		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
+	}
+	return nil
 }
 
 func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) error {
@@ -177,29 +189,35 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		return res, abciRes
 	}
 
+	params := loadParams(store)
+
 	// Run the transaction
 	switch _tx := tx.Unwrap().(type) {
 	case TxDeclareCandidacy:
 		fn := defaultTransferFn(ctx, store, dispatch)
 		abciRes = runTxDeclareCandidacy(store, sender, fn, _tx)
+		res.GasUsed = params.GasDeclareCandidacy
+	case TxEditCandidacy:
+		fn := defaultTransferFn(ctx, store, dispatch)
+		abciRes = runTxEditCandidacy(store, sender, fn, _tx)
+		res.GasUsed = params.GasEditCandidacy
 	case TxDelegate:
 		fn := defaultTransferFn(ctx, store, dispatch)
 		abciRes = runTxDelegate(store, sender, fn, _tx)
+		res.GasUsed = params.GasDelegate
 	case TxUnbond:
 		//context with hold account permissions
 		params := loadParams(store)
 		ctx2 := ctx.WithPermissions(params.HoldAccount)
 		fn := defaultTransferFn(ctx2, store, dispatch)
 		abciRes = runTxUnbond(store, sender, fn, _tx)
+		res.GasUsed = params.GasUnbond
 	}
 
-	res = sdk.DeliverResult{
-		Data:    abciRes.Data,
-		Log:     abciRes.Log,
-		GasUsed: loadParams(store).GasBond,
-	}
+	res.Data = abciRes.Data
+	res.Log = abciRes.Log
 
-	return
+	return res, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,6 +236,7 @@ func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
 		return resCandidateExistsAddr
 	}
 	candidate := NewCandidate(tx.PubKey, sender)
+	candidate.Description = tx.Description // add the description parameters
 	saveCandidate(store, candidate)
 
 	// move coins from the sender account to a (self-bond) delegator account
@@ -227,6 +246,37 @@ func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
 	if res.IsErr() {
 		return res
 	}
+
+	return abci.OK
+}
+
+func runTxEditCandidacy(store state.SimpleDB, sender sdk.Actor,
+	transferFn transferFn, tx TxEditCandidacy) (res abci.Result) {
+
+	// Get the pubKey bond account
+	candidate := LoadCandidate(store, tx.PubKey)
+	if candidate == nil {
+		return resBondNotNominated
+	}
+	if candidate.Owner.Empty() { //candidate has been rejected
+		return resBondNotNominated
+	}
+
+	//check and edit any of the editable terms
+	if tx.Description.Name != "" {
+		candidate.Description.Name = tx.Description.Name
+	}
+	if tx.Description.Keybase != "" {
+		candidate.Description.Keybase = tx.Description.Keybase
+	}
+	if tx.Description.Website != "" {
+		candidate.Description.Website = tx.Description.Website
+	}
+	if tx.Description.Details != "" {
+		candidate.Description.Details = tx.Description.Details
+	}
+
+	saveCandidate(store, candidate)
 
 	return abci.OK
 }

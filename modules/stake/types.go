@@ -23,8 +23,8 @@ type Params struct {
 
 	// gas costs for txs
 	GasDeclareCandidacy uint64 `json:"gas_declare_candidacy"`
-	GasRevokeCandidacy  uint64 `json:"gas_declare_candidacy"`
-	GasBond             uint64 `json:"gas_bond"`
+	GasEditCandidacy    uint64 `json:"gas_edit_candidacy"`
+	GasDelegate         uint64 `json:"gas_delegate"`
 	GasUnbond           uint64 `json:"gas_unbond"`
 }
 
@@ -34,9 +34,9 @@ func defaultParams() Params {
 		MaxVals:             100,
 		AllowedBondDenom:    "fermion",
 		GasDeclareCandidacy: 20,
-		GasRevokeCandidacy:  20,
-		GasBond:             20,
-		GasUnbond:           0, //TODO verify that it is safe to have gas of zero here
+		GasEditCandidacy:    20,
+		GasDelegate:         20,
+		GasUnbond:           20,
 	}
 }
 
@@ -51,10 +51,19 @@ func defaultParams() Params {
 // total bonds multiplied by exchange rate.
 // NOTE if the Owner.Empty() == true then this is a revoked candidate
 type Candidate struct {
-	PubKey      crypto.PubKey `json:"pubkey"`       // Pubkey of validator
+	PubKey      crypto.PubKey `json:"pubkey"`       // Pubkey of candidate
 	Owner       sdk.Actor     `json:"owner"`        // Sender of BondTx - UnbondTx returns here
-	Shares      uint64        `json:"shares"`       // Total number of delegated shares for the validator, equivalent to coins held in bond account
+	Shares      uint64        `json:"shares"`       // Total number of delegated shares to this candidate, equivalent to coins held in bond account
 	VotingPower uint64        `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Description Description   `json:"description"`  // Description terms for the candidate
+}
+
+// Description - description fields for a candidate
+type Description struct {
+	Name    string `json:"pubkey"`
+	Keybase string `json:"keybase"` // keybase signature
+	Website string `json:"website"`
+	Details string `json:"details"`
 }
 
 // NewCandidate - initialize a new candidate

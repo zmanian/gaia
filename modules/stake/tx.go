@@ -38,9 +38,9 @@ type BondUpdate struct {
 	Bond   coin.Coin     `json:"amount"`
 }
 
-// ValidateBasic - Check for non-empty actor, and valid coins
+// ValidateBasic - Check for non-empty candidate, and valid coins
 func (tx BondUpdate) ValidateBasic() error {
-	if tx.PubKey.Empty() { // TODO will an empty validator actually have len 0?
+	if tx.PubKey.Empty() {
 		return errCandidateEmpty
 	}
 
@@ -55,18 +55,54 @@ func (tx BondUpdate) ValidateBasic() error {
 }
 
 // TxDeclareCandidacy - struct for unbonding transactions
-type TxDeclareCandidacy struct{ BondUpdate }
+type TxDeclareCandidacy struct {
+	BondUpdate
+	Description
+}
 
 // NewTxDeclareCandidacy - new TxDeclareCandidacy
-func NewTxDeclareCandidacy(bond coin.Coin, pubKey crypto.PubKey) sdk.Tx {
-	return TxDeclareCandidacy{BondUpdate{
-		PubKey: pubKey,
-		Bond:   bond,
-	}}.Wrap()
+func NewTxDeclareCandidacy(bond coin.Coin, pubKey crypto.PubKey, description Description) sdk.Tx {
+	return TxDeclareCandidacy{
+		BondUpdate{
+			PubKey: pubKey,
+			Bond:   bond,
+		},
+		description,
+	}.Wrap()
 }
 
 // Wrap - Wrap a Tx as a Basecoin Tx
 func (tx TxDeclareCandidacy) Wrap() sdk.Tx { return sdk.Tx{tx} }
+
+// TxEditCandidacy - struct for editing a candidate
+type TxEditCandidacy struct {
+	PubKey crypto.PubKey `json:"pubKey"`
+	Description
+}
+
+// NewTxEditCandidacy - new TxEditCandidacy
+func NewTxEditCandidacy(pubKey crypto.PubKey, description Description) sdk.Tx {
+	return TxEditCandidacy{
+		PubKey:      pubKey,
+		Description: description,
+	}.Wrap()
+}
+
+// Wrap - Wrap a Tx as a Basecoin Tx
+func (tx TxEditCandidacy) Wrap() sdk.Tx { return sdk.Tx{tx} }
+
+// ValidateBasic - Check for non-empty candidate,
+func (tx TxEditCandidacy) ValidateBasic() error {
+	if tx.PubKey.Empty() {
+		return errCandidateEmpty
+	}
+
+	empty := Description{}
+	if tx.Description == empty {
+		return fmt.Errorf("Transaction must include some information to modify")
+	}
+	return nil
+}
 
 // TxDelegate - struct for bonding transactions
 type TxDelegate struct{ BondUpdate }
@@ -99,7 +135,7 @@ func NewTxUnbond(shares uint64, pubKey crypto.PubKey) sdk.Tx {
 // Wrap - Wrap a Tx as a Basecoin Tx
 func (tx TxUnbond) Wrap() sdk.Tx { return sdk.Tx{tx} }
 
-// ValidateBasic - Check for non-empty actor, positive shares
+// ValidateBasic - Check for non-empty candidate, positive shares
 func (tx TxUnbond) ValidateBasic() error {
 	if tx.PubKey.Empty() { // TODO will an empty validator actually have len 0?
 		return errCandidateEmpty

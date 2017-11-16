@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -13,11 +14,56 @@ import (
 	scmds "github.com/cosmos/gaia/modules/stake/commands"
 )
 
+const (
+	//parameters used in urls
+	paramPubKey = "pubkey"
+	paramAmount = "amount"
+	paramShares = "shares"
+
+	paramName    = "name"
+	paramKeybase = "keybase"
+	paramWebsite = "website"
+	paramDetails = "details"
+)
+
 // RegisterDeclareCandidacy is a mux.Router handler that exposes
 // POST method access on route /tx/stake/declare-candidacy to create a
 // transaction for declaring candidacy
 func RegisterDeclareCandidacy(r *mux.Router) error {
-	r.HandleFunc("/tx/stake/declare-candidacy/{pubkey}/{amount}", declareCandidacy).Methods("POST")
+	r.HandleFunc(
+		"/"+path.Join(
+			"tx",
+			"stake",
+			"declare-candidacy",
+			"{"+paramPubKey+"}",
+			"{"+paramAmount+"}",
+			"{"+paramName+"}",
+			"{"+paramKeybase+"}",
+			"{"+paramWebsite+"}",
+			"{"+paramDetails+"}",
+		),
+		declareCandidacy,
+	).Methods("POST")
+	return nil
+}
+
+// RegisterEditCandidacy is a mux.Router handler that exposes
+// POST method access on route /tx/stake/edit-candidacy to create a
+// transaction for editing a candidate
+func RegisterEditCandidacy(r *mux.Router) error {
+	r.HandleFunc(
+		"/"+path.Join(
+			"tx",
+			"stake",
+			"edit-candidacy",
+			"{"+paramPubKey+"}",
+			"{"+paramName+"}",
+			"{"+paramKeybase+"}",
+			"{"+paramWebsite+"}",
+			"{"+paramDetails+"}",
+		),
+		editCandidacy,
+	).Methods("POST")
 	return nil
 }
 
@@ -25,7 +71,16 @@ func RegisterDeclareCandidacy(r *mux.Router) error {
 // POST method access on route /tx/stake/delegate to create a
 // transaction for delegate to a candidaate/validator
 func RegisterDelegate(r *mux.Router) error {
-	r.HandleFunc("/tx/stake/delegate/{pubkey}/{amount}", delegate).Methods("POST")
+	r.HandleFunc(
+		"/"+path.Join(
+			"tx",
+			"stake",
+			"declare-candidacy",
+			"{"+paramPubKey+"}",
+			"{"+paramAmount+"}",
+		),
+		delegate,
+	).Methods("POST")
 	return nil
 }
 
@@ -33,23 +88,25 @@ func RegisterDelegate(r *mux.Router) error {
 // POST method access on route /tx/stake/unbond to create a
 // transaction for unbonding delegated coins
 func RegisterUnbond(r *mux.Router) error {
-	r.HandleFunc("/tx/stake/unbond/{pubkey}/{shares}", unbond).Methods("POST")
+	r.HandleFunc(
+		"/"+path.Join(
+			"tx",
+			"stake",
+			"declare-candidacy",
+			"{"+paramPubKey+"}",
+			"{"+paramShares+"}",
+		),
+		unbond,
+	).Methods("POST")
 	return nil
 }
 
 func declareCandidacy(w http.ResponseWriter, r *http.Request) {
-	bondUpdate(w, r, stake.NewTxDeclareCandidacy)
-}
-func delegate(w http.ResponseWriter, r *http.Request) {
-	bondUpdate(w, r, stake.NewTxDelegate)
-}
-
-func bondUpdate(w http.ResponseWriter, r *http.Request, makeTx scmds.MakeTx) {
 	// get the arguments object
 	args := mux.Vars(r)
 
 	// get the pubkey
-	pkArg := args["pubkey"]
+	pkArg := args[paramPubKey]
 	pk, err := scmds.GetPubKey(pkArg)
 	if err != nil {
 		common.WriteError(w, err)
@@ -57,14 +114,72 @@ func bondUpdate(w http.ResponseWriter, r *http.Request, makeTx scmds.MakeTx) {
 	}
 
 	// get the amount
-	amountArg := args["amount"]
+	amountArg := args[paramAmount]
 	amount, err := coin.ParseCoin(amountArg)
 	if err != nil {
 		common.WriteError(w, err)
 		return
 	}
 
-	tx := makeTx(amount, pk)
+	// get description parameters
+	description := stake.Description{
+		Name:    args[paramName],
+		Keybase: args[paramKeybase],
+		Website: args[paramWebsite],
+		Details: args[paramDetails],
+	}
+
+	tx := stake.NewTxDeclareCandidacy(amount, pk, description)
+	common.WriteSuccess(w, tx)
+}
+
+func editCandidacy(w http.ResponseWriter, r *http.Request) {
+
+	// get the arguments object
+	args := mux.Vars(r)
+
+	// get the pubkey
+	pkArg := args[paramPubKey]
+	pk, err := scmds.GetPubKey(pkArg)
+	if err != nil {
+		common.WriteError(w, err)
+		return
+	}
+
+	// get description parameters
+	description := stake.Description{
+		Name:    args[paramName],
+		Keybase: args[paramKeybase],
+		Website: args[paramWebsite],
+		Details: args[paramDetails],
+	}
+
+	tx := stake.NewTxEditCandidacy(pk, description)
+	common.WriteSuccess(w, tx)
+}
+
+func delegate(w http.ResponseWriter, r *http.Request) {
+
+	// get the arguments object
+	args := mux.Vars(r)
+
+	// get the pubkey
+	pkArg := args[paramPubKey]
+	pk, err := scmds.GetPubKey(pkArg)
+	if err != nil {
+		common.WriteError(w, err)
+		return
+	}
+
+	// get the amount
+	amountArg := args[paramAmount]
+	amount, err := coin.ParseCoin(amountArg)
+	if err != nil {
+		common.WriteError(w, err)
+		return
+	}
+
+	tx := stake.NewTxDelegate(amount, pk)
 	common.WriteSuccess(w, tx)
 }
 
@@ -73,7 +188,7 @@ func unbond(w http.ResponseWriter, r *http.Request) {
 	args := mux.Vars(r)
 
 	// get the pubkey
-	pkArg := args["pubkey"]
+	pkArg := args[paramPubKey]
 	pk, err := scmds.GetPubKey(pkArg)
 	if err != nil {
 		common.WriteError(w, err)
@@ -81,7 +196,7 @@ func unbond(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get the shares
-	sharesArg := args["shares"]
+	sharesArg := args[paramShares]
 	shares, err := strconv.ParseInt(sharesArg, 10, 64)
 	if shares <= 0 {
 		common.WriteError(w, fmt.Errorf("shares must be positive interger"))

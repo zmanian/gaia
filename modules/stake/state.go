@@ -15,8 +15,9 @@ var (
 	ParamKey             = []byte{0x02} // key for global parameters relating to staking
 
 	// Key prefixes
-	CandidateKeyPrefix     = []byte{0x03} // prefix for each key to a candidate
-	DelegatorBondKeyPrefix = []byte{0x04} // prefix for each key to a delegator's bond
+	CandidateKeyPrefix      = []byte{0x03} // prefix for each key to a candidate
+	DelegatorBondKeyPrefix  = []byte{0x04} // prefix for each key to a delegator's bond
+	DelegatorBondsKeyPrefix = []byte{0x05} // prefix for each key to a delegator's bond
 )
 
 // GetCandidateKey - get the key for the candidate with pubKey
@@ -32,6 +33,11 @@ func GetDelegatorBondKey(delegator sdk.Actor, candidate crypto.PubKey) []byte {
 // GetDelegatorBondKeyPrefix - get the prefix of keys for a delegator
 func GetDelegatorBondKeyPrefix(delegator sdk.Actor) []byte {
 	return append(DelegatorBondKeyPrefix, append(wire.BinaryBytes(&delegator))...)
+}
+
+// GetDelegatorBondsKey - get the key for a delegator bonds
+func GetDelegatorBondsKey(delegator sdk.Actor) []byte {
+	return append(DelegatorBondsKeyPrefix, append(wire.BinaryBytes(&delegator))...)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -117,24 +123,43 @@ func loadDelegatorBond(store state.SimpleDB,
 func saveDelegatorBond(store state.SimpleDB, delegator sdk.Actor, bond *DelegatorBond) {
 	b := wire.BinaryBytes(*bond)
 	store.Set(GetDelegatorBondKey(delegator, bond.PubKey), b)
+	updateDelegatorBonds(store, delegator)
 }
 
 func removeDelegatorBond(store state.SimpleDB, delegator sdk.Actor, candidate crypto.PubKey) {
 	store.Remove(GetDelegatorBondKey(delegator, candidate))
+	updateDelegatorBonds(store, delegator)
 }
 
 func loadDelegatorBonds(store state.SimpleDB,
-	delegator sdk.Actor) (bonds []*DelegatorBond) {
+	delegator sdk.Actor, candidate crypto.PubKey) (bonds []*DelegatorBond) {
+
+	bondsBytes := store.Get(GetDelegatorBondKey(delegator, candidate))
+	if bondsBytes == nil {
+		return nil
+	}
+
+	err := wire.ReadBinaryBytes(bondsBytes, bonds)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func updateDelegatorBonds(store state.SimpleDB,
+	delegator sdk.Actor) {
+
+	var bonds []*DelegatorBond
 
 	prefix := GetDelegatorBondKeyPrefix(delegator)
 	l := len(prefix)
 	delegatorsBytes := store.List(prefix,
-		append(prefix[:l-1], (prefix[l-1]+1)), 100000) //XXX 100000 should be limited
+		append(prefix[:l-1], (prefix[l-1]+1)), loadParams(store).MaxVals)
 
 	for _, delegatorBytesModel := range delegatorsBytes {
 		delegatorBytes := delegatorBytesModel.Value
 		if delegatorBytes == nil {
-			return
+			continue
 		}
 
 		bond := new(DelegatorBond)
@@ -144,7 +169,13 @@ func loadDelegatorBonds(store state.SimpleDB,
 		}
 		bonds = append(bonds, bond)
 	}
-	return
+
+	if len(bonds) == 0 {
+		store.Remove(GetDelegatorBondsKey(delegator))
+	}
+
+	b := wire.BinaryBytes(bonds)
+	store.Set(GetDelegatorBondsKey(delegator), b)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
