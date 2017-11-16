@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	rest "github.com/cosmos/cosmos-sdk/client/rest"
@@ -20,41 +21,39 @@ import (
 	stakerest "github.com/cosmos/gaia/modules/stake/rest"
 )
 
-var portFlag int
-
 const defaultAlgo = "ed25519"
 
-var serverCmd = &cobra.Command{
-	Use:   "server",
-	Short: "REST client for gaia commands",
-	Long:  `Gaiaserver presents  a nice (not raw hex) interface to the gaia blockchain structure.`,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		// this should share the dir with gaiacli, so you can use the cli and
-		// the api interchangeably
-		_ = cli.PrepareMainCmd(cmd, "GA", os.ExpandEnv("$HOME/.gaiacli"))
-	},
+var (
+	serverCmd = &cobra.Command{
+		Use:   "server",
+		Short: "REST client for gaia commands",
+		Long:  `Gaiaserver presents  a nice (not raw hex) interface to the gaia blockchain structure.`,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			// this should share the dir with gaiacli, so you can use the cli and
+			// the api interchangeably
+			_ = cli.PrepareMainCmd(cmd, "GA", os.ExpandEnv("$HOME/.gaiacli"))
+		},
 
-	Run: func(cmd *cobra.Command, args []string) { cmd.Help() },
-}
+		Run: func(cmd *cobra.Command, args []string) { cmd.Help() },
+	}
 
-var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Serve the REST client",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return cmdServe(cmd, args)
-	},
-}
+	serveCmd = &cobra.Command{
+		Use:   "serve",
+		Short: "Serve the REST client",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmdServe(cmd, args)
+		},
+	}
+
+	flagPort = "port"
+)
 
 func prepareServerCommands() {
 	serverCmd.AddCommand(commands.InitCmd)
 	serverCmd.AddCommand(commands.VersionCmd)
 	serverCmd.AddCommand(serveCmd)
-	addServerFlags()
-}
-
-func addServerFlags() {
 	commands.AddBasicFlags(serveCmd)
-	serveCmd.PersistentFlags().IntVarP(&portFlag, "port", "p", 8998, "port to run the server on")
+	serveCmd.PersistentFlags().IntP(flagPort, "p", 8998, "port to run the server on")
 }
 
 func cmdServe(cmd *cobra.Command, args []string) error {
@@ -90,7 +89,7 @@ func cmdServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	addr := fmt.Sprintf(":%d", portFlag)
+	addr := fmt.Sprintf(":%d", viper.GetInt(flagPort))
 
 	log.Printf("Serving on %q", addr)
 	return http.ListenAndServe(addr, router)
