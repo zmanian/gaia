@@ -12,7 +12,7 @@ import:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: develop
+  version: gaia_compatible
 - package: github.com/tendermint/iavl
   version: develop
 - package: github.com/tendermint/go-crypto

@@ -1,5 +1,5 @@
-hash: cb9e61f4708a66d39336db685529d8f655871593e9fd10b5b9fd033bb574bb7e
-updated: 2017-11-06T21:14:21.889482998Z
+hash: 4de934cc1f79253a87801eb2b07dfb722e5cbbfe40453c5a18977dda2aaa2e44
+updated: 2017-11-20T06:02:31.783702529Z
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,12 +10,11 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: f9dde9f685a1dddfbf31afa740ba44aaff7e120d
+  version: 0e14fd69102c6ecf49ac62c945030faae98a42eb
   subpackages:
   - app
   - client
   - client/commands
-  - client/commands/auto
   - client/commands/commits
   - client/commands/keys
   - client/commands/proxy
@@ -83,7 +82,7 @@ imports:
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
-  version: 24fca303ac6da784b9e8269f724ddeb0b2eea5e7
+  version: 7f08801859139f86dfafd1c296e2cba9a80d292e
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/hashicorp/hcl
@@ -147,7 +146,7 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/tendermint/abci
-  version: c9612f094b8181c3986a07f85cd8a8a07c9676c8
+  version: bee7c5c7aa09443c4d9aa74217a891f8229d9ea3
   subpackages:
   - client
   - example/dummy
@@ -213,7 +212,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: ac0cf0b2e2e5246f331628a38e50ea7f0db54f8b
+  version: 135a1a7cd78215105a55308c167b3331c225e00b
   subpackages:
   - autofile
   - cli
