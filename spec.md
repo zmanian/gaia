@@ -20,7 +20,7 @@ validator bond is defined as the object below.
 ``` golang
 type ValidatorBond struct {
 	PubKey       crypto.PubKey  // validator PubKey
-	Owner        sdk.Actor      // account coins are bonded from and unbonded to
+	Owner        auth.Account      // account coins are bonded from and unbonded to
 	BondedTokens uint64         // total number of bond tokens from the validator 
 	VotingPower  uint64         // voting power for tendermint consensus 
 	Notes        string         // arbitrary information for the UI 
@@ -55,7 +55,7 @@ BondedTokens are held in a global account.
 ``` golang
 type Param struct {
 	BondedTokenPool    uint64     // reserve of all bonded tokens  
-	HoldAccountBonded sdk.Actor  // Protocol account for bonded tokens 
+	HoldAccountBonded auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -95,7 +95,7 @@ Each validator-candidate bond is defined as the object below.
 ``` golang
 type Candidate struct {
 	PubKey       crypto.PubKey
-	Owner        sdk.Actor
+	Owner        auth.Account
 	Shares       uint64    
 	VotingPower  uint64   
 	Notes        string   
@@ -120,6 +120,9 @@ type DelegatorBond struct {
 
 Within the store each `DelegatorBond` is individually stored by candidate
 pubkey and sender actor.  
+
+ - key: Delegator/Candidate-Pubkey
+ - value: DelegatorBond 
 
 The transactions types must be renamed. `TxBond` is now effectively
 `TxDeclareCandidacy` and but is only used to become a new validator. For all
@@ -180,7 +183,7 @@ type QueueElem struct {
 
 type QueueElemUnbondDelegation struct {
 	QueueElem
-	Payout      sdk.Actor // account to pay out to
+	Payout      auth.Account // account to pay out to
     Shares      uint64    // amount of shares which are unbonding
 }
 ```
@@ -196,7 +199,14 @@ Additionally within this phase unbonding of entire candidates to temporary
 liquid accounts is introduced. This full candidate unbond is used when a
 candidate unbonds all of their tokens, is kicked from the validator set for
 liveliness issues, or crosses a self-imposed safety threshold (defined in later
-sections) 
+sections). Whenever a validator is kicked, the delegators do not automatically
+unbond to their personal wallets, but unbond to a pool where they must transact
+to completely withdraw their tokens. If a validator is able to regain
+liveliness and participate in consensus once again, any delegator who has not
+yet withdrawn from this liquid pool associated with that validator will
+automatically be bonded back to the now-live validator. Mechanisms are also in
+place to ensure that a delegator can continue to unbond, or re-delegate
+instead, so long as the delegator acts in time.
 
 ``` golang
 type QueueElemUnbondCandidate struct {
@@ -209,10 +219,16 @@ signal that the candidate is either active, unbonding, or unbonded. Also
 `UnbondingDelegatorShares` is introduced to account for delegators unbonding.  
 
 ``` golang
+type CandidateStatus byte
+
+const Active CandidateStatus = 0x00
+const Unbonding CandidateStatus = 0x01
+const Unbonded CandidateStatus = 0x02
+
 type Candidate struct {
-	Status                    byte          // 0x00 active, 0x01 unbonding, 0x02 unbonded
+	Status                    CandidateStatus
 	PubKey                    crypto.PubKey
-	Owner                     sdk.Actor
+	Owner                     auth.Account
 	Shares                    uint64    
 	UnbondingDelegatorShares  uint64        // Delegator shares currently unbonding  
 	VotingPower               uint64   
@@ -221,20 +237,24 @@ type Candidate struct {
 ```
 
 When unbonding is initiated, delegator shares remain accounted for within the
-`Candidate.Shares` and the term `UnbondingDelegatorShares` is incremented.
-During the unbonding period all unbonding shares do not count towards the
-voting power of a validator. Once the `QueueElemUnbondDelegation` has reached
+`Candidate.Shares` and the term `UnbondingDelegatorShares` is incremented. This
+must be done in anticipation for the next phase of implementation where we must
+properly calculate payouts to unbonding token holders.  During the unbonding
+period all unbonding shares do not count towards the voting power of a
+validator. Once the `QueueElemUnbondDelegation` has reached
 maturity, the appropriate unbonding shares are removed from the `Shares` and
 `UnbondingDelegatorShares` term.   
 
-Similarly, A delegator may choose to initiate an unbond of their delegated
-shares while a candidate full unbond is commencing. This an unbond from an
-unbonding candidate will already have completed some of the unbonding period
-and is therefor subject to a reduced unbonding period when is is begun. 
+At this point `TxDeclareCandidacy` can be used to reinstate an unbonding or
+unbonded validator while providing any additionally required tokens. When this
+occurs all previously delegated bonds will be applied to this validator
+provided each delegator has not already withdrawn from the liquid pool, or
+initiated another transaction from the validator
 
-Additionally at this point `TxDeclareCandidacy` can be used to reinstate an
-unbonding or unbonded validator while providing any additionally required
-tokens. 
+If a delegator chooses to initiate an unbond or re-delegation of their shares
+while a candidate full unbond is commencing, then that unbond/re-delegation is
+subject to a reduced unbonding period based on how much time that bond has
+already spent in the unbonding queue.
 
 Re-delegation is defined as an unbond followed by an immediate bond at the 
 maturity of the unbonding. 
@@ -242,7 +262,7 @@ maturity of the unbonding.
 ```
 type QueueElemReDelegate struct {
 	QueueElem
-	Payout       sdk.Actor     // account to pay out to
+	Payout       auth.Account     // account to pay out to
     Shares       uint64        // amount of shares which are unbonding
     NewCandidate crypto.PubKey // validator to bond to after unbond
 }
@@ -267,7 +287,7 @@ is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
 	BondedTokenPool           uint64  // reserve of all bonded tokens  
-	HoldAccountBonded        sdk.Actor  // Protocol account for bonded tokens 
+	HoldAccountBonded        auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -277,7 +297,7 @@ The candidate struct must now be expanded:
 type Candidate struct {
 	Status                    byte       
 	PubKey                    crypto.PubKey
-	Owner                     sdk.Actor
+	Owner                     auth.Account
 	IssuedDelegatorShares     uint64    
 	UnbondingDelegatorShares  uint64    
 	GlobalStakeShares         uint64  
@@ -321,7 +341,7 @@ the `GlobalStakeShares` of other validators remains worth a constant absolute
 amount of the `BondedTokenPool`
 
 ```
-createdGlobalStakeShares += coinsDeposited / globalStakeExRate 
+createdGlobalStakeShares = coinsDeposited / globalStakeExRate 
 validator.GlobalStakeShares +=  createdGlobalStakeShares
 params.IssuedGlobalStakeShares +=  createdGlobalStakeShares
 
@@ -390,14 +410,14 @@ purely delegating to others. Fees are paid directly into a global fee pool
 type Candidate struct {
 	Status                 byte       
 	PubKey                 crypto.PubKey
-	Owner                  sdk.Actor
+	Owner                  auth.Account
 	IssuedDelegatorShares  uint64    
 	GlobalStakeShares      uint64  
 	VotingPower            uint64   
     Commission             uint64
     CommissionMax          uint64
     CommissionChangeRate   uint64
-    CommissionChangeToday  uint64
+    CommissionChangeToday  int64
     FeeShares              uint64
     FeeCommissionShares    uint64
 	Notes                  string   
@@ -407,7 +427,7 @@ type Candidate struct {
 Here several new parameters are introduced:
  - Commission:  The commission rate of fees charged to any delegators
  - CommissionMax:  The maximum commission rate which this candidate can charge
- - CommissionChangeRate: The maximum daily change of the candidate commission
+ - CommissionChangeRate: The maximum daily increase of the candidate commission
  - CommissionChangeToday: Counter for the amount of change to commission rate 
    which has occurred today, reset on the first block of each day (UTC time)
  - FeeShares: Cumulative counter for the amount of fees the candidate and its
@@ -447,10 +467,10 @@ calculation fee portions
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
 	IssuedFeeShares          uint64  // sum of all fee pool shares issued 
-	BondedTokenPool           uint64  // reserve of all bonded tokens  
+	BondedTokenPool          uint64  // reserve of all bonded tokens  
 	FeePool                  coin.Coins // fee pool
-	HoldAccountBonded        sdk.Actor  // Protocol account for bonded tokens 
-	HoldAccountFeePool       sdk.Actor  // Protocol account for the fee pool 
+	HoldAccountBonded        auth.Account  // Protocol account for bonded tokens 
+	HoldAccountFeePool       auth.Account  // Protocol account for the fee pool 
 	DateLastCommissionReset  uint64     // Unix Timestamp for last commission accounting reset
 }
 ```
@@ -466,7 +486,7 @@ Here a separate fee pool exists per candidate containing all fee asset held by
 a validator. The candidate accum increments each block as fees are collected.
 If the validator is the proposer of the round then a skew factor is provided to
 give this validator an incentive to provide non-empty blocks. The skew factor
-is passed in through Tendermint core and will be 1 for proposer nodes and
+is passed in through Tendermint core and will be 1 for non-proposer nodes and
 between 1.01 and 1.05 for proposer nodes.  
 
 ```
@@ -491,6 +511,10 @@ pool to be withdrawn during a delegator fee withdrawal:
 feeSharesToWithdraw = (currentHeight - delegator.FeeWithdrawalHeight) 
                       * delegator.Shares / candidate.IssueDelegatorShares
 withdrawalEntitlement := feeSharesToWithdraw / params.IssuedFeeShares
+
+coinsWithdrawn = param.FeePool * withdrawalEntitlement
+param.FeePool -= coinsWithdrawn
+delegator.Owner.Balance. += coinsWithdrawn
 ```
 
 When a withdrawal of a delegator fees occurs the shares must also be balanced
@@ -507,6 +531,11 @@ Similarly when a candidate chooses to withdraw fees from the FeeCommissionShares
 withdrawalEntitlement := candidate.FeeCommissionShares / params.IssuedFeeShares
 candidate.FeeCommissionShares = 0  
 params.IssuedFeeShares -= FeeCommissionShares
+
+
+coinsWithdrawn = param.FeePool * withdrawalEntitlement
+param.FeePool -= coinsWithdrawn
+candidate.Owner.Balance. += coinsWithdrawn
 ```
 
 Finally, note that when a delegator chooses to unbond shares, fees continue to
