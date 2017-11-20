@@ -56,10 +56,9 @@ func main() {
 	)
 
 	// prepare and add flags
-	_ = cli.PrepareMainCmd(GaiaCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
-	commands.AddBasicFlags(GaiaCmd)
-
-	GaiaCmd.Execute()
+	executor := cli.PrepareMainCmd(GaiaCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
+	//commands.AddBasicFlags(GaiaCmd)
+	executor.Execute()
 }
 
 // GaiaCmd is the entry point for this binary
