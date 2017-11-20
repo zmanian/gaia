@@ -84,17 +84,6 @@ func (c Candidate) ABCIValidator() *abci.Validator {
 	}
 }
 
-// HoldAccount - Get the hold account for the Candidate
-//func (c Candidate) HoldAccount() sdk.Actor {
-//return getHoldAccount(c.Owner)
-//}
-
-// getHoldAccount - the account where bonded atoms are held only accessed by protocol
-//func getHoldAccount(owner sdk.Actor) sdk.Actor {
-//holdAddr := append([]byte{0x00}, owner.Address[1:]...) //shift and prepend a zero
-//return sdk.NewActor(stakingModuleName, holdAddr)
-//}
-
 //--------------------------------------------------------------------------------
 
 // TODO replace with sorted multistore functionality

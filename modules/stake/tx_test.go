@@ -64,23 +64,21 @@ func TestAllAreTx(t *testing.T) {
 	// Note that Wrap is only defined on BondUpdate, so when you call it,
 	// you lose all info on the embedding type. Please add Wrap()
 	// method to all the parents
-	delTx := NewTxDelegate(bond, pubKey)
-	_, ok := delTx.Unwrap().(TxDelegate)
-	assert.True(ok, "%#v", delTx)
+	txDelegate := NewTxDelegate(bond, pubKey)
+	_, ok := txDelegate.Unwrap().(TxDelegate)
+	assert.True(ok, "%#v", txDelegate)
 
-	ubndTx := NewTxUnbond(bondAmt, pubKey)
-	_, ok = ubndTx.Unwrap().(TxUnbond)
-	assert.True(ok, "%#v", ubndTx)
+	txUnbond := NewTxUnbond(bondAmt, pubKey)
+	_, ok = txUnbond.Unwrap().(TxUnbond)
+	assert.True(ok, "%#v", txUnbond)
 
-	declTx := NewTxDeclareCandidacy(bond, pubKey, Description{})
-	_, ok = declTx.Unwrap().(TxDeclareCandidacy)
-	assert.True(ok, "%#v", declTx)
+	txDecl := NewTxDeclareCandidacy(bond, pubKey, Description{})
+	_, ok = txDecl.Unwrap().(TxDeclareCandidacy)
+	assert.True(ok, "%#v", txDecl)
 
-	// One of these two should be defined...
-	// revTx := TxRevokeCandidacy{pubKey}.Wrap()
-	// // revTx := NewTxRevokeCandidacy(pubKey)
-	// _, ok = revTx.Unwrap().(TxRevokeCandidacy)
-	// assert.True(ok, "%#v", revTx)
+	txEditCan := NewTxEditCandidacy(pubKey, Description{})
+	_, ok = txEditCan.Unwrap().(TxEditCandidacy)
+	assert.True(ok, "%#v", txEditCan)
 }
 
 func TestSerializeTx(t *testing.T) {

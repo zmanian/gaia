@@ -16,21 +16,24 @@ import (
 // so it gets routed properly
 const (
 	ByteTxDeclareCandidacy = 0x55
-	ByteTxDelegate         = 0x56
-	ByteTxUnbond           = 0x57
+	ByteTxEditCandidacy    = 0x56
+	ByteTxDelegate         = 0x57
+	ByteTxUnbond           = 0x58
 	TypeTxDeclareCandidacy = stakingModuleName + "/declareCandidacy"
+	TypeTxEditCandidacy    = stakingModuleName + "/editCandidacy"
 	TypeTxDelegate         = stakingModuleName + "/delegate"
 	TypeTxUnbond           = stakingModuleName + "/unbond"
 )
 
 func init() {
 	sdk.TxMapper.RegisterImplementation(TxDeclareCandidacy{}, TypeTxDeclareCandidacy, ByteTxDeclareCandidacy)
+	sdk.TxMapper.RegisterImplementation(TxEditCandidacy{}, TypeTxEditCandidacy, ByteTxEditCandidacy)
 	sdk.TxMapper.RegisterImplementation(TxDelegate{}, TypeTxDelegate, ByteTxDelegate)
 	sdk.TxMapper.RegisterImplementation(TxUnbond{}, TypeTxUnbond, ByteTxUnbond)
 }
 
 //Verify interface at compile time
-var _, _, _ sdk.TxInner = &TxDeclareCandidacy{}, &TxDelegate{}, &TxUnbond{}
+var _, _, _, _ sdk.TxInner = &TxDeclareCandidacy{}, &TxEditCandidacy{}, &TxDelegate{}, &TxUnbond{}
 
 // BondUpdate - struct for bonding or unbonding transactions
 type BondUpdate struct {
@@ -137,7 +140,7 @@ func (tx TxUnbond) Wrap() sdk.Tx { return sdk.Tx{tx} }
 
 // ValidateBasic - Check for non-empty candidate, positive shares
 func (tx TxUnbond) ValidateBasic() error {
-	if tx.PubKey.Empty() { // TODO will an empty validator actually have len 0?
+	if tx.PubKey.Empty() {
 		return errCandidateEmpty
 	}
 
