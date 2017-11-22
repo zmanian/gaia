@@ -2,7 +2,7 @@
 
 This document is intended to lay out the implementation order of various
 staking features. Each iteration of the staking module should be deployable 
-as a test-net. Please contribute to this document and add discussion :)
+as a test-net. 
 
 Overall the Staking module should be rolled out in the following steps
 
@@ -20,7 +20,7 @@ validator bond is defined as the object below.
 ``` golang
 type ValidatorBond struct {
 	PubKey       crypto.PubKey  // validator PubKey
-	Owner        auth.Account      // account coins are bonded from and unbonded to
+	Owner        auth.Account   // account coins are bonded from and unbonded to
 	BondedTokens uint64         // total number of bond tokens from the validator 
 	VotingPower  uint64         // voting power for tendermint consensus 
 	Notes        string         // arbitrary information for the UI 
@@ -315,11 +315,11 @@ type DelegatorBond struct {
 } 
 ```
 
-Here, the bonded tokens that a validator has can be calculated as:
+Here, the bonded tokens that a candidate has can be calculated as:
 
 ```
 globalStakeExRate = params.BondedTokenPool / params.IssuedGlobalStakeShares
-validatorCoins = candidate.GlobalStakeShares * globalStakeExRate 
+candidateCoins = candidate.GlobalStakeShares * globalStakeExRate 
 ```
 
 If a delegator chooses to add more tokens to a validator then the amount of
@@ -420,6 +420,8 @@ type Candidate struct {
     CommissionChangeToday  int64
     FeeShares              uint64
     FeeCommissionShares    uint64
+    LastFeesHeight         uint64
+    LastFeesBondedTokens   uint64
 	Notes                  string   
 }
 ```
@@ -434,6 +436,10 @@ Here several new parameters are introduced:
    deligators are entitled too
  - FeeCommissionShares: Fee shares reserved for the candidate charged as
    commission to the delegators
+ - LastFeesHeight: The last height fees moved from the `FeeHolding` to
+   `FeePool` for this candidate
+ - LastFeesBondedTokens: The candidates bonded tokens at the time that the last
+   fees were processed (at `LastFeesHeight`)
 
 Similarly, the delegator bond must integrate an accum for fee pool accounting. 
 Rather than individually account the accum, the accum may be calculated lazily 
@@ -465,13 +471,17 @@ calculation fee portions
 
 ``` golang
 type Param struct {
-	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
-	IssuedFeeShares          uint64  // sum of all fee pool shares issued 
-	BondedTokenPool          uint64  // reserve of all bonded tokens  
-	FeePool                  coin.Coins // fee pool
-	HoldAccountBonded        auth.Account  // Protocol account for bonded tokens 
-	HoldAccountFeePool       auth.Account  // Protocol account for the fee pool 
-	DateLastCommissionReset  uint64     // Unix Timestamp for last commission accounting reset
+	IssuedGlobalStakeShares  uint64       // sum of all the validators bonded shares
+	IssuedFeeShares          uint64       // sum of all fee pool shares issued 
+	BondedTokenPool          uint64       // reserve of all bonded tokens  
+	FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
+	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
+	FeeHoldingsShares        uint64       // total accumulated shares created for the fee holdings
+	FeeHoldingsBondedTokens  uint64       // total bonded tokens of validators considered when adding shares to FeeHoldings
+	FeeHoldingsCounter       uint64       // moving counter term used to distribute fee holdings to validators
+	HoldAccountBonded        auth.Account // Protocol account for bonded tokens 
+	HoldAccountFeePool       auth.Account // Protocol account for the fee pool 
+	DateLastCommissionReset  uint64       // Unix Timestamp for last commission accounting reset
 }
 ```
 
@@ -483,17 +493,40 @@ Some basic rules for the fee pool are as following:
    the fees must occur (as the rules for lazy accounting change)
 
 Here a separate fee pool exists per candidate containing all fee asset held by
-a validator. The candidate accum increments each block as fees are collected.
-If the validator is the proposer of the round then a skew factor is provided to
-give this validator an incentive to provide non-empty blocks. The skew factor
-is passed in through Tendermint core and will be 1 for non-proposer nodes and
+a validator. The candidate accum is passively incremented for each block as
+fees are collected.  When the validator is the proposer of a block then the
+passive calculation of accum takes place.  Additionally, when the validator is
+the proposer of the round then a skew factor is provided to this block give
+this validator an incentive to provide non-empty blocks. The skew factor is
+passed in through Tendermint core and will be 1 for non-proposer nodes and
 between 1.01 and 1.05 for proposer nodes.  
 
+reset the candidates
+`LastFeesBondedTokens` 
 ```
-issuedShares = Skew * candidate.VotingPower / param.TotalVotingPower 
+heights = (CurrentHeight - 1) - candidate.LastFeesHeight 
+holdingsShares = heights * candidate.LastFeesBondedTokens / params.FeeHoldingsBondedTokens 
+
+candidate.LastFeesHeight = currentHeight
+
+params.FeeHoldingsBondedTokens -= candidate.LastFeesBondedTokens
+candidate.LastFeesBondedTokens = candidateCoins
+params.FeeHoldingsBondedTokens += candidate.LastFeesBondedTokens
+```
+Calculate the shares from the current proposal block, note that the new bonded tokens is used now
+```
+proposerBlockShares = Skew * candidate.LastFeesBondedTokens / param.FeeHoldingsBondedTokens 
+
+issuedShares = holdingsShares + proposerBlockShares
+
 candidate.FeeShares += issuedShares * (1 - candidate.Commission/PRECISION)
 candidate.FeeCommissionShares += issuedShares * candidate.Commission/PRECISION
 params.IssuedFeeShares += issuedShares
+
+params.FeePool += collectedFees
+params.FeeHoldings += collectedFees * candidateCoins
+
+
 ```
 
 The fee pool entitlement of each share (whether `FeeShares` or
