@@ -1,5 +1,5 @@
-hash: 3cfc5033b5bb97bf2f4d1d92c812bc1193c6d74874c1395d81c5684e9b737ca0
-updated: 2017-11-22T16:52:41.507239964+01:00
+hash: 4de934cc1f79253a87801eb2b07dfb722e5cbbfe40453c5a18977dda2aaa2e44
+updated: 2017-11-20T06:02:31.783702529Z
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -48,7 +48,7 @@ imports:
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/ethanfrey/hid
-  version: dce75af84cf849c60f39bf1b8192fb5cd597b5d9
+  version: 660bb717bd4e7cbcdf0f7cd5cadf1cb2e4be452a
 - name: github.com/ethanfrey/ledger
   version: 23a7bb9d74bc83a862fcb4bddde24215b2295ad9
 - name: github.com/fsnotify/fsnotify
@@ -181,7 +181,7 @@ imports:
   - client
   - iavl
 - name: github.com/tendermint/tendermint
-  version: e997db7a23d3e51b2b265f892226e980ae4c8300
+  version: e236302256b8b0b75441e8e44c6d0d3f5b5152c6
   subpackages:
   - blockchain
   - certifiers
@@ -195,7 +195,6 @@ imports:
   - mempool
   - node
   - p2p
-  - p2p/trust
   - p2p/upnp
   - proxy
   - rpc/client
@@ -226,8 +225,6 @@ imports:
   - log
   - logger
   - merkle
-  - pubsub
-  - pubsub/query
 - name: golang.org/x/crypto
   version: 2509b142fb2b797aa7587dad548f113b2c0f20ce
   subpackages:

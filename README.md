@@ -18,4 +18,5 @@ cd $GOPATH/src/github.com/cosmos/gaia
 make all
 ```
 
-See the [docs directory](/docs), also rendered as part of the [cosmos-sdk documentation](cosmos-sdk.readthedocs.io) for information on using the staking module.
+See the [cosmos-sdk documentation](https://cosmos-sdk.readthedocs.io) for
+information on using the gaia staking module.
