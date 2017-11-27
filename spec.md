@@ -275,6 +275,11 @@ type QueueElemReDelegate struct {
 }
 ```
 
+As a unique case, any delegator who is in the process of unbonding from a
+validator can use this transaction type to re-delegate back to the original
+validator they're currently unbonding from (and only that validator).  This can
+be thought of as a _cancel unbonding_ option.
+
 ## Validation Prevision Atoms
 
 In this phase validation provision tokens are introduced as the incentive
