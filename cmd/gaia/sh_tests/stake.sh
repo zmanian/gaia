@@ -2,7 +2,7 @@
 
 # These global variables are required for common.sh
 SERVER_EXE="gaia node"
-CLIENT_EXE=gaia
+CLIENT_EXE="gaia client"
 ACCOUNTS=(jae ethan bucky rigel igor)
 RICH=${ACCOUNTS[0]}
 POOR=${ACCOUNTS[4]}
@@ -43,37 +43,37 @@ oneTimeTearDown() {
     quickTearDown
 }
 
-#test00GetAccount() {
-#SENDER=$(getAddr $RICH)
-#RECV=$(getAddr $POOR)
+test00GetAccount() {
+    SENDER=$(getAddr $RICH)
+    RECV=$(getAddr $POOR)
 
-#assertFalse "line=${LINENO}, requires arg" "${CLIENT_EXE} query account"
+    assertFalse "line=${LINENO}, requires arg" "${CLIENT_EXE} query account"
 
-#checkAccount $SENDER "9007199254740992"
+    checkAccount $SENDER "9007199254740992"
 
-#ACCT2=$(${CLIENT_EXE} query account $RECV 2>/dev/null)
-#assertFalse "line=${LINENO}, has no genesis account" $?
-#}
+    ACCT2=$(${CLIENT_EXE} query account $RECV 2>/dev/null)
+    assertFalse "line=${LINENO}, has no genesis account" $?
+}
 
-#test01SendTx() {
-#SENDER=$(getAddr $RICH)
-#RECV=$(getAddr $POOR)
+test01SendTx() {
+    SENDER=$(getAddr $RICH)
+    RECV=$(getAddr $POOR)
 
-#assertFalse "line=${LINENO}, missing dest" "${CLIENT_EXE} tx send --amount=992strings --sequence=1"
-#assertFalse "line=${LINENO}, bad password" "echo foo | ${CLIENT_EXE} tx send --amount=992strings --sequence=1 --to=$RECV --name=$RICH"
-#TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=992strings --sequence=1 --to=$RECV --name=$RICH)
-#txSucceeded $? "$TX" "$RECV"
-#HASH=$(echo $TX | jq .hash | tr -d \")
-#TX_HEIGHT=$(echo $TX | jq .height)
+    assertFalse "line=${LINENO}, missing dest" "${CLIENT_EXE} tx send --amount=992fermion --sequence=1"
+    assertFalse "line=${LINENO}, bad password" "echo foo | ${CLIENT_EXE} tx send --amount=992fermion --sequence=1 --to=$RECV --name=$RICH"
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=992fermion --sequence=1 --to=$RECV --name=$RICH)
+    txSucceeded $? "$TX" "$RECV"
+    HASH=$(echo $TX | jq .hash | tr -d \")
+    TX_HEIGHT=$(echo $TX | jq .height)
 
-#checkAccount $SENDER "9007199254740000"
-## make sure 0x prefix also works
-#checkAccount "0x$SENDER" "9007199254740000"
-#checkAccount $RECV "992"
+    checkAccount $SENDER "9007199254740000" $TX_HEIGHT
+    # make sure 0x prefix also works
+    checkAccount "0x$SENDER" "9007199254740000" $TX_HEIGHT
+    checkAccount $RECV "992" $TX_HEIGHT
 
-## Make sure tx is indexed
-#checkSendTx $HASH $TX_HEIGHT $SENDER "992"
-#}
+    # Make sure tx is indexed
+    checkSendTx $HASH $TX_HEIGHT $SENDER "992"
+}
 
 # Load common then run these tests with shunit2!
 CLI_DIR=$GOPATH/src/github.com/cosmos/gaia/vendor/github.com/cosmos/cosmos-sdk/tests/cli

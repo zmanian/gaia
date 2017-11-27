@@ -1,11 +1,7 @@
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
-
-	"github.com/tendermint/tmlibs/cli"
 
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/client/commands/commits"
@@ -23,58 +19,20 @@ import (
 	rolecmd "github.com/cosmos/cosmos-sdk/modules/roles/commands"
 
 	stakecmd "github.com/cosmos/gaia/modules/stake/commands"
-	"github.com/cosmos/gaia/version"
 )
 
-func main() {
-	// disable sorting
-	cobra.EnableCommandSorting = false
-
-	// add commands
-	prepareNodeCommands()
-	prepareServerCommands()
-	prepareClientCommands()
-
-	GaiaCmd.AddCommand(
-		nodeCmd,
-		proxy.RootCmd,
-		serverCmd,
-		lineBreak,
-
-		txcmd.RootCmd,
-		query.RootCmd,
-		rpccmd.RootCmd,
-		lineBreak,
-
-		keys.RootCmd,
-		commands.InitCmd,
-		commands.ResetCmd,
-		commits.RootCmd,
-		lineBreak,
-		version.VersionCmd,
-		//auto.AutoCompleteCmd,
-	)
-
-	// prepare and add flags
-	executor := cli.PrepareMainCmd(GaiaCmd, "GA", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
-	//commands.AddBasicFlags(GaiaCmd)
-	executor.Execute()
+// clientCmd is the entry point for this binary
+var clientCmd = &cobra.Command{
+	Use:   "client",
+	Short: "Gaia light client",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
 }
 
-// GaiaCmd is the entry point for this binary
-var (
-	GaiaCmd = &cobra.Command{
-		Use:   "gaia",
-		Short: "The Cosmos Network delegation-game test",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
-	}
-
-	lineBreak = &cobra.Command{Run: func(*cobra.Command, []string) {}}
-)
-
 func prepareClientCommands() {
+	commands.AddBasicFlags(clientCmd)
+
 	// Prepare queries
 	query.RootCmd.AddCommand(
 		// These are default parsers, but optional in your app (you can remove key)
@@ -116,6 +74,22 @@ func prepareClientCommands() {
 		stakecmd.CmdDelegate,
 		stakecmd.CmdUnbond,
 		stakecmd.CmdDeclareCandidacy,
+	)
+
+	clientCmd.AddCommand(
+		proxy.RootCmd,
+		lineBreak,
+
+		txcmd.RootCmd,
+		query.RootCmd,
+		rpccmd.RootCmd,
+		lineBreak,
+
+		keys.RootCmd,
+		commands.InitCmd,
+		commands.ResetCmd,
+		commits.RootCmd,
+		lineBreak,
 	)
 
 }
