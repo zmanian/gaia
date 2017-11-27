@@ -23,7 +23,14 @@ type ValidatorBond struct {
 	Owner        auth.Account   // account coins are bonded from and unbonded to
 	BondedTokens uint64         // total number of bond tokens from the validator 
 	VotingPower  uint64         // voting power for tendermint consensus 
-	Notes        string         // arbitrary information for the UI 
+	Description  Description    // arbitrary information for the UI 
+}
+
+type Description struct {
+	Name     string `json:"pubkey"`
+	Identity string `json:"identity"`
+	Website  string `json:"website"`
+	Details  string `json:"details"`
 }
 ```
 
@@ -65,9 +72,9 @@ PubKey struct as defined by `tendermint/go-crypto`.
 
 ``` golang
 type TxBond struct {
-	PubKey crypto.PubKey 
-	Amount coin.Coin
-    Notes  string     
+	PubKey       crypto.PubKey 
+	Amount       coin.Coin
+    Description  Description     
 }
 ```
 
@@ -98,7 +105,7 @@ type Candidate struct {
 	Owner        auth.Account
 	Shares       uint64    
 	VotingPower  uint64   
-	Notes        string   
+    Description  Description     
 }
 ```
 
@@ -143,7 +150,7 @@ type TxDelegate struct {
 
 type TxDeclareCandidacy struct { 
     BondUpdate
-    Notes string
+    Description Description
 }
 
 type TxUnbond struct { 
@@ -232,7 +239,7 @@ type Candidate struct {
 	Shares                    uint64    
 	UnbondingDelegatorShares  uint64        // Delegator shares currently unbonding  
 	VotingPower               uint64   
-	Notes                     string   
+    Description               Description
 }
 ```
 
@@ -302,7 +309,7 @@ type Candidate struct {
 	UnbondingDelegatorShares  uint64    
 	GlobalStakeShares         uint64  
 	VotingPower               uint64   
-	Notes                     string   
+    Description               Description
 }
 ```
 
@@ -421,8 +428,8 @@ type Candidate struct {
     FeeShares              uint64
     FeeCommissionShares    uint64
     LastFeesHeight         uint64
-    LastFeesBondedTokens   uint64
-	Notes                  string   
+    LastFeesStakedShares   uint64
+    Description            Description
 }
 ```
 
@@ -438,7 +445,7 @@ Here several new parameters are introduced:
    commission to the delegators
  - LastFeesHeight: The last height fees moved from the `FeeHolding` to
    `FeePool` for this candidate
- - LastFeesBondedTokens: The candidates bonded tokens at the time that the last
+ - LastFeesStakedShares: The candidates staked shares at the time that the last
    fees were processed (at `LastFeesHeight`)
 
 Similarly, the delegator bond must integrate an accum for fee pool accounting. 
@@ -449,7 +456,7 @@ based on the Height of the previous withdrawal.
 type DelegatorBond struct {
 	Candidate           crypto.PubKey
 	Shares              uint64
-    FeeWithdrawalHeight uint64 // last height fees were withdrawn from
+    FeeWithdrawalHeight uint64 // last height fees were withdrawn from Candidate.FeeShares
 } 
 ```
 
@@ -458,7 +465,7 @@ type DelegatorBond struct {
 ``` golang
 type TxDeclareCandidacy struct {
 	BondUpdate
-    Notes               string
+    Description         Description
 	Commission          uint64  
 	CommissionMax       uint64 
 	CommissionMaxChange uint64 
@@ -475,10 +482,10 @@ type Param struct {
 	IssuedFeeShares          uint64       // sum of all fee pool shares issued 
 	BondedTokenPool          uint64       // reserve of all bonded tokens  
 	FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
+	FeePoolShares            uint64       // total accumulated shares created for the fee pool
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
 	FeeHoldingsShares        uint64       // total accumulated shares created for the fee holdings
 	FeeHoldingsBondedTokens  uint64       // total bonded tokens of validators considered when adding shares to FeeHoldings
-	FeeHoldingsCounter       uint64       // moving counter term used to distribute fee holdings to validators
 	HoldAccountBonded        auth.Account // Protocol account for bonded tokens 
 	HoldAccountFeePool       auth.Account // Protocol account for the fee pool 
 	DateLastCommissionReset  uint64       // Unix Timestamp for last commission accounting reset
@@ -493,40 +500,57 @@ Some basic rules for the fee pool are as following:
    the fees must occur (as the rules for lazy accounting change)
 
 Here a separate fee pool exists per candidate containing all fee asset held by
-a validator. The candidate accum is passively incremented for each block as
-fees are collected.  When the validator is the proposer of a block then the
-passive calculation of accum takes place.  Additionally, when the validator is
-the proposer of the round then a skew factor is provided to this block give
-this validator an incentive to provide non-empty blocks. The skew factor is
-passed in through Tendermint core and will be 1 for non-proposer nodes and
-between 1.01 and 1.05 for proposer nodes.  
+a validator. The candidate `FeeShares` are passively calculated for each block
+as fees are collected.  When the validator is the proposer of a block then the
+passive calculation of the fee pool shares takes place.  Additionally, when the
+validator is the proposer of the round then a skew factor is provided to this
+block give this validator an incentive to provide non-empty blocks. The skew
+factor is calculated from precommits Tendermint messages and will be 1 for
+non-proposer nodes and between 1.01 and 1.05 for proposer nodes.  
 
-reset the candidates
-`LastFeesBondedTokens` 
 ```
+skew = 1.01 + 0.04 * number_precommits/number_validators
+```
+
+Fees are passively calculated using a second temporary pool dubbed as the
+holding pool. For each proposer block, the fees are withdrawn for the proposer
+validator, and the fee holding pool is increased to contain the fees for the
+non-proposer validators to be withdrawn at a later block. 
+
+```
+proposerFeeCalcShares = skew * candidate.GlobalStakeShares
+totalCalcShares = params.IssuedGlobalStakeShares + (skew - 1) 
+                  * candidate.GlobalStakeShares 
+ProposerBlockFees = FeesJustCollected * proposerFeeCalcShares / totalCalcShares
+
 heights = (CurrentHeight - 1) - candidate.LastFeesHeight 
-holdingsShares = heights * candidate.LastFeesBondedTokens / params.FeeHoldingsBondedTokens 
+FeeHoldingSharesWithdrawn = heights * candidate.LastFeesStakedShares 
+FeeHoldingWithdrawn = params.FeeHoldings 
+                      * FeeHoldingSharesWithdrawn / params.FeeHoldingsShares
 
-candidate.LastFeesHeight = currentHeight
-
-params.FeeHoldingsBondedTokens -= candidate.LastFeesBondedTokens
-candidate.LastFeesBondedTokens = candidateCoins
-params.FeeHoldingsBondedTokens += candidate.LastFeesBondedTokens
+params.FeeHoldingsShares += totalCalcShares - proposerFeeCalcShares 
+                            - FeeHoldingSharesWithdrawn
+params.FeeHoldings -= FeesJustCollected - ProposerBlockFees 
+                      - FeeHoldingWithdrawn
 ```
-Calculate the shares from the current proposal block, note that the new bonded tokens is used now
+Add the fees to the pool and increase proposer pool shares. Note that shares
+are divided into shares for delegators and shares collected as commission by
+the validator
 ```
-proposerBlockShares = Skew * candidate.LastFeesBondedTokens / param.FeeHoldingsBondedTokens 
+issuedShares = FeesForProposer * candidate.proposerFeeCalcShares
+               + FeeHoldingWithdraw * candidate.LastFeesStakedShares
 
-issuedShares = holdingsShares + proposerBlockShares
+params.FeePool += ProposerBlockFees + FeeHoldingWithdrawn
+params.FeePoolShares += issuedShares 
 
-candidate.FeeShares += issuedShares * (1 - candidate.Commission/PRECISION)
-candidate.FeeCommissionShares += issuedShares * candidate.Commission/PRECISION
+candidate.FeeShares += issuedShares * (1 - candidate.Commission)
+candidate.FeeCommissionShares += issuedShares * candidate.Commission
 params.IssuedFeeShares += issuedShares
-
-params.FeePool += collectedFees
-params.FeeHoldings += collectedFees * candidateCoins
-
-
+```
+lastly, reset the candidates `LastFeesStakedShares` and `LastFeesHeight`
+```
+candidate.LastFeesHeight = currentHeight
+candidate.LastFeesStakedShares = candidate.GlobalStakeShares
 ```
 
 The fee pool entitlement of each share (whether `FeeShares` or
@@ -547,7 +571,7 @@ withdrawalEntitlement := feeSharesToWithdraw / params.IssuedFeeShares
 
 coinsWithdrawn = param.FeePool * withdrawalEntitlement
 param.FeePool -= coinsWithdrawn
-delegator.Owner.Balance. += coinsWithdrawn
+delegator.Owner.Balance += coinsWithdrawn
 ```
 
 When a withdrawal of a delegator fees occurs the shares must also be balanced
