@@ -161,6 +161,8 @@ type TxUnbond struct {
 
 ## Unbonding Period, Re-Delegation
 
+### Unbonding
+
 A staking-module state parameter will be introduced which defines the number of
 blocks to unbond from a validator. Once complete unbonding as a validator or a
 Candidate will put your coins in a queue before being returned.
@@ -190,8 +192,9 @@ type QueueElem struct {
 
 type QueueElemUnbondDelegation struct {
 	QueueElem
-	Payout      auth.Account // account to pay out to
-    Shares      uint64    // amount of shares which are unbonding
+	Payout           auth.Account // account to pay out to
+    Amount           uint64    // amount of shares which are unbonding
+    StartSlashRatio  uint64    // old candidate slash ratio at start of re-delegation
 }
 ```
 
@@ -201,6 +204,51 @@ of the queue is checked and if the unbonding period has passed since
 Currently the each share to unbond is equivelent to a single unbonding token,
 although in later phases shares are used along with other terms to calculate
 the coins.
+
+When unbonding is initiated, delegator shares are immediately removed from the
+candidate. In the unbonding queue - the fraction of all historical slashings on
+that validator are recorded (StartSlashRatio). When this queue reaches maturity
+if that total slashing applied is greater on the validator then the
+difference (amount that should have been slashed from the first validator) is
+assigned to the amount being paid out. 
+
+### Re-Delegation
+
+If a delegator is attempting to switch validators, using an unbonding command
+followed by a bond command will reduce the amount of validation reward than
+having just stayed with the same validator. Because we do not want to
+disincentive delegators from switching validators, the re-delegate command is
+introduced. This command provides a delegator who wishes to switch validators
+equal reward to as if you had never unbonded. Transactions structs of the
+re-delegation command may looks like this:
+
+Re-delegation is defined as an unbond followed by an immediate bond at the 
+maturity of the unbonding. 
+
+```
+type QueueElemReDelegate struct {
+	QueueElem
+	Payout       auth.Account  // account to pay out to
+    Shares       uint64        // amount of shares which are unbonding
+    NewCandidate crypto.PubKey // validator to bond to after unbond
+}
+```
+
+When re-delegation is initiated, delegator shares remain accounted for within
+the `Candidate.Shares` and the term `ReDelegatingShares` is incremented.
+This must be done in anticipation for the next phase of implementation where we
+must properly calculate payouts to unbonding token holders.  During the
+unbonding period all unbonding shares do not count towards the voting power of
+a validator. Once the `QueueElemReDelegation` has reached maturity, the
+appropriate unbonding shares are removed from the `Shares` and
+`ReDelegatingShares` term.   
+
+As a unique case, any delegator who is in the process of unbonding from a
+validator can use this transaction type to re-delegate back to the original
+validator they're currently unbonding from (and only that validator).  This can
+be thought of as a _cancel unbonding_ option.
+
+### Candidate Unbonding
 
 Additionally within this phase unbonding of entire candidates to temporary
 liquid accounts is introduced. This full candidate unbond is used when a
@@ -233,24 +281,16 @@ const Unbonding CandidateStatus = 0x01
 const Unbonded CandidateStatus = 0x02
 
 type Candidate struct {
-	Status                    CandidateStatus
-	PubKey                    crypto.PubKey
-	Owner                     auth.Account
-	Shares                    uint64    
-	UnbondingDelegatorShares  uint64        // Delegator shares currently unbonding  
-	VotingPower               uint64   
-    Description               Description
+	Status             CandidateStatus
+	PubKey             crypto.PubKey
+	Owner              auth.Account
+	Shares             uint64    
+	ReDelegatingShares uint64  // Delegator shares currently re-delegating
+	VotingPower        uint64   
+    SlashRatio         uint64  // multiplicative slash ratio for this candidate
+    Description        Description
 }
 ```
-
-When unbonding is initiated, delegator shares remain accounted for within the
-`Candidate.Shares` and the term `UnbondingDelegatorShares` is incremented. This
-must be done in anticipation for the next phase of implementation where we must
-properly calculate payouts to unbonding token holders.  During the unbonding
-period all unbonding shares do not count towards the voting power of a
-validator. Once the `QueueElemUnbondDelegation` has reached
-maturity, the appropriate unbonding shares are removed from the `Shares` and
-`UnbondingDelegatorShares` term.   
 
 At this point `TxDeclareCandidacy` can be used to reinstate an unbonding or
 unbonded validator while providing any additionally required tokens. When this
@@ -262,23 +302,6 @@ If a delegator chooses to initiate an unbond or re-delegation of their shares
 while a candidate full unbond is commencing, then that unbond/re-delegation is
 subject to a reduced unbonding period based on how much time that bond has
 already spent in the unbonding queue.
-
-Re-delegation is defined as an unbond followed by an immediate bond at the 
-maturity of the unbonding. 
-
-```
-type QueueElemReDelegate struct {
-	QueueElem
-	Payout       auth.Account     // account to pay out to
-    Shares       uint64        // amount of shares which are unbonding
-    NewCandidate crypto.PubKey // validator to bond to after unbond
-}
-```
-
-As a unique case, any delegator who is in the process of unbonding from a
-validator can use this transaction type to re-delegate back to the original
-validator they're currently unbonding from (and only that validator).  This can
-be thought of as a _cancel unbonding_ option.
 
 ## Validation Prevision Atoms
 
