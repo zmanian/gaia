@@ -9,7 +9,8 @@ Overall the Staking module should be rolled out in the following steps
 1. Self-Bonding
 2. Delegation
 4. Unbonding Period, Re-Delegation
-5. Fee Pool, Commission
+5. Validation Provision Atoms
+6. Fee Pool, Commission
 
 ## Self-Bonding
 
@@ -303,7 +304,7 @@ while a candidate full unbond is commencing, then that unbond/re-delegation is
 subject to a reduced unbonding period based on how much time that bond has
 already spent in the unbonding queue.
 
-## Validation Prevision Atoms
+## Validation Provision Atoms
 
 In this phase validation provision tokens are introduced as the incentive
 mechanism for tokens holders to keep their tokens bonded. All token holders are
