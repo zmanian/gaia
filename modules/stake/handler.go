@@ -263,8 +263,8 @@ func runTxEditCandidacy(store state.SimpleDB, sender sdk.Actor,
 	}
 
 	//check and edit any of the editable terms
-	if tx.Description.Name != "" {
-		candidate.Description.Name = tx.Description.Name
+	if tx.Description.Moniker != "" {
+		candidate.Description.Moniker = tx.Description.Moniker
 	}
 	if tx.Description.Keybase != "" {
 		candidate.Description.Keybase = tx.Description.Keybase

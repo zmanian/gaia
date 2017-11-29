@@ -139,7 +139,7 @@ test02Bond() {
     SENDER=$(getAddr $POOR)
     gaia client query account ${SENDER}
 
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=5fermion --name=$POOR --pubkey=$PK2)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=5fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
     if [ $? != 0 ]; then return 1; fi
     HASH=$(echo $TX | jq .hash | tr -d \")
     TX_HEIGHT=$(echo $TX | jq .height)

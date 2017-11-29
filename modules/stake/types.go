@@ -60,7 +60,7 @@ type Candidate struct {
 
 // Description - description fields for a candidate
 type Description struct {
-	Name    string `json:"pubkey"`
+	Moniker string `json:"pubkey"`
 	Keybase string `json:"keybase"` // keybase signature
 	Website string `json:"website"`
 	Details string `json:"details"`
@@ -157,6 +157,14 @@ func (cs Candidates) UpdateVotingPower(store state.SimpleDB) (changed bool) {
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
 func (cs Candidates) GetValidators(store state.SimpleDB) []Candidate {
+
+	//test if empty
+	if len(cs) == 1 {
+		if cs[0].VotingPower == 0 {
+			return nil
+		}
+	}
+
 	maxVals := loadParams(store).MaxVals
 	validators := make([]Candidate, cmn.MinInt(len(cs), maxVals))
 	for i, c := range cs {
@@ -168,6 +176,7 @@ func (cs Candidates) GetValidators(store state.SimpleDB) []Candidate {
 		}
 		validators[i] = *c
 	}
+
 	return validators
 }
 
@@ -206,6 +215,9 @@ func ValidatorsDiff(previous, current []Candidate, store state.SimpleDB) (diff [
 		//loop through diff to see if there where any missed
 		found := false
 		for _, prevVal := range previous {
+			if prevVal.PubKey.Empty() {
+				continue
+			}
 			if prevVal.PubKey.Equals(curVal.PubKey) {
 				found = true
 				break

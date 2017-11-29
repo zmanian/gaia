@@ -22,7 +22,8 @@ var (
 
 // GetCandidateKey - get the key for the candidate with pubKey
 func GetCandidateKey(pubKey crypto.PubKey) []byte {
-	return append(CandidateKeyPrefix, pubKey.Bytes()...)
+	b := append(CandidateKeyPrefix, pubKey.Bytes()...)
+	return b
 }
 
 // GetDelegatorBondKey - get the key for a delegator bond
@@ -64,6 +65,9 @@ func saveCandidatesPubKeys(store state.SimpleDB, pubKeys []crypto.PubKey) {
 // for patchwork of tick functionality therefor much easier if exported until
 // the new SDK is created
 func LoadCandidate(store state.SimpleDB, pubKey crypto.PubKey) *Candidate {
+	if pubKey.Empty() {
+		return nil
+	}
 	b := store.Get(GetCandidateKey(pubKey))
 	if b == nil {
 		return nil

@@ -22,7 +22,7 @@ const (
 	FlagAmount = "amount"
 	FlagShares = "shares"
 
-	FlagName    = "name"
+	FlagMoniker = "moniker"
 	FlagKeybase = "keybase-sig"
 	FlagWebsite = "website"
 	FlagDetails = "details"
@@ -65,7 +65,7 @@ func init() {
 	fsShares.Int64(FlagShares, 0, "Amount of shares to unbond")
 
 	fsCandidate := flag.NewFlagSet("", flag.ContinueOnError)
-	fsCandidate.String(FlagName, "", "validator-candidate name")
+	fsCandidate.String(FlagMoniker, "", "validator-candidate name")
 	fsCandidate.String(FlagKeybase, "", "optional keybase signature")
 	fsCandidate.String(FlagWebsite, "", "optional website")
 	fsCandidate.String(FlagDetails, "", "optional detailed description space")
@@ -96,12 +96,12 @@ func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if viper.GetString(FlagName) == "" {
-		return fmt.Errorf("please enter a name for the validator-candidate using --name")
+	if viper.GetString(FlagMoniker) == "" {
+		return fmt.Errorf("please enter a moniker for the validator-candidate using --moniker")
 	}
 
 	description := stake.Description{
-		Name:    viper.GetString(FlagName),
+		Moniker: viper.GetString(FlagMoniker),
 		Keybase: viper.GetString(FlagKeybase),
 		Website: viper.GetString(FlagWebsite),
 		Details: viper.GetString(FlagDetails),
@@ -119,7 +119,7 @@ func cmdEditCandidacy(cmd *cobra.Command, args []string) error {
 	}
 
 	description := stake.Description{
-		Name:    viper.GetString(FlagName),
+		Moniker: viper.GetString(FlagMoniker),
 		Keybase: viper.GetString(FlagKeybase),
 		Website: viper.GetString(FlagWebsite),
 		Details: viper.GetString(FlagDetails),

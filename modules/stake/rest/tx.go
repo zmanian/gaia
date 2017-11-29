@@ -123,7 +123,7 @@ func declareCandidacy(w http.ResponseWriter, r *http.Request) {
 
 	// get description parameters
 	description := stake.Description{
-		Name:    args[paramName],
+		Moniker: args[paramName],
 		Keybase: args[paramKeybase],
 		Website: args[paramWebsite],
 		Details: args[paramDetails],
@@ -148,7 +148,7 @@ func editCandidacy(w http.ResponseWriter, r *http.Request) {
 
 	// get description parameters
 	description := stake.Description{
-		Name:    args[paramName],
+		Moniker: args[paramName],
 		Keybase: args[paramKeybase],
 		Website: args[paramWebsite],
 		Details: args[paramDetails],
