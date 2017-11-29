@@ -581,6 +581,18 @@ candidate.LastFeesHeight = currentHeight
 candidate.LastFeesStakedShares = candidate.GlobalStakeShares
 ```
 
+To a delegator to withdraw fees a transaction must be sent to the candidate.
+The upon withdrawal the liquid tokens are sent to the delegators liquid
+account.  If the delegator account is the candidate.Owner (aka the candidate
+owner is with withdrawing fees) then both the entitled fees as well as the
+commission fees will be withdrawn.
+
+``` golang
+type TxWithdrawFees struct {
+	PubKey crypto.PubKey
+}
+```
+
 The fee pool entitlement of each share (whether `FeeShares` or
 `FeeCommissionShares`)  can be calculated as: 
 
