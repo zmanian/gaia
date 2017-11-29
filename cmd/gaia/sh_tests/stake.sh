@@ -150,10 +150,14 @@ test02Bond() {
     # echo "wait for ticks to finish"
     # gaia client rpc wait --delta 2
 
-    echo "other"
     # TODO: these hang forever, something up with historical queries...
-    # gaia client query account 77777777777777777777777777777777 --height=${TX_HEIGHT}
+    echo "h3"
+    gaia client query account 77777777777777777777777777777777 --height=3
+    echo "h0"
+    gaia client query account 77777777777777777777777777777777 --height=0
     # gaia client query delegator-bond --delegator-address=$(getAddr $POOR) --pubkey=$PK2
+    echo "h${TX_HEIGHT}"
+    gaia client query account 77777777777777777777777777777777 --height=${TX_HEIGHT}
 
     echo; echo "********"
     # gaia client query candidate --pubkey=$PK2
