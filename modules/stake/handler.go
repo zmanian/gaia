@@ -300,6 +300,11 @@ func runTxDelegate(store state.SimpleDB, sender sdk.Actor,
 		return res
 	}
 
+	//key := stack.PrefixedKey(coin.NameCoin, sender.Address)
+	//acc := coin.Account{}
+	//query.GetParsed(key, &acc, query.GetHeight(), false)
+	//panic(fmt.Sprintf("debug acc: %v\n", acc))
+
 	// Get or create the delegator bond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
 	if bond == nil {

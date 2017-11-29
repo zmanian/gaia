@@ -95,7 +95,7 @@ test02Bond() {
     # init the second node
     SERVER_LOG2=$BASE_DIR2/node2.log
     GENKEY=$(${CLIENT_EXE} keys get ${RICH} | awk '{print $2}')
-    ${SERVER_EXE} init $GENKEY --static --chain-id $CHAIN_ID --home=$SERVER2 >>$SERVER_LOG2
+    ${SERVER_EXE} init $GENKEY --chain-id $CHAIN_ID --home=$SERVER2 >>$SERVER_LOG2
     if [ $? != 0 ]; then return 1; fi
 
     # copy in the genesis from the first initialization to the new server
@@ -131,9 +131,17 @@ test02Bond() {
     # get the pubkey of the second validator
     curl localhost:46657/validators
     PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
-    echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=10fermion --name=$POOR --pubkey=$PK2
+    echo "PK2: $PK2"
+    gaia client query account $(getAddr $POOR)
+    echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=5fermion --name=$POOR --pubkey=$PK2
     if [ $? != 0 ]; then return 1; fi
-    gaia client query candidates
+    gaia client query account $(getAddr $POOR)
+    gaia client query account 77777777777777777777777777777777
+
+    gaia client query delegator-bond --delegator-address=$(getAddr $POOR) --pubkey=$PK2
+
+    gaia client query candidate --pubkey=$PK2
+
     curl localhost:46657/validators
 }
 

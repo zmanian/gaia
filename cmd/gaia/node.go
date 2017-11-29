@@ -29,7 +29,6 @@ var nodeCmd = &cobra.Command{
 
 func prepareNodeCommands() {
 
-	// require all fees in strings - change this in your app!
 	basecmd.Handler = stack.New(
 		base.Logger{},
 		stack.Recovery{},
@@ -41,7 +40,7 @@ func prepareNodeCommands() {
 		IBC(ibc.NewMiddleware()).
 		Apps(
 			roles.NewMiddleware(),
-			fee.NewSimpleFeeMiddleware(coin.Coin{"strings", 0}, fee.Bank),
+			fee.NewSimpleFeeMiddleware(coin.Coin{"fermion", 0}, fee.Bank),
 			stack.Checkpoint{OnDeliver: true},
 		).
 		Dispatch(
@@ -56,7 +55,6 @@ func prepareNodeCommands() {
 		basecmd.GetTickStartCmd(sdk.TickerFunc(tickFn)),
 		basecmd.UnsafeResetAllCmd,
 	)
-	//basecmd.SetUpRoot(nodeCmd)
 }
 
 // Tick - Called every block even if no transaction,
