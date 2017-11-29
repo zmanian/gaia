@@ -89,52 +89,49 @@ test01SendTx() {
 
 test02Bond() {
 
-    # # the premise of this test is to run a second validator (from rich) and then bond and unbond some tokens
-    # # first create a second node to run and connect to the system
+    # the premise of this test is to run a second validator (from rich) and then bond and unbond some tokens
+    # first create a second node to run and connect to the system
 
-    # # init the second node
-    # SERVER_LOG2=$BASE_DIR2/node2.log
-    # GENKEY=$(${CLIENT_EXE} keys get ${RICH} | awk '{print $2}')
-    # ${SERVER_EXE} init $GENKEY --chain-id $CHAIN_ID --home=$SERVER2 >>$SERVER_LOG2
-    # if [ $? != 0 ]; then return 1; fi
+    # init the second node
+    SERVER_LOG2=$BASE_DIR2/node2.log
+    GENKEY=$(${CLIENT_EXE} keys get ${RICH} | awk '{print $2}')
+    ${SERVER_EXE} init $GENKEY --chain-id $CHAIN_ID --home=$SERVER2 >>$SERVER_LOG2
+    if [ $? != 0 ]; then return 1; fi
 
-    # # copy in the genesis from the first initialization to the new server
-    # cp $SERVER1/genesis.json $SERVER2/genesis.json
+    # copy in the genesis from the first initialization to the new server
+    cp $SERVER1/genesis.json $SERVER2/genesis.json
 
-    # # point the new config to the old server location
-    # rm $SERVER2/config.toml
-    # echo 'proxy_app = "tcp://127.0.0.1:46668"
-    # moniker = "anonymous"
-    # fast_sync = true
-    # db_backend = "leveldb"
-    # log_level = "state:info,*:error"
+    # point the new config to the old server location
+    rm $SERVER2/config.toml
+    echo 'proxy_app = "tcp://127.0.0.1:46668"
+    moniker = "anonymous"
+    fast_sync = true
+    db_backend = "leveldb"
+    log_level = "state:info,*:error"
 
-    # [rpc]
-    # laddr = "tcp://0.0.0.0:46667"
+    [rpc]
+    laddr = "tcp://0.0.0.0:46667"
 
-    # [p2p]
-    # laddr = "tcp://0.0.0.0:46666"
-    # seeds = "0.0.0.0:46656"' >$SERVER2/config.toml
+    [p2p]
+    laddr = "tcp://0.0.0.0:46666"
+    seeds = "0.0.0.0:46656"' >$SERVER2/config.toml
 
-    # # start the second node
-    # echo "starting second server"
-    # ${SERVER_EXE} start --home=$SERVER2 >>$SERVER_LOG2 2>&1 &
-    # sleep 5
-    # PID_SERVER2=$!
-    # disown
-    # if ! ps $PID_SERVER2 >/dev/null; then
-    #     echo "**FAILED**"
-    #     cat $SERVER_LOG2
-    #     return 1
-    # fi
+    # start the second node
+    echo "starting second server"
+    ${SERVER_EXE} start --home=$SERVER2 >>$SERVER_LOG2 2>&1 &
+    sleep 5
+    PID_SERVER2=$!
+    disown
+    if ! ps $PID_SERVER2 >/dev/null; then
+        echo "**FAILED**"
+        cat $SERVER_LOG2
+        return 1
+    fi
 
     # get the pubkey of the second validator
-    curl localhost:46657/validators
-    echo "********"; echo
 
-    # PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
-    # echo "PK2: $PK2"
-    PK2=D09049182119A97C0C10D7944CDF6D9AC835126709B7897C01CB34D114BC2589
+    PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
+    echo "PK2: $PK2"
 
     SENDER=$(getAddr $POOR)
     gaia client query account ${SENDER}
@@ -147,22 +144,8 @@ test02Bond() {
     # better to parse data (like checkAccount) than printing out
     gaia client query account ${SENDER} --height=${TX_HEIGHT}
 
-    # echo "wait for ticks to finish"
-    # gaia client rpc wait --delta 2
-
-    # TODO: these hang forever, something up with historical queries...
-    echo "h3"
-    gaia client query account 77777777777777777777777777777777 --height=3
-    echo "h0"
-    gaia client query account 77777777777777777777777777777777 --height=0
-    # gaia client query delegator-bond --delegator-address=$(getAddr $POOR) --pubkey=$PK2
-    echo "h${TX_HEIGHT}"
-    gaia client query account 77777777777777777777777777777777 --height=${TX_HEIGHT}
-
-    echo; echo "********"
-    # gaia client query candidate --pubkey=$PK2
-
-    curl localhost:46657/validators
+    gaia client query candidate --pubkey=$PK2
+    #curl localhost:46657/validators
 }
 
 # Load common then run these tests with shunit2!
