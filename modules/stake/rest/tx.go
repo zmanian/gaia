@@ -5,11 +5,19 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
+	crypto "github.com/tendermint/go-crypto"
 	"github.com/tendermint/tmlibs/common"
 
+	sdk "github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/client/commands"
+	"github.com/cosmos/cosmos-sdk/modules/auth"
+	"github.com/cosmos/cosmos-sdk/modules/base"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
+	"github.com/cosmos/cosmos-sdk/modules/fee"
+	"github.com/cosmos/cosmos-sdk/modules/nonce"
 	"github.com/cosmos/gaia/modules/stake"
 	scmds "github.com/cosmos/gaia/modules/stake/commands"
 )
@@ -25,6 +33,15 @@ const (
 	paramWebsite = "website"
 	paramDetails = "details"
 )
+
+type DelegateInput struct {
+	Fees     *coin.Coin `json:"fees"`
+	Sequence uint32     `json:"sequence"`
+
+	Pubkey crypto.PubKey `json:"pubkey"`
+	From   *sdk.Actor    `json:"from"`
+	Amount coin.Coin     `json:"amount"`
+}
 
 // RegisterDeclareCandidacy is a mux.Router handler that exposes
 // POST method access on route /tx/stake/declare-candidacy to create a
@@ -71,16 +88,7 @@ func RegisterEditCandidacy(r *mux.Router) error {
 // POST method access on route /tx/stake/delegate to create a
 // transaction for delegate to a candidaate/validator
 func RegisterDelegate(r *mux.Router) error {
-	r.HandleFunc(
-		"/"+path.Join(
-			"tx",
-			"stake",
-			"declare-candidacy",
-			"{"+paramPubKey+"}",
-			"{"+paramAmount+"}",
-		),
-		delegate,
-	).Methods("POST")
+	r.HandleFunc("/build/stake/delegate", delegate).Methods("POST")
 	return nil
 }
 
@@ -92,7 +100,7 @@ func RegisterUnbond(r *mux.Router) error {
 		"/"+path.Join(
 			"tx",
 			"stake",
-			"declare-candidacy",
+			"unbond",
 			"{"+paramPubKey+"}",
 			"{"+paramShares+"}",
 		),
@@ -158,28 +166,50 @@ func editCandidacy(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccess(w, tx)
 }
 
+func prepareDelegateTx(di *DelegateInput) sdk.Tx {
+	tx := stake.NewTxDelegate(di.Amount, di.Pubkey)
+	// fees are optional
+	if di.Fees != nil && !di.Fees.IsZero() {
+		tx = fee.NewFee(tx, *di.Fees, *di.From)
+	}
+	// only add the actual digner to the nonce
+	digners := []sdk.Actor{*di.From}
+	tx = nonce.NewTx(di.Sequence, digners, tx)
+	tx = base.NewChainTx(commands.GetChainID(), 0, tx)
+
+	tx = auth.NewSig(tx).Wrap()
+	return tx
+}
+
 func delegate(w http.ResponseWriter, r *http.Request) {
-
-	// get the arguments object
-	args := mux.Vars(r)
-
-	// get the pubkey
-	pkArg := args[paramPubKey]
-	pk, err := scmds.GetPubKey(pkArg)
-	if err != nil {
+	defer r.Body.Close()
+	di := new(DelegateInput)
+	if err := common.ParseRequestAndValidateJSON(r, di); err != nil {
 		common.WriteError(w, err)
 		return
 	}
 
-	// get the amount
-	amountArg := args[paramAmount]
-	amount, err := coin.ParseCoin(amountArg)
-	if err != nil {
-		common.WriteError(w, err)
+	var errsList []string
+	if di.From == nil {
+		errsList = append(errsList, `"from" cannot be nil`)
+	}
+	if di.Sequence <= 0 {
+		errsList = append(errsList, `"sequence" must be > 0`)
+	}
+	if di.Pubkey.Empty() {
+		errsList = append(errsList, `"pubkey" cannot be empty`)
+	}
+	if len(errsList) > 0 {
+		code := http.StatusBadRequest
+		err := &common.ErrorResponse{
+			Err:  strings.Join(errsList, ", "),
+			Code: code,
+		}
+		common.WriteCode(w, err, code)
 		return
 	}
 
-	tx := stake.NewTxDelegate(amount, pk)
+	tx := prepareDelegateTx(di)
 	common.WriteSuccess(w, tx)
 }
 
