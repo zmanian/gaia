@@ -63,6 +63,7 @@ func cmdRestServer(cmd *cobra.Command, args []string) error {
 
 		//staking query functionality TODO add tx and all query here
 		stakerest.RegisterQueryCandidate,
+		stakerest.RegisterQueryCandidates,
 		stakerest.RegisterDelegate,
 	}
 
