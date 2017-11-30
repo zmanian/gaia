@@ -22,10 +22,10 @@ const (
 	FlagAmount = "amount"
 	FlagShares = "shares"
 
-	FlagMoniker = "moniker"
-	FlagKeybase = "keybase-sig"
-	FlagWebsite = "website"
-	FlagDetails = "details"
+	FlagMoniker  = "moniker"
+	FlagIdentity = "keybase-sig"
+	FlagWebsite  = "website"
+	FlagDetails  = "details"
 )
 
 // nolint
@@ -66,7 +66,7 @@ func init() {
 
 	fsCandidate := flag.NewFlagSet("", flag.ContinueOnError)
 	fsCandidate.String(FlagMoniker, "", "validator-candidate name")
-	fsCandidate.String(FlagKeybase, "", "optional keybase signature")
+	fsCandidate.String(FlagIdentity, "", "optional keybase signature")
 	fsCandidate.String(FlagWebsite, "", "optional website")
 	fsCandidate.String(FlagDetails, "", "optional detailed description space")
 
@@ -101,10 +101,10 @@ func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 	}
 
 	description := stake.Description{
-		Moniker: viper.GetString(FlagMoniker),
-		Keybase: viper.GetString(FlagKeybase),
-		Website: viper.GetString(FlagWebsite),
-		Details: viper.GetString(FlagDetails),
+		Moniker:  viper.GetString(FlagMoniker),
+		Identity: viper.GetString(FlagIdentity),
+		Website:  viper.GetString(FlagWebsite),
+		Details:  viper.GetString(FlagDetails),
 	}
 
 	tx := stake.NewTxDeclareCandidacy(amount, pk, description)
@@ -119,10 +119,10 @@ func cmdEditCandidacy(cmd *cobra.Command, args []string) error {
 	}
 
 	description := stake.Description{
-		Moniker: viper.GetString(FlagMoniker),
-		Keybase: viper.GetString(FlagKeybase),
-		Website: viper.GetString(FlagWebsite),
-		Details: viper.GetString(FlagDetails),
+		Moniker:  viper.GetString(FlagMoniker),
+		Identity: viper.GetString(FlagIdentity),
+		Website:  viper.GetString(FlagWebsite),
+		Details:  viper.GetString(FlagDetails),
 	}
 
 	tx := stake.NewTxEditCandidacy(pk, description)

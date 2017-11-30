@@ -60,10 +60,10 @@ type Candidate struct {
 
 // Description - description fields for a candidate
 type Description struct {
-	Moniker string `json:"pubkey"`
-	Keybase string `json:"keybase"` // keybase signature
-	Website string `json:"website"`
-	Details string `json:"details"`
+	Moniker  string `json:"moniker"`
+	Identity string `json:"identity"`
+	Website  string `json:"website"`
+	Details  string `json:"details"`
 }
 
 // NewCandidate - initialize a new candidate

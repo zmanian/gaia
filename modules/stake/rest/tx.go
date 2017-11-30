@@ -20,10 +20,10 @@ const (
 	paramAmount = "amount"
 	paramShares = "shares"
 
-	paramName    = "name"
-	paramKeybase = "keybase"
-	paramWebsite = "website"
-	paramDetails = "details"
+	paramName     = "name"
+	paramIdentity = "keybase"
+	paramWebsite  = "website"
+	paramDetails  = "details"
 )
 
 // RegisterDeclareCandidacy is a mux.Router handler that exposes
@@ -38,7 +38,7 @@ func RegisterDeclareCandidacy(r *mux.Router) error {
 			"{"+paramPubKey+"}",
 			"{"+paramAmount+"}",
 			"{"+paramName+"}",
-			"{"+paramKeybase+"}",
+			"{"+paramIdentity+"}",
 			"{"+paramWebsite+"}",
 			"{"+paramDetails+"}",
 		),
@@ -58,7 +58,7 @@ func RegisterEditCandidacy(r *mux.Router) error {
 			"edit-candidacy",
 			"{"+paramPubKey+"}",
 			"{"+paramName+"}",
-			"{"+paramKeybase+"}",
+			"{"+paramIdentity+"}",
 			"{"+paramWebsite+"}",
 			"{"+paramDetails+"}",
 		),
@@ -123,10 +123,10 @@ func declareCandidacy(w http.ResponseWriter, r *http.Request) {
 
 	// get description parameters
 	description := stake.Description{
-		Moniker: args[paramName],
-		Keybase: args[paramKeybase],
-		Website: args[paramWebsite],
-		Details: args[paramDetails],
+		Moniker:  args[paramName],
+		Identity: args[paramIdentity],
+		Website:  args[paramWebsite],
+		Details:  args[paramDetails],
 	}
 
 	tx := stake.NewTxDeclareCandidacy(amount, pk, description)
@@ -148,10 +148,10 @@ func editCandidacy(w http.ResponseWriter, r *http.Request) {
 
 	// get description parameters
 	description := stake.Description{
-		Moniker: args[paramName],
-		Keybase: args[paramKeybase],
-		Website: args[paramWebsite],
-		Details: args[paramDetails],
+		Moniker:  args[paramName],
+		Identity: args[paramIdentity],
+		Website:  args[paramWebsite],
+		Details:  args[paramDetails],
 	}
 
 	tx := stake.NewTxEditCandidacy(pk, description)

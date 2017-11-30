@@ -266,8 +266,8 @@ func runTxEditCandidacy(store state.SimpleDB, sender sdk.Actor,
 	if tx.Description.Moniker != "" {
 		candidate.Description.Moniker = tx.Description.Moniker
 	}
-	if tx.Description.Keybase != "" {
-		candidate.Description.Keybase = tx.Description.Keybase
+	if tx.Description.Identity != "" {
+		candidate.Description.Identity = tx.Description.Identity
 	}
 	if tx.Description.Website != "" {
 		candidate.Description.Website = tx.Description.Website

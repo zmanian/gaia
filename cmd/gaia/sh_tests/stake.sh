@@ -5,6 +5,7 @@ SERVER_EXE="gaia node"
 CLIENT_EXE="gaia client"
 ACCOUNTS=(jae ethan bucky rigel igor)
 RICH=${ACCOUNTS[0]}
+DELEGATOR=${ACCOUNTS[1]}
 POOR=${ACCOUNTS[4]}
 
 BASE_DIR=$HOME/stake_test
@@ -136,16 +137,41 @@ test02Bond() {
     SENDER=$(getAddr $POOR)
     gaia client query account ${SENDER}
 
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=5fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=10fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
     if [ $? != 0 ]; then return 1; fi
     HASH=$(echo $TX | jq .hash | tr -d \")
     TX_HEIGHT=$(echo $TX | jq .height)
 
     # better to parse data (like checkAccount) than printing out
     gaia client query account ${SENDER} --height=${TX_HEIGHT}
-
     gaia client query candidate --pubkey=$PK2
-    #curl localhost:46657/validators
+
+    # send some coins to a delegator
+    DELADDR=$(getAddr $DELEGATOR)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=10fermion --sequence=2 --to=$DELADDR --name=$RICH)
+    txSucceeded $? "$TX" "$DELADDR"
+
+    TX_HEIGHT=$(echo $TX | jq .height)
+    gaia client query account ${SENDER} --height=${TX_HEIGHT}
+
+    echo d..........asdfffff
+    # delegate some coins to the new 
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
+    if [ $? != 0 ]; then return 1; fi
+
+    echo d..........asdfffff
+    gaia client query account ${DELADDR} 
+
+    echo delegating.............
+    sleep 5
+    TX_HEIGHT=$(echo $TX | jq .height)
+    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
+    gaia client query delegator-bonds --delegator-address=$DELADDR
+
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
+    sleep 5
+    gaia client query candidate --pubkey=$PK2
+
 }
 
 # Load common then run these tests with shunit2!
