@@ -61,10 +61,12 @@ func cmdRestServer(cmd *cobra.Command, args []string) error {
 		// Nonce query handler
 		noncerest.RegisterQueryNonce,
 
-		//staking query functionality TODO add tx and all query here
+		// Staking query handlers
 		stakerest.RegisterQueryCandidate,
 		stakerest.RegisterQueryCandidates,
+		// Staking tx builders
 		stakerest.RegisterDelegate,
+		stakerest.RegisterUnbond,
 	}
 
 	for _, routeRegistrar := range routeRegistrars {
