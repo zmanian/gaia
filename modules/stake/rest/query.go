@@ -22,14 +22,14 @@ import (
 // RegisterQueryCandidate is a mux.Router handler that exposes GET
 // method access on route /query/stake/candidate/{pubkey} to query a candidate
 func RegisterQueryCandidate(r *mux.Router) error {
-	r.HandleFunc("/query/stake/candidate/{pubkey}", queryCandidate).Methods("GET")
+	r.HandleFunc("/query/stake/candidates/{pubkey}", queryCandidate).Methods("GET")
 	return nil
 }
 
 // RegisterQueryCandidates is a mux.Router handler that exposes GET
 // method access on route /query/stake/candidate to query the group of all candidates
 func RegisterQueryCandidates(r *mux.Router) error {
-	r.HandleFunc("/query/stake/candidate", queryCandidates).Methods("GET")
+	r.HandleFunc("/query/stake/candidates", queryCandidates).Methods("GET")
 	return nil
 }
 
