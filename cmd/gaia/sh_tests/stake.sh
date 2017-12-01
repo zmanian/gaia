@@ -5,7 +5,7 @@ SERVER_EXE="gaia node"
 CLIENT_EXE="gaia client"
 ACCOUNTS=(jae ethan bucky rigel igor)
 RICH=${ACCOUNTS[0]}
-DELEGATOR=${ACCOUNTS[1]}
+DELEGATOR=${ACCOUNTS[2]}
 POOR=${ACCOUNTS[4]}
 
 BASE_DIR=$HOME/stake_test
@@ -88,7 +88,7 @@ test01SendTx() {
     checkSendTx $HASH $TX_HEIGHT $SENDER "992"
 }
 
-test02Bond() {
+test02DeclareCandidacy() {
 
     # the premise of this test is to run a second validator (from rich) and then bond and unbond some tokens
     # first create a second node to run and connect to the system
@@ -145,33 +145,55 @@ test02Bond() {
     # better to parse data (like checkAccount) than printing out
     gaia client query account ${SENDER} --height=${TX_HEIGHT}
     gaia client query candidate --pubkey=$PK2
+}
 
+test03Delegate() {
     # send some coins to a delegator
     DELADDR=$(getAddr $DELEGATOR)
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=10fermion --sequence=2 --to=$DELADDR --name=$RICH)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=15fermion --sequence=2 --to=$DELADDR --name=$RICH)
     txSucceeded $? "$TX" "$DELADDR"
-
+    sleep 5
+    echo "initial balance"
+    echo "$DELADDR"
+    echo "$SENDER"
     TX_HEIGHT=$(echo $TX | jq .height)
-    gaia client query account ${SENDER} --height=${TX_HEIGHT}
+    gaia client query account ${DELADDR} 
+    gaia client query account ${SENDER} 
 
-    echo d..........asdfffff
     # delegate some coins to the new 
+    echo "first delegation of 10 fermion"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
-
-    echo d..........asdfffff
-    gaia client query account ${DELADDR} 
-
-    echo delegating.............
     sleep 5
-    TX_HEIGHT=$(echo $TX | jq .height)
+    gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
-    gaia client query delegator-bonds --delegator-address=$DELADDR
 
+    echo "second delegation of 3 fermion"
+    TX_HEIGHT=$(echo $TX | jq .height)
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
     sleep 5
-    gaia client query candidate --pubkey=$PK2
+    gaia client query account ${DELADDR} 
+    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
+}
 
+test03Unbond() {
+    # unbond from the delegator a bit
+    echo "unbond test"
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --shares=10 --name=$DELEGATOR --pubkey=$PK2)
+    sleep 5
+    TX_HEIGHT=$(echo $TX | jq .height)
+    gaia client query account ${DELADDR} 
+    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
+    echo "HEREHERHRE"
+    gaia client query candidates --height=${TX_HEIGHT}
+    echo "sddddddddddddddddddddddd"
+    gaia client query delegator-bond --delegator-address=$DELADDR --pubkey=$PK2 --height=${TX_HEIGHT}
+    echo "sddddddddddddddddddddddd"
+    gaia client query delegator-candidates --delegator-address=$DELADDR --height=${TX_HEIGHT}
+
+    # unbond entirely from the delegator
+    # unbond a bit from the owner
+    # unbond entirely from the validator
 }
 
 # Load common then run these tests with shunit2!

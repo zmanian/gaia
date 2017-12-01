@@ -47,7 +47,7 @@ func prepareClientCommands() {
 		stakecmd.CmdQueryCandidates,
 		stakecmd.CmdQueryCandidate,
 		stakecmd.CmdQueryDelegatorBond,
-		stakecmd.CmdQueryDelegatorBonds,
+		stakecmd.CmdQueryDelegatorCandidates,
 	)
 
 	// set up the middleware

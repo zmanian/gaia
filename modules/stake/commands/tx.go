@@ -146,7 +146,7 @@ func cmdDelegate(cmd *cobra.Command, args []string) error {
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
 
-	sharesRaw := viper.GetInt64(FlagAmount)
+	sharesRaw := viper.GetInt64(FlagShares)
 	if sharesRaw <= 0 {
 		return fmt.Errorf("shares must be positive interger")
 	}
