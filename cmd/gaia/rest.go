@@ -64,6 +64,8 @@ func cmdRestServer(cmd *cobra.Command, args []string) error {
 		// Staking query handlers
 		stakerest.RegisterQueryCandidate,
 		stakerest.RegisterQueryCandidates,
+		stakerest.RegisterQueryDelegatorBond,
+		stakerest.RegisterQueryDelegatorCandidates,
 		// Staking tx builders
 		stakerest.RegisterDelegate,
 		stakerest.RegisterUnbond,

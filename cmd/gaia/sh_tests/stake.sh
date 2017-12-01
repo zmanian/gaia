@@ -176,7 +176,7 @@ test03Delegate() {
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
 }
 
-test03Unbond() {
+test04Unbond() {
     # unbond from the delegator a bit
     echo "unbond test"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --shares=10 --name=$DELEGATOR --pubkey=$PK2)

@@ -34,7 +34,7 @@ type delegateInput struct {
 	Fees     *coin.Coin `json:"fees"`
 	Sequence uint32     `json:"sequence"`
 
-	Pubkey crypto.PubKey `json:"pubkey"`
+	Pubkey crypto.PubKey `json:"pub_key"`
 	From   *sdk.Actor    `json:"from"`
 	Amount coin.Coin     `json:"amount"`
 }
@@ -43,7 +43,7 @@ type unbondInput struct {
 	Fees     *coin.Coin `json:"fees"`
 	Sequence uint32     `json:"sequence"`
 
-	Pubkey crypto.PubKey `json:"pubkey"`
+	Pubkey crypto.PubKey `json:"pub_key"`
 	From   *sdk.Actor    `json:"from"`
 	Amount uint64        `json:"amount"`
 }

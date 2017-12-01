@@ -33,12 +33,12 @@ func GetDelegatorBondKey(delegator sdk.Actor, candidate crypto.PubKey) []byte {
 
 // GetDelegatorBondKeyPrefix - get the prefix of keys for a delegator
 func GetDelegatorBondKeyPrefix(delegator sdk.Actor) []byte {
-	return append(DelegatorBondKeyPrefix, append(wire.BinaryBytes(&delegator))...)
+	return append(DelegatorBondKeyPrefix, wire.BinaryBytes(&delegator)...)
 }
 
 // GetDelegatorBondsKey - get the key for a delegator bonds
 func GetDelegatorBondsKey(delegator sdk.Actor) []byte {
-	return append(DelegatorBondsKeyPrefix, append(wire.BinaryBytes(&delegator))...)
+	return append(DelegatorBondsKeyPrefix, wire.BinaryBytes(&delegator)...)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -60,11 +60,8 @@ func saveCandidatesPubKeys(store state.SimpleDB, pubKeys []crypto.PubKey) {
 	store.Set(CandidatesPubKeysKey, b)
 }
 
-// LoadCandidate - loads the pubKey bond set
-// TODO ultimately this function should be made unexported... being used right now
-// for patchwork of tick functionality therefor much easier if exported until
-// the new SDK is created
-func LoadCandidate(store state.SimpleDB, pubKey crypto.PubKey) *Candidate {
+// loadCandidate - loads the candidate object for the provided pubkey
+func loadCandidate(store state.SimpleDB, pubKey crypto.PubKey) *Candidate {
 	if pubKey.Empty() {
 		return nil
 	}
@@ -104,6 +101,15 @@ func removeCandidate(store state.SimpleDB, pubKey crypto.PubKey) {
 			break
 		}
 	}
+}
+
+// loadCandidates - TODO replace with  multistore
+func loadCandidates(store state.SimpleDB) (candidates Candidates) {
+	pks := loadCandidatesPubKeys(store)
+	for _, pk := range pks {
+		candidates = append(candidates, loadCandidate(store, pk))
+	}
+	return
 }
 
 /////////////////////////////////////////////////////////////////////////////////
