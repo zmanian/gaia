@@ -1,16 +1,16 @@
-hash: 4de934cc1f79253a87801eb2b07dfb722e5cbbfe40453c5a18977dda2aaa2e44
-updated: 2017-11-20T06:02:31.783702529Z
+hash: 2dd081a08130520bd7f3458aeb93aa1ef797a24b4b477c6bb51bf3c50280850c
+updated: 2017-12-01T18:16:03.968596+01:00
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
 - name: github.com/btcsuite/btcd
-  version: 8cea3866d0f7fb12d567a20744942c0d078c7d15
+  version: c7588cbf7690cd9f047a28efa2dcd8f2435a4e5e
   subpackages:
   - btcec
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: c734af9f1019ffa35280d8d5f5494a4dc9c5e2ae
+  version: 32dec478819250d184a08253a93018e2d4ab3537
   subpackages:
   - app
   - client
@@ -20,6 +20,7 @@ imports:
   - client/commands/proxy
   - client/commands/query
   - client/commands/rpc
+  - client/commands/search
   - client/commands/txs
   - client/rest
   - errors
@@ -48,13 +49,13 @@ imports:
 - name: github.com/ebuchman/fail-test
   version: 95f809107225be108efcf10a3509e4ea6ceef3c4
 - name: github.com/ethanfrey/hid
-  version: 660bb717bd4e7cbcdf0f7cd5cadf1cb2e4be452a
+  version: f76da0b80567e8b6f676e1757b549a93494fe4b5
 - name: github.com/ethanfrey/ledger
-  version: 23a7bb9d74bc83a862fcb4bddde24215b2295ad9
+  version: f7f2f056357db77db845a79aa1abdadc3ae66369
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/go-kit/kit
-  version: e2b298466b32c7cd5579a9b9b07e968fc9d9452c
+  version: d67bb4c202e3b91377d1079b110a6c9ce23ab2f8
   subpackages:
   - log
   - log/level
@@ -62,13 +63,13 @@ imports:
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-playground/locales
-  version: e4cbcb5d0652150d40ad0646651076b6bd2be4f6
+  version: 1e5f1161c6416a5ff48840eb8724a394e48cc534
   subpackages:
   - currency
 - name: github.com/go-playground/universal-translator
   version: 71201497bace774495daed26a3874fd339e0b538
 - name: github.com/go-stack/stack
-  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
+  version: 100eb0c0a9c5b306ca2fb4f165df21d80ada4b82
 - name: github.com/golang/protobuf
   version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
@@ -110,8 +111,10 @@ imports:
   version: a5cdd64afdee435007ee3e9f6ed4684af949d568
 - name: github.com/mitchellh/mapstructure
   version: 06020f85339e21b2478f756a78e295255ffa4d6a
+- name: github.com/pelletier/go-buffruneio
+  version: c37440a7cf42ac63b919c752ca73a85067e05992
 - name: github.com/pelletier/go-toml
-  version: 4e9e0ee19b60b13eb79915933f44d8ed5f268bdd
+  version: 13d49d4606eb801b8f01ae542b4afc4c6ee3d84a
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/rcrowley/go-metrics
@@ -131,7 +134,7 @@ imports:
 - name: github.com/spf13/viper
   version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: github.com/syndtr/goleveldb
-  version: b89cc31ef7977104127d34c1bd31ebd1a9db2199
+  version: 8c81ea47d4c41a385645e133e15510fc6a2a74b4
   subpackages:
   - leveldb
   - leveldb/cache
@@ -146,7 +149,7 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/tendermint/abci
-  version: bee7c5c7aa09443c4d9aa74217a891f8229d9ea3
+  version: 22b491bb1952125dd2fb0730d6ca8e59e310547c
   subpackages:
   - client
   - example/dummy
@@ -158,7 +161,7 @@ imports:
   - edwards25519
   - extra25519
 - name: github.com/tendermint/go-crypto
-  version: dd20358a264c772b4a83e477b0cfce4c88a7001d
+  version: b4f04f196cd719660e43b91202cd60d9a95b1837
   subpackages:
   - cmd
   - keys
@@ -167,34 +170,31 @@ imports:
   - keys/wordlist
   - nano
 - name: github.com/tendermint/go-wire
-  version: 2baffcb6b690057568bc90ef1d457efb150b979a
+  version: 217a3c439f6497890d232ff5ed24084b43d9bfb3
   subpackages:
   - data
   - data/base58
+  - nowriter/tmencoding
 - name: github.com/tendermint/iavl
   version: 595f3dcd5b6cd4a292e90757ae6d367fd7a6e653
 - name: github.com/tendermint/light-client
-  version: ac2e4bf47b31aaf5d3d336691ac786ec751bfc32
-- name: github.com/tendermint/merkleeyes
-  version: 2f6e5d31e7a35045d8d0a5895cb1fec33dd4d32b
-  subpackages:
-  - client
-  - iavl
+  version: cb3f11b19e6d9b1392c85e0f09a66bfe75ca8baa
 - name: github.com/tendermint/tendermint
-  version: e236302256b8b0b75441e8e44c6d0d3f5b5152c6
+  version: b2489b4318c843a64e2809517f93d906c5f9dc15
   subpackages:
   - blockchain
-  - certifiers
-  - certifiers/client
-  - certifiers/errors
-  - certifiers/files
   - cmd/tendermint/commands
   - config
   - consensus
   - consensus/types
+  - lite
+  - lite/client
+  - lite/errors
+  - lite/files
   - mempool
   - node
   - p2p
+  - p2p/trust
   - p2p/upnp
   - proxy
   - rpc/client
@@ -212,7 +212,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: 135a1a7cd78215105a55308c167b3331c225e00b
+  version: 21fb7819891997c96838308b4eba5a50b07ff03f
   subpackages:
   - autofile
   - cli
@@ -225,8 +225,10 @@ imports:
   - log
   - logger
   - merkle
+  - pubsub
+  - pubsub/query
 - name: golang.org/x/crypto
-  version: 2509b142fb2b797aa7587dad548f113b2c0f20ce
+  version: c7af5bf2638a1164f2eb5467c39c6cffbd13a02e
   subpackages:
   - curve25519
   - nacl/box
@@ -237,7 +239,7 @@ imports:
   - ripemd160
   - salsa20/salsa
 - name: golang.org/x/net
-  version: c73622c77280266305273cb545f54516ced95b93
+  version: cd69bc3fc700721b709c3a59e16e24c67b58f6ff
   subpackages:
   - context
   - http2
@@ -247,11 +249,11 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 661970f62f5897bc0cd5fdca7e087ba8a98a8fa1
+  version: 8dbc5d05d6edcc104950cc299a1ce6641235bc86
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 6eab0e8f74e86c598ec3b6fad4888e0c11482d48
+  version: c01e4764d870b77f8abe5096ee19ad20d80e8075
   subpackages:
   - secure/bidirule
   - transform
@@ -281,7 +283,7 @@ imports:
   - tap
   - transport
 - name: gopkg.in/go-playground/validator.v9
-  version: 1304298bf10d085adec514b076772a79c9cadb6b
+  version: 6d8c18553ea1ac493d049edd6f102f52e618f085
 - name: gopkg.in/yaml.v2
   version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports:
