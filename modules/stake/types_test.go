@@ -30,14 +30,16 @@ var pks = []crypto.PubKey{newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E
 
 // NOTE: PubKey is supposed to be the binaryBytes of the crypto.PubKey
 // instead this is just being set the address here for testing purposes
-func candidatesFromActors(actors []sdk.Actor, amts []int) (candidates Candidates) {
+func candidatesFromActors(actors []sdk.Actor, store state.SimpleDB, amts []int) (candidates Candidates) {
 	for i, a := range actors {
-		candidates = append(candidates, &Candidate{
+		c := &Candidate{
 			PubKey:      pks[i],
 			Owner:       a,
 			Shares:      uint64(amts[i]),
 			VotingPower: uint64(amts[i]),
-		})
+		}
+		candidates = append(candidates, c)
+		saveCandidate(store, c)
 	}
 
 	return
@@ -48,7 +50,7 @@ func TestCandidatesMaxVals(t *testing.T) {
 	assert := assert.New(t)
 	store := state.NewMemKVStore()
 	actors := newActors(3)
-	bonds := candidatesFromActors(actors, []int{10, 300, 123})
+	bonds := candidatesFromActors(actors, store, []int{10, 300, 123})
 
 	testCases := []struct {
 		maxVals, expectedVals int
@@ -63,7 +65,7 @@ func TestCandidatesMaxVals(t *testing.T) {
 	for _, testCase := range testCases {
 		params.MaxVals = testCase.maxVals
 		saveParams(store, params)
-		bonds.UpdateVotingPower(store)
+		UpdateValidatorSet(store)
 		assert.Equal(testCase.expectedVals, len(bonds.GetValidators(store)), "%v", bonds.GetValidators(store))
 	}
 }
@@ -75,7 +77,7 @@ func TestCandidatesSort(t *testing.T) {
 
 	N := 5
 	actors := newActors(N)
-	bonds := candidatesFromActors(actors, []int{10, 300, 123, 4, 200})
+	bonds := candidatesFromActors(actors, store, []int{10, 300, 123, 4, 200})
 	expectedOrder := []int{1, 4, 2, 0, 3}
 
 	// test basic sort
@@ -93,7 +95,7 @@ func TestCandidatesSort(t *testing.T) {
 	maxVals := 3
 	params.MaxVals = maxVals
 	saveParams(store, params)
-	bonds.UpdateVotingPower(store)
+	UpdateValidatorSet(store)
 	vals = bonds.GetValidators(store)
 	require.Equal(maxVals, len(vals))
 
@@ -102,7 +104,6 @@ func TestCandidatesSort(t *testing.T) {
 		assert.Equal(val.PubKey, pks[expectedIdx])
 	}
 }
-
 func TestCandidatesUpdate(t *testing.T) {
 	params := defaultParams()
 	assert, require := assert.New(t), require.New(t)
@@ -119,7 +120,7 @@ func TestCandidatesUpdate(t *testing.T) {
 	// Change some of the bonded shares, get the new validator set
 	vals1 := candidates.GetValidators(store)
 	candidates[2].Shares = 1000
-	candidates.UpdateVotingPower(store)
+	candidates.updateVotingPower(store)
 	vals2 := candidates.GetValidators(store)
 
 	require.Equal(maxVals, len(vals2))
@@ -131,7 +132,7 @@ func TestCandidatesUpdate(t *testing.T) {
 	}
 
 	// calculate the difference in the validator set from the original set
-	diff := ValidatorsDiff(vals1, vals2, store)
+	diff := validatorsDiff(vals1, vals2, store)
 
 	require.Equal(2, len(diff), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
 		diff, vals1, vals2)

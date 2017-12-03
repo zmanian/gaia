@@ -29,7 +29,7 @@ type Handler struct {
 	stack.PassInitValidate
 }
 
-// NewHandler returns a new Handler with the default Params.
+// NewHandler returns a new Handler with the default Params
 func NewHandler() Handler {
 	return Handler{}
 }
@@ -72,7 +72,7 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 
 		switch key {
 		case "max_vals":
-			params.MaxVals = i
+			params.MaxVals = uint16(i)
 		case "gas_bond":
 			params.GasDelegate = uint64(i)
 		case "gas_unbound":
@@ -155,7 +155,7 @@ func checkTxDelegate(tx TxDelegate, sender sdk.Actor, store state.SimpleDB) erro
 
 func checkTxUnbond(tx TxUnbond, sender sdk.Actor, store state.SimpleDB) error {
 
-	//check if have enough shares to unbond
+	// check if have enough shares to unbond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
 	if bond.Shares < tx.Shares {
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
@@ -184,7 +184,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 
 	sender, err := getTxSender(ctx)
 	if err != nil {
-		return res, err
+		return
 	}
 
 	params := loadParams(store)
@@ -193,26 +193,21 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	switch _tx := tx.Unwrap().(type) {
 	case TxDeclareCandidacy:
 		fn := defaultTransferFn(ctx, store, dispatch)
-		err = runTxDeclareCandidacy(store, sender, fn, _tx)
-		res.GasUsed = params.GasDeclareCandidacy
+		return runTxDeclareCandidacy(store, params, sender, fn, _tx)
 	case TxEditCandidacy:
 		fn := defaultTransferFn(ctx, store, dispatch)
-		err = runTxEditCandidacy(store, sender, fn, _tx)
-		res.GasUsed = params.GasEditCandidacy
+		return runTxEditCandidacy(store, params, sender, fn, _tx)
 	case TxDelegate:
 		fn := defaultTransferFn(ctx, store, dispatch)
-		err = runTxDelegate(store, sender, fn, _tx)
-		res.GasUsed = params.GasDelegate
+		return runTxDelegate(store, params, sender, fn, _tx)
 	case TxUnbond:
 		//context with hold account permissions
 		params := loadParams(store)
 		ctx2 := ctx.WithPermissions(params.HoldAccount)
 		fn := defaultTransferFn(ctx2, store, dispatch)
-		err = runTxUnbond(store, sender, fn, _tx)
-		res.GasUsed = params.GasUnbond
+		return runTxUnbond(store, params, sender, fn, _tx)
 	}
-
-	return res, err
+	return
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,13 +217,16 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 // TODO: why not just return (sdk.DeliverResult, error)?
 // that is why the other interface is such, and err != nil
 // is more idiomatic than res.IsErr()
-func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
-	transferFn transferFn, tx TxDeclareCandidacy) error {
+func runTxDeclareCandidacy(store state.SimpleDB, params Params, sender sdk.Actor,
+	transferFn transferFn, tx TxDeclareCandidacy) (res sdk.DeliverResult, err error) {
+
+	// define the gas used for this transaction
+	res.GasUsed = params.GasDeclareCandidacy
 
 	// create and save the empty candidate
 	bond := loadCandidate(store, tx.PubKey)
 	if bond != nil {
-		return ErrCandidateExistsAddr()
+		return res, ErrCandidateExistsAddr()
 	}
 	candidate := NewCandidate(tx.PubKey, sender)
 	candidate.Description = tx.Description // add the description parameters
@@ -237,19 +235,22 @@ func runTxDeclareCandidacy(store state.SimpleDB, sender sdk.Actor,
 	// move coins from the sender account to a (self-bond) delegator account
 	// the candidate account will be updated automatically here
 	txDelegate := TxDelegate{tx.BondUpdate}
-	return runTxDelegate(store, sender, transferFn, txDelegate)
+	return runTxDelegate(store, params, sender, transferFn, txDelegate)
 }
 
-func runTxEditCandidacy(store state.SimpleDB, sender sdk.Actor,
-	transferFn transferFn, tx TxEditCandidacy) error {
+func runTxEditCandidacy(store state.SimpleDB, params Params, sender sdk.Actor,
+	transferFn transferFn, tx TxEditCandidacy) (res sdk.DeliverResult, err error) {
+
+	// define the gas used for this transaction
+	res.GasUsed = params.GasEditCandidacy
 
 	// Get the pubKey bond account
 	candidate := loadCandidate(store, tx.PubKey)
 	if candidate == nil {
-		return ErrBondNotNominated()
+		return res, ErrBondNotNominated()
 	}
 	if candidate.Owner.Empty() { //candidate has been withdrawn
-		return ErrBondNotNominated()
+		return res, ErrBondNotNominated()
 	}
 
 	//check and edit any of the editable terms
@@ -267,27 +268,28 @@ func runTxEditCandidacy(store state.SimpleDB, sender sdk.Actor,
 	}
 
 	saveCandidate(store, candidate)
-
-	return nil
+	return
 }
 
-func runTxDelegate(store state.SimpleDB, sender sdk.Actor,
-	transferFn transferFn, tx TxDelegate) error {
+func runTxDelegate(store state.SimpleDB, params Params, sender sdk.Actor,
+	transferFn transferFn, tx TxDelegate) (res sdk.DeliverResult, err error) {
+
+	// define the gas used for this transaction
+	res.GasUsed = params.GasDelegate
 
 	// Get the pubKey bond account
 	candidate := loadCandidate(store, tx.PubKey)
 	if candidate == nil {
-		return ErrBondNotNominated()
+		return res, ErrBondNotNominated()
 	}
 	if candidate.Owner.Empty() { //candidate has been withdrawn
-		return ErrBondNotNominated()
+		return res, ErrBondNotNominated()
 	}
 
 	// Move coins from the delegator account to the pubKey lock account
-	params := loadParams(store)
-	err := transferFn(sender, params.HoldAccount, coin.Coins{tx.Bond})
+	err = transferFn(sender, params.HoldAccount, coin.Coins{tx.Bond})
 	if err != nil {
-		return err
+		return
 	}
 
 	//key := stack.PrefixedKey(coin.NameCoin, sender.Address)
@@ -312,27 +314,30 @@ func runTxDelegate(store state.SimpleDB, sender sdk.Actor,
 	saveCandidate(store, candidate)
 	saveDelegatorBond(store, sender, bond)
 
-	return nil
+	return
 }
 
-func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
-	transferFn transferFn, tx TxUnbond) error {
+func runTxUnbond(store state.SimpleDB, params Params, sender sdk.Actor,
+	transferFn transferFn, tx TxUnbond) (res sdk.DeliverResult, err error) {
 
-	//get delegator bond
+	// define the gas used for this transaction
+	res.GasUsed = params.GasUnbond
+
+	// get delegator bond
 	bond := loadDelegatorBond(store, sender, tx.PubKey)
 	if bond == nil {
-		return ErrNoDelegatorForAddress()
+		return res, ErrNoDelegatorForAddress()
 	}
 
-	//get pubKey candidate
+	// get pubKey candidate
 	candidate := loadCandidate(store, tx.PubKey)
 	if candidate == nil {
-		return ErrNoCandidateForAddress()
+		return res, ErrNoCandidateForAddress()
 	}
 
 	// subtract bond tokens from bond
 	if bond.Shares < uint64(tx.Shares) {
-		return ErrInsufficientFunds()
+		return res, ErrInsufficientFunds()
 	}
 	bond.Shares -= uint64(tx.Shares)
 
@@ -344,7 +349,7 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 			candidate.Owner = sdk.Actor{}
 		}
 
-		//remove the bond
+		// remove the bond
 		removeDelegatorBond(store, sender, tx.PubKey)
 	} else {
 		saveDelegatorBond(store, sender, bond)
@@ -359,14 +364,11 @@ func runTxUnbond(store state.SimpleDB, sender sdk.Actor,
 	}
 
 	// transfer coins back to account
-	params := loadParams(store)
 	returnCoins := int64(tx.Shares) //currently each share is worth one coin
-	err := transferFn(params.HoldAccount, sender,
+	err = transferFn(params.HoldAccount, sender,
 		coin.Coins{{params.AllowedBondDenom, returnCoins}})
-	return err
+	return
 }
-
-// TODO: why don't you return a non-abci error, eg. normal error case here?
 
 // get the sender from the ctx and ensure it matches the tx pubkey
 func getTxSender(ctx sdk.Context) (sender sdk.Actor, err error) {
@@ -374,16 +376,5 @@ func getTxSender(ctx sdk.Context) (sender sdk.Actor, err error) {
 	if len(senders) != 1 {
 		return sender, ErrMissingSignature()
 	}
-
-	// TODO: ensure senders[0] matches tx.pubkey ...
-	// NOTE on TODO..  right now the PubKey doesn't need to match the sender
-	// and we actually don't have the means to construct the priv_validator.json
-	// with its private key with current keys tooling in SDK so needs to be
-	// a second key... This is still secure because you will only be able to
-	// unbond to the first married account, although, you could hypotheically
-	// bond some coins to somebody elses account (effectively giving them coins)
-	// maybe that is worth checking more. Validators should probably be allowed
-	// to use two different keys, one for validating and one with coins on it...
-	// so this point may never be relevant
 	return senders[0], nil
 }

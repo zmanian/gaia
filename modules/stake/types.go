@@ -18,7 +18,7 @@ import (
 type Params struct {
 	HoldAccount sdk.Actor `json:"hold_account"` // PubKey where all bonded coins are held
 
-	MaxVals          int    `json:"max_vals"`           // maximum number of validators
+	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
@@ -40,16 +40,16 @@ func defaultParams() Params {
 	}
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
 // Candidate defines the total amount of bond shares and their exchange rate to
-// coins, associated with a single validator. Accumulation of interest is modelled
-// as an in increase in the exchange rate, and slashing as a decrease.
-// When coins are delegated to this validator, the validator is credited
-// with a DelegatorBond whose number of bond shares is based on the amount of coins
-// delegated divided by the current exchange rate. Voting power can be calculated as
-// total bonds multiplied by exchange rate.
-// NOTE if the Owner.Empty() == true then this is a revoked candidate
+// coins. Accumulation of interest is modelled as an in increase in the
+// exchange rate, and slashing as a decrease.  When coins are delegated to this
+// candidate, the candidate is credited with a DelegatorBond whose number of
+// bond shares is based on the amount of coins delegated divided by the current
+// exchange rate. Voting power can be calculated as total bonds multiplied by
+// exchange rate.
+// NOTE if the Owner.Empty() == true then this is a candidate who has revoked candidacy
 type Candidate struct {
 	PubKey      crypto.PubKey `json:"pub_key"`      // Pubkey of candidate
 	Owner       sdk.Actor     `json:"owner"`        // Sender of BondTx - UnbondTx returns here
@@ -84,7 +84,7 @@ func (c Candidate) ABCIValidator() *abci.Validator {
 	}
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
 // TODO replace with sorted multistore functionality
 
@@ -112,37 +112,52 @@ func (cs Candidates) Sort() {
 	sort.Sort(cs)
 }
 
-// UpdateVotingPower - voting power based on bond tokens and exchange rate
-// TODO: make not a function of ValidatorBonds as validatorbonds can be loaded from the store
-func (cs Candidates) UpdateVotingPower(store state.SimpleDB) (changed bool) {
+// UpdateValidatorSet - Updates the voting power for the candidate set and
+// returns the difference in the validator set for Tendermint
+func UpdateValidatorSet(store state.SimpleDB) (diff []*abci.Validator, err error) {
+
+	// load candidates from store
+	candidates := loadCandidates(store)
+
+	// get the validators before update
+	startVals := candidates.GetValidators(store)
+	candidates.updateVotingPower(store)
+
+	// get the updated validators
+	newVals := candidates.GetValidators(store)
+
+	diff = startVals.validatorDiff(newVals, store)
+	return
+}
+
+func (cs Candidates) updateVotingPower(store state.SimpleDB) {
+
+	// update voting power
 	for _, c := range cs {
 		if c.VotingPower != c.Shares {
-			changed = true
 			c.VotingPower = c.Shares
 		}
 	}
-
-	// we don't write anything if nothing changes
-	if !changed {
-		return false
-	}
-
-	// Now sort and truncate the power
 	cs.Sort()
 	for i, c := range cs {
-		if i >= loadParams(store).MaxVals {
+		// truncate the power
+		if i >= int(loadParams(store).MaxVals) {
 			c.VotingPower = 0
 		}
 		saveCandidate(store, c)
 	}
-	return true
 }
+
+//_________________________________________________________________________
+
+// Validators - list of Validators
+type Validators []Candidate
 
 // GetValidators - get the most recent updated validator set from the
 // Candidates. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (cs Candidates) GetValidators(store state.SimpleDB) []Candidate {
+func (cs Candidates) GetValidators(store state.SimpleDB) Validators {
 
 	//test if empty
 	if len(cs) == 1 {
@@ -152,12 +167,12 @@ func (cs Candidates) GetValidators(store state.SimpleDB) []Candidate {
 	}
 
 	maxVals := loadParams(store).MaxVals
-	validators := make([]Candidate, cmn.MinInt(len(cs), maxVals))
+	validators := make([]Candidate, cmn.MinInt(len(cs), int(maxVals)))
 	for i, c := range cs {
 		if c.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			break
 		}
-		if i >= maxVals {
+		if i >= int(maxVals) {
 			return validators
 		}
 		validators[i] = *c
@@ -166,27 +181,22 @@ func (cs Candidates) GetValidators(store state.SimpleDB) []Candidate {
 	return validators
 }
 
-// ValidatorsDiff - get the difference in the validator set from the input validator set
-func ValidatorsDiff(previous, current []Candidate, store state.SimpleDB) (diff []*abci.Validator) {
-
-	//TODO: do something more efficient possibly by sorting first
-
+func (vs1 Validators) validatorDiff(vs2 Validators, store state.SimpleDB) (diff []*abci.Validator) {
 	// calculate any differences from the previous to the new validator set
 	// first loop through the previous validator set, and then catch any
 	// missed records in the new validator set
 	diff = make([]*abci.Validator, 0, loadParams(store).MaxVals)
 
-	for _, prevVal := range previous {
-		abciVal := prevVal.ABCIValidator()
+	for _, startVal := range vs1 {
+		abciVal := startVal.ABCIValidator()
 		found := false
-		candidate := loadCandidate(store, prevVal.PubKey)
+		candidate := loadCandidate(store, startVal.PubKey)
 		if candidate != nil {
 			found = true
-			if candidate.VotingPower != prevVal.VotingPower {
+			if candidate.VotingPower != startVal.VotingPower {
 				diff = append(diff, &abci.Validator{abciVal.PubKey, candidate.VotingPower})
 			}
 		}
-
 		if !found {
 			diff = append(diff, &abci.Validator{abciVal.PubKey, 0})
 		}
@@ -196,39 +206,37 @@ func ValidatorsDiff(previous, current []Candidate, store state.SimpleDB) (diff [
 	//  to the notfound set in the above loop. Then simply loop through this. Really only one loop
 	//  as the above loop.
 
-	for _, curVal := range current {
+	for _, v2 := range vs2 {
 
 		//loop through diff to see if there where any missed
 		found := false
-		for _, prevVal := range previous {
-			if prevVal.PubKey.Empty() {
+		for _, v1 := range vs1 {
+			if v1.PubKey.Empty() {
 				continue
 			}
-			if prevVal.PubKey.Equals(curVal.PubKey) {
+			if v1.PubKey.Equals(v2.PubKey) {
 				found = true
 				break
 			}
 		}
-
 		if !found {
-			diff = append(diff, curVal.ABCIValidator())
+			diff = append(diff, v2.ABCIValidator())
 		}
-
 	}
-
 	return
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
-// DelegatorBond represents some bond tokens held by an account.
-// It is owned by one delegator, and is associated with the voting power of one pubKey.
+// DelegatorBond represents the bond with tokens held by an account.  It is
+// owned by one delegator, and is associated with the voting power of one
+// pubKey.
 type DelegatorBond struct {
 	PubKey crypto.PubKey
 	Shares uint64
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
 // transfer coins
 type transferFn func(from sdk.Actor, to sdk.Actor, coins coin.Coins) error
