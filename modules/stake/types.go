@@ -11,7 +11,6 @@ import (
 	abci "github.com/tendermint/abci/types"
 	crypto "github.com/tendermint/go-crypto"
 	wire "github.com/tendermint/go-wire"
-	cmn "github.com/tendermint/tmlibs/common"
 )
 
 // Params defines the high level settings for staking
@@ -112,24 +111,7 @@ func (cs Candidates) Sort() {
 	sort.Sort(cs)
 }
 
-// UpdateValidatorSet - Updates the voting power for the candidate set and
-// returns the difference in the validator set for Tendermint
-func UpdateValidatorSet(store state.SimpleDB) (diff []*abci.Validator, err error) {
-
-	// load candidates from store
-	candidates := loadCandidates(store)
-
-	// get the validators before update
-	startVals := candidates.GetValidators(store)
-	candidates.updateVotingPower(store)
-
-	// get the updated validators
-	newVals := candidates.GetValidators(store)
-
-	diff = startVals.validatorDiff(newVals, store)
-	return
-}
-
+// update the voting power and save
 func (cs Candidates) updateVotingPower(store state.SimpleDB) {
 
 	// update voting power
@@ -153,11 +135,11 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB) {
 // Validators - list of Validators
 type Validators []Candidate
 
-// GetValidators - get the most recent updated validator set from the
+// getValidators - get the most recent updated validator set from the
 // Candidates. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (cs Candidates) GetValidators(store state.SimpleDB) Validators {
+func (cs Candidates) getValidators() Validators {
 
 	//test if empty
 	if len(cs) == 1 {
@@ -166,14 +148,10 @@ func (cs Candidates) GetValidators(store state.SimpleDB) Validators {
 		}
 	}
 
-	maxVals := loadParams(store).MaxVals
-	validators := make([]Candidate, cmn.MinInt(len(cs), int(maxVals)))
+	validators := make([]Candidate, len(cs))
 	for i, c := range cs {
 		if c.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
-			break
-		}
-		if i >= int(maxVals) {
-			return validators
+			return validators[:i]
 		}
 		validators[i] = *c
 	}
@@ -181,48 +159,64 @@ func (cs Candidates) GetValidators(store state.SimpleDB) Validators {
 	return validators
 }
 
-func (vs1 Validators) validatorDiff(vs2 Validators, store state.SimpleDB) (diff []*abci.Validator) {
-	// calculate any differences from the previous to the new validator set
-	// first loop through the previous validator set, and then catch any
-	// missed records in the new validator set
-	diff = make([]*abci.Validator, 0, loadParams(store).MaxVals)
+// determine all changed validators between two SORTED validator sets
+func (vs1 Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
 
-	for _, startVal := range vs1 {
-		abciVal := startVal.ABCIValidator()
-		found := false
-		candidate := loadCandidate(store, startVal.PubKey)
-		if candidate != nil {
-			found = true
-			if candidate.VotingPower != startVal.VotingPower {
-				diff = append(diff, &abci.Validator{abciVal.PubKey, candidate.VotingPower})
-			}
-		}
-		if !found {
-			diff = append(diff, &abci.Validator{abciVal.PubKey, 0})
-		}
-	}
+	max := len(vs1) + len(vs2)
+	changed = make([]*abci.Validator, max)
+	i, j, n := 0, 0, 0 //counters for vs1 loop, vs2 loop, changed element
 
-	// TODO should use "notfound" variable which starts with the "current" set and is reduced
-	//  to the notfound set in the above loop. Then simply loop through this. Really only one loop
-	//  as the above loop.
+	for i < len(vs1) && j < len(vs2) {
 
-	for _, v2 := range vs2 {
-
-		//loop through diff to see if there where any missed
-		found := false
-		for _, v1 := range vs1 {
-			if v1.PubKey.Empty() {
+		if !vs1[i].PubKey.Equals(vs2[j].PubKey) {
+			// pk1 > pk2, a new validator was introduced between these pubkeys
+			if bytes.Compare(vs1[i].PubKey.Bytes(), vs2[j].PubKey.Bytes()) == 1 {
+				changed[n] = vs2[j].ABCIValidator()
+				n++
+				j++
 				continue
-			}
-			if v1.PubKey.Equals(v2.PubKey) {
-				found = true
-				break
-			}
+			} // else, the old validator has been removed
+			changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+			n++
+			i++
+			continue
 		}
-		if !found {
-			diff = append(diff, v2.ABCIValidator())
+
+		if vs1[i].VotingPower != vs2[j].VotingPower {
+			changed[n] = vs2[j].ABCIValidator()
+			n++
 		}
+		j++
+		i++
 	}
+
+	// add any excess validators in set 2
+	for ; j < len(vs2); j, n = j+1, n+1 {
+		changed[n] = vs2[j].ABCIValidator()
+	}
+
+	// remove any excess validators left in set 1
+	for ; i < len(vs1); i, n = i+1, n+1 {
+		changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+	}
+
+	return changed[:n]
+}
+
+// UpdateValidatorSet - Updates the voting power for the candidate set and
+// returns the subset of validators which have changed for Tendermint
+func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err error) {
+
+	// get the validators before update
+	candidates := loadCandidates(store)
+	v1 := candidates.getValidators()
+
+	// get the updated validators
+	candidates.updateVotingPower(store)
+	candidates = loadCandidates(store)
+	v2 := candidates.getValidators()
+
+	change = v1.validatorsChanged(v2)
 	return
 }
 
