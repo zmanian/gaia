@@ -120,7 +120,7 @@ test02DeclareCandidacy() {
     # start the second node
     echo "starting second server"
     ${SERVER_EXE} start --home=$SERVER2 >>$SERVER_LOG2 2>&1 &
-    sleep 5
+    sleep 1
     PID_SERVER2=$!
     disown
     if ! ps $PID_SERVER2 >/dev/null; then
@@ -152,7 +152,6 @@ test03Delegate() {
     DELADDR=$(getAddr $DELEGATOR)
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=15fermion --sequence=2 --to=$DELADDR --name=$RICH)
     txSucceeded $? "$TX" "$DELADDR"
-    sleep 5
     echo "initial balance"
     echo "$DELADDR"
     echo "$SENDER"
@@ -164,14 +163,15 @@ test03Delegate() {
     echo "first delegation of 10 fermion"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
-    sleep 5
+    sleep 1
+    TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
 
     echo "second delegation of 3 fermion"
-    TX_HEIGHT=$(echo $TX | jq .height)
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
-    sleep 5
+    sleep 1
+    TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
 }
@@ -180,7 +180,7 @@ test04Unbond() {
     # unbond from the delegator a bit
     echo "unbond test"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --shares=10 --name=$DELEGATOR --pubkey=$PK2)
-    sleep 5
+    sleep 1
     TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}

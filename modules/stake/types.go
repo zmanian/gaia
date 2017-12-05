@@ -111,6 +111,11 @@ func (cs Candidates) Sort() {
 	sort.Sort(cs)
 }
 
+//func updateVotingPower(store state.SimpleDB) {
+//candidates := loadCandidates(store)
+//candidates.updateVotingPower(store)
+//}
+
 // update the voting power and save
 func (cs Candidates) updateVotingPower(store state.SimpleDB) {
 

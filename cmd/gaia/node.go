@@ -59,11 +59,11 @@ func prepareNodeCommands() {
 
 // Tick - Called every block even if no transaction, process all queues,
 // validator rewards, and calculate the validator set difference
-func tickFn(ctx sdk.Context, store state.SimpleDB) (diff []*abci.Validator, err error) {
+func tickFn(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, err error) {
 	// first need to prefix the store, at this point it's a global store
 	store = stack.PrefixedStore(stake.Name(), store)
 
 	// execute Tick
-	diff, err = stake.UpdateValidatorSet(store)
+	change, err = stake.UpdateValidatorSet(store)
 	return
 }

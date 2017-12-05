@@ -218,7 +218,7 @@ func TestValidatorsChanged(t *testing.T) {
 }
 
 func TestUpdateValidatorSet(t *testing.T) {
-	require := require.New(t)
+	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 
 	N := 5
@@ -242,41 +242,8 @@ func TestUpdateValidatorSet(t *testing.T) {
 	require.Nil(err)
 	require.Equal(1, len(change), "%v", change) // change 1, remove 1, add 2
 	testRemove(t, *candidates[4], change[0])
+
+	// test that the new validator set has been saved properly to the store
+	candidates = loadCandidates(store)
+	assert.Equal(uint64(0), candidates[4].VotingPower)
 }
-
-//func TestCandidatesUpdate(t *testing.T) {
-//params := defaultParams()
-//assert, require := assert.New(t), require.New(t)
-//store := state.NewMemKVStore()
-
-//actors := newActors(3)
-//candidates := candidatesFromActors(actors, []int{10, 300, 123})
-//candidates.Sort()
-
-//var maxVals uint16 = 2
-//params.MaxVals = maxVals
-//saveParams(store, params)
-
-//// Change some of the bonded shares, get the new validator set
-//vals1 := candidates.getValidators()
-//candidates[2].Shares = 1000
-//candidates.updateVotingPower(store)
-//vals2 := candidates.getValidators()
-
-//require.Equal(int(maxVals), len(vals2))
-
-//expectedOrder := []int{0, 1, 2}
-//for i, val := range vals2 {
-//expectedIdx := expectedOrder[i]
-//assert.Equal(val.PubKey, pks[expectedIdx])
-//}
-
-//// calculate the difference in the validator set from the original set
-//change := vals1.validatorsChanged(vals2)
-//require.Equal(2, len(change), "validator diff should have length 2, diff %v, val1 %v, val2 %v",
-//change, vals1, vals2)
-//testChange(t, )
-////testRemove(t, )
-////assert.True(change[0].Power == 0)
-////assert.True(change[1].Power == 1000)
-//}
