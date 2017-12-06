@@ -20,7 +20,7 @@ func TestState(t *testing.T) {
 
 	pk := newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB57")
 
-	/////////////////////////////////////////////////////////////////////////
+	//----------------------------------------------------------------------
 	// Candidate checks
 
 	candidate := &Candidate{
@@ -52,7 +52,7 @@ func TestState(t *testing.T) {
 	require.Equal(1, len(resPks))
 	assert.Equal(pk, resPks[0])
 
-	/////////////////////////////////////////////////////////////////////////
+	//----------------------------------------------------------------------
 	// Bond checks
 
 	bond := &DelegatorBond{
@@ -75,7 +75,7 @@ func TestState(t *testing.T) {
 	resBond = loadDelegatorBond(store, delegator, pk)
 	assert.Equal(bond, resBond)
 
-	/////////////////////////////////////////////////////////////////////////
+	//----------------------------------------------------------------------
 	// Param checks
 
 	params := defaultParams()

@@ -213,7 +213,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	return
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//---------------------------------------------------------------------
 // These functions assume everything has been authenticated,
 // now we just perform action and save
 

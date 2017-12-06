@@ -22,26 +22,25 @@ var (
 
 // GetCandidateKey - get the key for the candidate with pubKey
 func GetCandidateKey(pubKey crypto.PubKey) []byte {
-	b := append(CandidateKeyPrefix, pubKey.Bytes()...)
-	return b
+	return append(CandidateKeyPrefix, pubKey.Bytes()...)
 }
 
-// GetDelegatorBondKey - get the key for a delegator bond
+// GetDelegatorBondKey - get the key for delegator bond with candidate
 func GetDelegatorBondKey(delegator sdk.Actor, candidate crypto.PubKey) []byte {
 	return append(GetDelegatorBondKeyPrefix(delegator), candidate.Bytes()...)
 }
 
-// GetDelegatorBondKeyPrefix - get the prefix of keys for a delegator
+// GetDelegatorBondKeyPrefix - get the prefix for a delegator for all candidates
 func GetDelegatorBondKeyPrefix(delegator sdk.Actor) []byte {
 	return append(DelegatorBondKeyPrefix, wire.BinaryBytes(&delegator)...)
 }
 
-// GetDelegatorBondsKey - get the key for a delegator bonds
+// GetDelegatorBondsKey - get the key for list of all the delegator's bonds
 func GetDelegatorBondsKey(delegator sdk.Actor) []byte {
 	return append(DelegatorBondsKeyPrefix, wire.BinaryBytes(&delegator)...)
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//---------------------------------------------------------------------
 
 // Get the active list of all the candidate pubKeys and owners
 func loadCandidatesPubKeys(store state.SimpleDB) (pubKeys []crypto.PubKey) {
@@ -59,6 +58,8 @@ func saveCandidatesPubKeys(store state.SimpleDB, pubKeys []crypto.PubKey) {
 	b := wire.BinaryBytes(pubKeys)
 	store.Set(CandidatesPubKeysKey, b)
 }
+
+//---------------------------------------------------------------------
 
 // loadCandidate - loads the candidate object for the provided pubkey
 func loadCandidate(store state.SimpleDB, pubKey crypto.PubKey) *Candidate {
@@ -112,7 +113,7 @@ func loadCandidates(store state.SimpleDB) (candidates Candidates) {
 	return
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//---------------------------------------------------------------------
 
 func loadDelegatorBond(store state.SimpleDB,
 	delegator sdk.Actor, candidate crypto.PubKey) *DelegatorBond {
@@ -212,7 +213,7 @@ func loadDelegatorCandidates(store state.SimpleDB,
 //store.Set(GetDelegatorBondsKey(delegator), b)
 //}
 
-/////////////////////////////////////////////////////////////////////////////////
+//---------------------------------------------------------------------
 
 // load/save the global staking params
 func loadParams(store state.SimpleDB) (params Params) {

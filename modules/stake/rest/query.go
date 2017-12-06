@@ -48,7 +48,7 @@ func RegisterQueryDelegatorCandidates(r *mux.Router) error {
 	return nil
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
+//---------------------------------------------------------------------
 
 // queryCandidate is the HTTP handlerfunc to query a candidate
 // it expects a query string
