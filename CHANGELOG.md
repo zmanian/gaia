@@ -1,14 +1,22 @@
 # Changelog
 
-## 0.4.0 (November 6, 2017)
+## 0.4.0 (December 6, 2017)
 
 Added delegation to existing validators
 
 BREAKING CHANGES:
 
-* Bonding replaced with DeclareCandidacy
-* Unbonding used for both delegation and candidates self-bonding
+* Consolidation of binaries:
+  * `gaia` -> `gaia node` 
+  * `gaiacli` -> `gaia client` 
+* `bond` replaced with `declare-candidacy`
+* `unbond` used for both delegation and candidates self-bonding
 * Unbonding must use the `--pubkey` flag
+
+IMPROVEMENTS: 
+
+* Delegation to existing validators with `gaia client tx delegate`
+* Added REST server support
 
 ## 0.3.0 (October 28, 2017)
 
