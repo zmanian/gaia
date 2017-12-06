@@ -1,19 +1,14 @@
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
-	"github.com/tendermint/tmlibs/cli"
-
 	"github.com/cosmos/cosmos-sdk/client/commands"
-	"github.com/cosmos/cosmos-sdk/client/commands/auto"
+	"github.com/cosmos/cosmos-sdk/client/commands/commits"
 	"github.com/cosmos/cosmos-sdk/client/commands/keys"
 	"github.com/cosmos/cosmos-sdk/client/commands/proxy"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
 	rpccmd "github.com/cosmos/cosmos-sdk/client/commands/rpc"
-	"github.com/cosmos/cosmos-sdk/client/commands/commits"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	authcmd "github.com/cosmos/cosmos-sdk/modules/auth/commands"
 	basecmd "github.com/cosmos/cosmos-sdk/modules/base/commands"
@@ -24,17 +19,19 @@ import (
 	rolecmd "github.com/cosmos/cosmos-sdk/modules/roles/commands"
 
 	stakecmd "github.com/cosmos/gaia/modules/stake/commands"
-	"github.com/cosmos/gaia/version"
 )
 
-// GaiaCli represents the base command when called without any subcommands
-var GaiaCli = &cobra.Command{
-	Use:   "gaiacli",
-	Short: "Client for Cosmos-Gaia blockchain",
+// clientCmd is the entry point for this binary
+var clientCmd = &cobra.Command{
+	Use:   "client",
+	Short: "Gaia light client",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
 }
 
-func main() {
-	commands.AddBasicFlags(GaiaCli)
+func prepareClientCommands() {
+	commands.AddBasicFlags(clientCmd)
 
 	// Prepare queries
 	query.RootCmd.AddCommand(
@@ -47,7 +44,10 @@ func main() {
 		ibccmd.IBCQueryCmd,
 
 		//stakecmd.CmdQueryValidator,
-		stakecmd.CmdQueryValidators,
+		stakecmd.CmdQueryCandidates,
+		stakecmd.CmdQueryCandidate,
+		stakecmd.CmdQueryDelegatorBond,
+		stakecmd.CmdQueryDelegatorCandidates,
 	)
 
 	// set up the middleware
@@ -72,24 +72,26 @@ func main() {
 		ibccmd.UpdateChainTxCmd,
 		ibccmd.PostPacketTxCmd,
 
-		stakecmd.CmdBond,
+		stakecmd.CmdDeclareCandidacy,
+		stakecmd.CmdEditCandidacy,
+		stakecmd.CmdDelegate,
 		stakecmd.CmdUnbond,
 	)
 
-	// Set up the various commands to use
-	GaiaCli.AddCommand(
+	clientCmd.AddCommand(
+		proxy.RootCmd,
+		lineBreak,
+
+		txcmd.RootCmd,
+		query.RootCmd,
+		rpccmd.RootCmd,
+		lineBreak,
+
+		keys.RootCmd,
 		commands.InitCmd,
 		commands.ResetCmd,
-		keys.RootCmd,
 		commits.RootCmd,
-		rpccmd.RootCmd,
-		query.RootCmd,
-		txcmd.RootCmd,
-		proxy.RootCmd,
-		version.VersionCmd,
-		auto.AutoCompleteCmd,
+		lineBreak,
 	)
 
-	cmd := cli.PrepareMainCmd(GaiaCli, "BC", os.ExpandEnv("$HOME/.cosmos-gaia-cli"))
-	cmd.Execute()
 }

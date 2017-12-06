@@ -2,254 +2,259 @@ package stake
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 
-	abci "github.com/tendermint/abci/types"
-	cmn "github.com/tendermint/tmlibs/common"
-
 	"github.com/cosmos/cosmos-sdk"
+	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
+
+	abci "github.com/tendermint/abci/types"
+	crypto "github.com/tendermint/go-crypto"
+	wire "github.com/tendermint/go-wire"
 )
 
 // Params defines the high level settings for staking
 type Params struct {
-	MaxVals          int    `json:"max_vals"`           // maximum number of validators
+	HoldAccount sdk.Actor `json:"hold_account"` // PubKey where all bonded coins are held
+
+	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
-	GasBond   uint64 `json:"gas_bond"`
-	GasUnbond uint64 `json:"gas_unbond"`
+	GasDeclareCandidacy uint64 `json:"gas_declare_candidacy"`
+	GasEditCandidacy    uint64 `json:"gas_edit_candidacy"`
+	GasDelegate         uint64 `json:"gas_delegate"`
+	GasUnbond           uint64 `json:"gas_unbond"`
 }
 
 func defaultParams() Params {
 	return Params{
-		MaxVals:          100,
-		AllowedBondDenom: "fermion",
-		GasBond:          20,
-		GasUnbond:        0,
+		HoldAccount:         sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
+		MaxVals:             100,
+		AllowedBondDenom:    "fermion",
+		GasDeclareCandidacy: 20,
+		GasEditCandidacy:    20,
+		GasDelegate:         20,
+		GasUnbond:           20,
 	}
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
-// ValidatorBond defines the total amount of bond tokens and their exchange rate to
-// coins, associated with a single validator. Accumulation of interest is modelled
-// as an in increase in the exchange rate, and slashing as a decrease.
-// When coins are delegated to this validator, the validator is credited
-// with a DelegatorBond whose number of bond tokens is based on the amount of coins
-// delegated divided by the current exchange rate. Voting power can be calculated as
-// total bonds multiplied by exchange rate.
-type ValidatorBond struct {
-	Sender       sdk.Actor // Sender of BondTx - UnbondTx returns here
-	PubKey       []byte    // Pubkey of validator
-	BondedTokens uint64    // Total number of bond tokens for the validator
-	HoldAccount  sdk.Actor // Account where the bonded coins are held. Controlled by the app
-	VotingPower  uint64    // Total number of bond tokens for the validator
+// Candidate defines the total amount of bond shares and their exchange rate to
+// coins. Accumulation of interest is modelled as an in increase in the
+// exchange rate, and slashing as a decrease.  When coins are delegated to this
+// candidate, the candidate is credited with a DelegatorBond whose number of
+// bond shares is based on the amount of coins delegated divided by the current
+// exchange rate. Voting power can be calculated as total bonds multiplied by
+// exchange rate.
+// NOTE if the Owner.Empty() == true then this is a candidate who has revoked candidacy
+type Candidate struct {
+	PubKey      crypto.PubKey `json:"pub_key"`      // Pubkey of candidate
+	Owner       sdk.Actor     `json:"owner"`        // Sender of BondTx - UnbondTx returns here
+	Shares      uint64        `json:"shares"`       // Total number of delegated shares to this candidate, equivalent to coins held in bond account
+	VotingPower uint64        `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Description Description   `json:"description"`  // Description terms for the candidate
 }
 
-// NewValidatorBond - returns a new empty validator bond object
-func NewValidatorBond(sender, holder sdk.Actor, pubKey []byte) *ValidatorBond {
-	return &ValidatorBond{
-		Sender:       sender,
-		PubKey:       pubKey,
-		BondedTokens: 0,
-		HoldAccount:  holder,
-		VotingPower:  0,
+// Description - description fields for a candidate
+type Description struct {
+	Moniker  string `json:"moniker"`
+	Identity string `json:"identity"`
+	Website  string `json:"website"`
+	Details  string `json:"details"`
+}
+
+// NewCandidate - initialize a new candidate
+func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor) *Candidate {
+	return &Candidate{
+		PubKey:      pubKey,
+		Owner:       owner,
+		Shares:      0,
+		VotingPower: 0,
 	}
 }
+
+// Validator returns a copy of the Candidate as a Validator.
+// Should only be called when the Candidate qualifies as a validator.
+func (c *Candidate) validator() Validator {
+	return Validator(*c)
+}
+
+// Validator is one of the top Candidates
+type Validator Candidate
 
 // ABCIValidator - Get the validator from a bond value
-func (vb ValidatorBond) ABCIValidator() *abci.Validator {
+func (v Validator) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
-		PubKey: vb.PubKey,
-		Power:  vb.VotingPower,
+		PubKey: wire.BinaryBytes(v.PubKey),
+		Power:  v.VotingPower,
 	}
 }
 
-//--------------------------------------------------------------------------------
+//_________________________________________________________________________
 
-// ValidatorBonds - the set of all ValidatorBonds
-type ValidatorBonds []*ValidatorBond
+// TODO replace with sorted multistore functionality
 
-var _ sort.Interface = ValidatorBonds{} // enforce the sort interface at compile time
+// Candidates - list of Candidates
+type Candidates []*Candidate
+
+var _ sort.Interface = Candidates{} //enforce the sort interface at compile time
 
 // nolint - sort interface functions
-func (vbs ValidatorBonds) Len() int      { return len(vbs) }
-func (vbs ValidatorBonds) Swap(i, j int) { vbs[i], vbs[j] = vbs[j], vbs[i] }
-func (vbs ValidatorBonds) Less(i, j int) bool {
-	vp1, vp2 := vbs[i].VotingPower, vbs[j].VotingPower
-	d1, d2 := vbs[i].Sender, vbs[j].Sender
+func (cs Candidates) Len() int      { return len(cs) }
+func (cs Candidates) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
+func (cs Candidates) Less(i, j int) bool {
+	vp1, vp2 := cs[i].VotingPower, cs[j].VotingPower
+	d1, d2 := cs[i].Owner, cs[j].Owner
 
-	switch {
-	case vp1 != vp2:
+	//note that all ChainId and App must be the same for a group of candidates
+	if vp1 != vp2 {
 		return vp1 > vp2
-	case d1.ChainID != d2.ChainID:
-		return d1.ChainID < d2.ChainID
-	case d1.App != d2.App:
-		return d1.App < d2.App
-	default:
-		return bytes.Compare(d1.Address, d2.Address) == -1
 	}
+	return bytes.Compare(d1.Address, d2.Address) == -1
 }
 
 // Sort - Sort the array of bonded values
-func (vbs ValidatorBonds) Sort() {
-	sort.Sort(vbs)
+func (cs Candidates) Sort() {
+	sort.Sort(cs)
 }
 
-// UpdateVotingPower - voting power based on bond tokens and exchange rate
-// TODO: make not a function of ValidatorBonds as validatorbonds can be loaded from the store
-func (vbs ValidatorBonds) UpdateVotingPower(store state.SimpleDB) (changed bool) {
-	for _, vb := range vbs {
-		if vb.VotingPower != vb.BondedTokens {
-			changed = true
-			vb.VotingPower = vb.BondedTokens
+//func updateVotingPower(store state.SimpleDB) {
+//candidates := loadCandidates(store)
+//candidates.updateVotingPower(store)
+//}
+
+// update the voting power and save
+func (cs Candidates) updateVotingPower(store state.SimpleDB) Candidates {
+
+	// update voting power
+	for _, c := range cs {
+		if c.VotingPower != c.Shares {
+			c.VotingPower = c.Shares
 		}
 	}
-
-	// we don't write anything if nothing changes
-	if !changed {
-		return false
-	}
-
-	// Now sort and truncate the power
-	vbs.Sort()
-	for i, vb := range vbs {
-		if i >= loadParams(store).MaxVals {
-			vb.VotingPower = 0
+	cs.Sort()
+	for i, c := range cs {
+		// truncate the power
+		if i >= int(loadParams(store).MaxVals) {
+			c.VotingPower = 0
 		}
+		saveCandidate(store, c)
 	}
-
-	saveBonds(store, vbs)
-	return true
+	return cs
 }
 
-// CleanupEmpty - removes all validators which have no bonded atoms left
-func (vbs ValidatorBonds) CleanupEmpty(store state.SimpleDB) {
-	for i, vb := range vbs {
-		if vb.BondedTokens == 0 {
-			var err error
-			vbs, err = vbs.Remove(i)
-			if err != nil {
-				cmn.PanicSanity(resBadRemoveValidator.Error())
-			}
-		}
-	}
-	saveBonds(store, vbs)
-}
-
-// GetValidators - get the most recent updated validator set from the
-// ValidatorBonds. These bonds are already sorted by VotingPower from
+// Validators - get the most recent updated validator set from the
+// Candidates. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (vbs ValidatorBonds) GetValidators(store state.SimpleDB) []*abci.Validator {
-	maxVals := loadParams(store).MaxVals
-	validators := make([]*abci.Validator, cmn.MinInt(len(vbs), maxVals))
-	for i, vb := range vbs {
-		if vb.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
-			break
+func (cs Candidates) Validators() Validators {
+
+	//test if empty
+	if len(cs) == 1 {
+		if cs[0].VotingPower == 0 {
+			return nil
 		}
-		if i >= maxVals {
-			return validators
-		}
-		validators[i] = vb.ABCIValidator()
 	}
+
+	validators := make(Validators, len(cs))
+	for i, c := range cs {
+		if c.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
+			return validators[:i]
+		}
+		validators[i] = c.validator()
+	}
+
 	return validators
 }
 
-// ValidatorsDiff - get the difference in the validator set from the input validator set
-func ValidatorsDiff(previous, current []*abci.Validator, store state.SimpleDB) (diff []*abci.Validator) {
+//_________________________________________________________________________
 
-	//TODO: do something more efficient possibly by sorting first
+// Validators - list of Validators
+type Validators []Validator
 
-	// calculate any differences from the previous to the new validator set
-	// first loop through the previous validator set, and then catch any
-	// missed records in the new validator set
-	diff = make([]*abci.Validator, 0, loadParams(store).MaxVals)
+// determine all changed validators between two SORTED validator sets
+func (vs1 Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
 
-	for _, prevVal := range previous {
-		if prevVal == nil {
-			continue
-		}
-		found := false
-		for _, curVal := range current {
-			if curVal == nil {
+	max := len(vs1) + len(vs2)
+	changed = make([]*abci.Validator, max)
+	i, j, n := 0, 0, 0 //counters for vs1 loop, vs2 loop, changed element
+
+	for i < len(vs1) && j < len(vs2) {
+
+		if !vs1[i].PubKey.Equals(vs2[j].PubKey) {
+			// pk1 > pk2, a new validator was introduced between these pubkeys
+			if bytes.Compare(vs1[i].PubKey.Bytes(), vs2[j].PubKey.Bytes()) == 1 {
+				changed[n] = vs2[j].ABCIValidator()
+				n++
+				j++
 				continue
-			}
-			if bytes.Equal(prevVal.PubKey, curVal.PubKey) {
-				found = true
-				if curVal.Power != prevVal.Power {
-					diff = append(diff, &abci.Validator{curVal.PubKey, curVal.Power})
-					break
-				}
-			}
-		}
-
-		if !found {
-			diff = append(diff, &abci.Validator{prevVal.PubKey, 0})
-		}
-	}
-
-	for _, curVal := range current {
-		if curVal == nil {
+			} // else, the old validator has been removed
+			changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+			n++
+			i++
 			continue
 		}
 
-		found := false
-		for _, prevVal := range previous {
-			if prevVal == nil {
-				continue
-			}
-			if bytes.Equal(prevVal.PubKey, curVal.PubKey) {
-				found = true
-				break
-			}
+		if vs1[i].VotingPower != vs2[j].VotingPower {
+			changed[n] = vs2[j].ABCIValidator()
+			n++
 		}
-
-		if !found {
-			diff = append(diff, &abci.Validator{curVal.PubKey, curVal.Power})
-		}
+		j++
+		i++
 	}
 
+	// add any excess validators in set 2
+	for ; j < len(vs2); j, n = j+1, n+1 {
+		changed[n] = vs2[j].ABCIValidator()
+	}
+
+	// remove any excess validators left in set 1
+	for ; i < len(vs1); i, n = i+1, n+1 {
+		changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+	}
+
+	return changed[:n]
+}
+
+// UpdateValidatorSet - Updates the voting power for the candidate set and
+// returns the subset of validators which have changed for Tendermint
+func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err error) {
+
+	// get the validators before update
+	candidates := loadCandidates(store)
+
+	v1 := candidates.Validators()
+	v2 := candidates.updateVotingPower(store).Validators()
+
+	change = v1.validatorsChanged(v2)
 	return
 }
 
-// Get - get a ValidatorBond for a specific sender from the ValidatorBonds
-func (vbs ValidatorBonds) Get(sender sdk.Actor) (int, *ValidatorBond) {
-	for i, vb := range vbs {
-		if vb.Sender.Equals(sender) {
-			return i, vb
-		}
-	}
+//_________________________________________________________________________
 
-	return 0, nil
+// DelegatorBond represents the bond with tokens held by an account.  It is
+// owned by one delegator, and is associated with the voting power of one
+// pubKey.
+type DelegatorBond struct {
+	PubKey crypto.PubKey
+	Shares uint64
 }
 
-// GetByPubKey - get a ValidatorBond for a specific validator from the ValidatorBonds
-func (vbs ValidatorBonds) GetByPubKey(pubkey []byte) (int, *ValidatorBond) {
-	for i, vb := range vbs {
-		if bytes.Equal(vb.PubKey, pubkey) {
-			return i, vb
-		}
-	}
+//_________________________________________________________________________
 
-	return 0, nil
-}
+// transfer coins
+type transferFn func(from sdk.Actor, to sdk.Actor, coins coin.Coins) error
 
-// Add - adds a ValidatorBond
-func (vbs ValidatorBonds) Add(bond *ValidatorBond) ValidatorBonds {
-	return append(vbs, bond)
-}
+// default transfer runs full DeliverTX
+func defaultTransferFn(ctx sdk.Context, store state.SimpleDB, dispatch sdk.Deliver) transferFn {
+	return func(sender, receiver sdk.Actor, coins coin.Coins) error {
+		// Move coins from the delegator account to the pubKey lock account
+		send := coin.NewSendOneTx(sender, receiver, coins)
 
-// Remove - remove validator from the validator list
-func (vbs ValidatorBonds) Remove(i int) (ValidatorBonds, error) {
-	switch {
-	case i < 0:
-		return vbs, fmt.Errorf("Cannot remove a negative element")
-	case i >= len(vbs):
-		return vbs, fmt.Errorf("Element is out of upper bound")
-	default:
-		return append(vbs[:i], vbs[i+1:]...), nil
+		// If the deduction fails (too high), abort the command
+		_, err := dispatch.DeliverTx(ctx, store, send)
+		return err
 	}
 }

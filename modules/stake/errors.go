@@ -4,23 +4,52 @@ package stake
 import (
 	"fmt"
 
+	"github.com/cosmos/cosmos-sdk/errors"
+
 	abci "github.com/tendermint/abci/types"
 )
 
 var (
+	errCandidateEmpty     = fmt.Errorf("Cannot bond to an empty candidate")
 	errBadBondingDenom    = fmt.Errorf("Invalid coin denomination")
 	errBadBondingAmount   = fmt.Errorf("Amount must be > 0")
 	errNoBondingAcct      = fmt.Errorf("No bond account for this (address, validator) pair")
 	errCommissionNegative = fmt.Errorf("Commission must be positive")
 	errCommissionHuge     = fmt.Errorf("Commission cannot be more than 100%")
 
-	resBadValidatorAddr      = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
-	resMissingSignature      = abci.ErrBaseInvalidSignature.AppendLog("Missing signature")
-	resBondNotNominated      = abci.ErrBaseInvalidOutput.AppendLog("Cannot bond to non-nominated account")
-	resNoValidatorForAddress = abci.ErrBaseUnknownAddress.AppendLog("Validator does not exist for that address")
-	resNoDelegatorForAddress = abci.ErrBaseInvalidInput.AppendLog("Delegator does not contain validator bond")
-	resInsufficientFunds     = abci.ErrBaseInsufficientFunds.AppendLog("Insufficient bond tokens")
-	resBadRemoveValidator    = abci.ErrInternalError.AppendLog("Error removing validator")
+	errBadValidatorAddr      = fmt.Errorf("Validator does not exist for that address")
+	errCandidateExistsAddr   = fmt.Errorf("Candidate already exist, cannot re-declare candidacy")
+	errMissingSignature      = fmt.Errorf("Missing signature")
+	errBondNotNominated      = fmt.Errorf("Cannot bond to non-nominated account")
+	errNoCandidateForAddress = fmt.Errorf("Validator does not exist for that address")
+	errNoDelegatorForAddress = fmt.Errorf("Delegator does not contain validator bond")
+	errInsufficientFunds     = fmt.Errorf("Insufficient bond shares")
+	errBadRemoveValidator    = fmt.Errorf("Error removing validator")
 
 	invalidInput = abci.CodeType_BaseInvalidInput
 )
+
+func ErrBadValidatorAddr() error {
+	return errors.WithCode(errBadValidatorAddr, abci.CodeType_BaseUnknownAddress)
+}
+func ErrCandidateExistsAddr() error {
+	return errors.WithCode(errCandidateExistsAddr, abci.CodeType_BaseInvalidInput)
+}
+func ErrMissingSignature() error {
+	return errors.WithCode(errMissingSignature, abci.CodeType_BaseInvalidSignature)
+}
+func ErrBondNotNominated() error {
+	return errors.WithCode(errBondNotNominated, abci.CodeType_BaseInvalidOutput)
+}
+func ErrNoCandidateForAddress() error {
+	return errors.WithCode(errNoCandidateForAddress, abci.CodeType_BaseUnknownAddress)
+}
+func ErrNoDelegatorForAddress() error {
+	return errors.WithCode(errNoDelegatorForAddress, abci.CodeType_BaseInvalidInput)
+}
+func ErrInsufficientFunds() error {
+	return errors.WithCode(errInsufficientFunds, abci.CodeType_InsufficientFunds)
+}
+func ErrBadRemoveValidator() error {
+	return errors.WithCode(errBadRemoveValidator, abci.CodeType_InternalError)
+}
