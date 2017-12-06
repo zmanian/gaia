@@ -59,6 +59,15 @@ func saveCandidatesPubKeys(store state.SimpleDB, pubKeys []crypto.PubKey) {
 	store.Set(CandidatesPubKeysKey, b)
 }
 
+// loadCandidates - get the active list of all candidates TODO replace with  multistore
+func loadCandidates(store state.SimpleDB) (candidates Candidates) {
+	pks := loadCandidatesPubKeys(store)
+	for _, pk := range pks {
+		candidates = append(candidates, loadCandidate(store, pk))
+	}
+	return
+}
+
 //---------------------------------------------------------------------
 
 // loadCandidate - loads the candidate object for the provided pubkey
@@ -104,11 +113,20 @@ func removeCandidate(store state.SimpleDB, pubKey crypto.PubKey) {
 	}
 }
 
-// loadCandidates - TODO replace with  multistore
-func loadCandidates(store state.SimpleDB) (candidates Candidates) {
-	pks := loadCandidatesPubKeys(store)
-	for _, pk := range pks {
-		candidates = append(candidates, loadCandidate(store, pk))
+//---------------------------------------------------------------------
+
+// load the pubkeys of all candidates a delegator is delegated too
+func loadDelegatorCandidates(store state.SimpleDB,
+	delegator sdk.Actor) (candidates []crypto.PubKey) {
+
+	candidateBytes := store.Get(GetDelegatorBondsKey(delegator))
+	if candidateBytes == nil {
+		return nil
+	}
+
+	err := wire.ReadBinaryBytes(candidateBytes, &candidates)
+	if err != nil {
+		panic(err)
 	}
 	return
 }
@@ -163,21 +181,6 @@ func removeDelegatorBond(store state.SimpleDB, delegator sdk.Actor, candidate cr
 	// now remove the actual bond
 	store.Remove(GetDelegatorBondKey(delegator, candidate))
 	//updateDelegatorBonds(store, delegator)
-}
-
-func loadDelegatorCandidates(store state.SimpleDB,
-	delegator sdk.Actor) (candidates []crypto.PubKey) {
-
-	candidateBytes := store.Get(GetDelegatorBondsKey(delegator))
-	if candidateBytes == nil {
-		return nil
-	}
-
-	err := wire.ReadBinaryBytes(candidateBytes, &candidates)
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
 //func updateDelegatorBonds(store state.SimpleDB,
