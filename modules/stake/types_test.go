@@ -47,14 +47,14 @@ func candidatesFromActors(actors []sdk.Actor, amts []int) (candidates Candidates
 }
 
 // helper function test if Candidate is changed asabci.Validator
-func testChange(t *testing.T, val Candidate, chg *abci.Validator) {
+func testChange(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
 	assert.Equal(val.VotingPower, chg.Power)
 }
 
 // helper function test if Candidate is removed as abci.Validator
-func testRemove(t *testing.T, val Candidate, chg *abci.Validator) {
+func testRemove(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
 	assert.Equal(uint64(0), chg.Power)
@@ -73,7 +73,7 @@ func TestCandidatesSort(t *testing.T) {
 	// test basic sort
 	candidates.Sort()
 
-	vals := candidates.getValidators()
+	vals := candidates.Validators()
 	require.Equal(N, len(vals))
 
 	for i, val := range vals {
@@ -116,7 +116,7 @@ func TestGetValidators(t *testing.T) {
 	actors := newActors(N)
 	candidates := candidatesFromActors(actors, []int{400, 200, 0, 0, 0})
 
-	validators := candidates.getValidators()
+	validators := candidates.Validators()
 	require.Equal(2, len(validators))
 	assert.Equal(candidates[0].PubKey, validators[0].PubKey)
 	assert.Equal(candidates[1].PubKey, validators[1].PubKey)
@@ -125,11 +125,11 @@ func TestGetValidators(t *testing.T) {
 func TestValidatorsChanged(t *testing.T) {
 	require := require.New(t)
 
-	v1 := Candidate{PubKey: pks[0], VotingPower: 10}
-	v2 := Candidate{PubKey: pks[1], VotingPower: 10}
-	v3 := Candidate{PubKey: pks[2], VotingPower: 10}
-	v4 := Candidate{PubKey: pks[3], VotingPower: 10}
-	v5 := Candidate{PubKey: pks[4], VotingPower: 10}
+	v1 := (&Candidate{PubKey: pks[0], VotingPower: 10}).validator()
+	v2 := (&Candidate{PubKey: pks[1], VotingPower: 10}).validator()
+	v3 := (&Candidate{PubKey: pks[2], VotingPower: 10}).validator()
+	v4 := (&Candidate{PubKey: pks[3], VotingPower: 10}).validator()
+	v5 := (&Candidate{PubKey: pks[4], VotingPower: 10}).validator()
 
 	// test from nothing to something
 	vs1 := Validators{}
@@ -241,7 +241,7 @@ func TestUpdateValidatorSet(t *testing.T) {
 
 	require.Nil(err)
 	require.Equal(1, len(change), "%v", change) // change 1, remove 1, add 2
-	testRemove(t, *candidates[4], change[0])
+	testRemove(t, candidates[4].validator(), change[0])
 
 	// test that the new validator set has been saved properly to the store
 	candidates = loadCandidates(store)

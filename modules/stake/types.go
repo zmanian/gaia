@@ -75,11 +75,20 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor) *Candidate {
 	}
 }
 
+// Validator returns a copy of the Candidate as a Validator.
+// Should only be called when the Candidate qualifies as a validator.
+func (c *Candidate) validator() Validator {
+	return Validator(*c)
+}
+
+// Validator is one of the top Candidates
+type Validator Candidate
+
 // ABCIValidator - Get the validator from a bond value
-func (c Candidate) ABCIValidator() *abci.Validator {
+func (v Validator) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
-		PubKey: wire.BinaryBytes(c.PubKey),
-		Power:  c.VotingPower,
+		PubKey: wire.BinaryBytes(v.PubKey),
+		Power:  v.VotingPower,
 	}
 }
 
@@ -117,7 +126,7 @@ func (cs Candidates) Sort() {
 //}
 
 // update the voting power and save
-func (cs Candidates) updateVotingPower(store state.SimpleDB) {
+func (cs Candidates) updateVotingPower(store state.SimpleDB) Candidates {
 
 	// update voting power
 	for _, c := range cs {
@@ -133,18 +142,14 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB) {
 		}
 		saveCandidate(store, c)
 	}
+	return cs
 }
 
-//_________________________________________________________________________
-
-// Validators - list of Validators
-type Validators []Candidate
-
-// getValidators - get the most recent updated validator set from the
+// Validators - get the most recent updated validator set from the
 // Candidates. These bonds are already sorted by VotingPower from
 // the UpdateVotingPower function which is the only function which
 // is to modify the VotingPower
-func (cs Candidates) getValidators() Validators {
+func (cs Candidates) Validators() Validators {
 
 	//test if empty
 	if len(cs) == 1 {
@@ -153,16 +158,21 @@ func (cs Candidates) getValidators() Validators {
 		}
 	}
 
-	validators := make([]Candidate, len(cs))
+	validators := make(Validators, len(cs))
 	for i, c := range cs {
 		if c.VotingPower == 0 { //exit as soon as the first Voting power set to zero is found
 			return validators[:i]
 		}
-		validators[i] = *c
+		validators[i] = c.validator()
 	}
 
 	return validators
 }
+
+//_________________________________________________________________________
+
+// Validators - list of Validators
+type Validators []Validator
 
 // determine all changed validators between two SORTED validator sets
 func (vs1 Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
@@ -214,12 +224,9 @@ func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err err
 
 	// get the validators before update
 	candidates := loadCandidates(store)
-	v1 := candidates.getValidators()
 
-	// get the updated validators
-	candidates.updateVotingPower(store)
-	candidates = loadCandidates(store)
-	v2 := candidates.getValidators()
+	v1 := candidates.Validators()
+	v2 := candidates.updateVotingPower(store).Validators()
 
 	change = v1.validatorsChanged(v2)
 	return
