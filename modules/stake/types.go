@@ -106,13 +106,13 @@ func (cs Candidates) Len() int      { return len(cs) }
 func (cs Candidates) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
 func (cs Candidates) Less(i, j int) bool {
 	vp1, vp2 := cs[i].VotingPower, cs[j].VotingPower
-	d1, d2 := cs[i].Owner, cs[j].Owner
+	pk1, pk2 := cs[i].PubKey.Bytes(), cs[j].PubKey.Bytes()
 
 	//note that all ChainId and App must be the same for a group of candidates
 	if vp1 != vp2 {
 		return vp1 > vp2
 	}
-	return bytes.Compare(d1.Address, d2.Address) == -1
+	return bytes.Compare(pk1, pk2) == -1
 }
 
 // Sort - Sort the array of bonded values
@@ -174,30 +174,49 @@ func (cs Candidates) Validators() Validators {
 // Validators - list of Validators
 type Validators []Validator
 
-// determine all changed validators between two SORTED validator sets
-func (vs1 Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
+var _ sort.Interface = Validators{} //enforce the sort interface at compile time
 
-	max := len(vs1) + len(vs2)
+// nolint - sort interface functions
+func (vs Validators) Len() int      { return len(vs) }
+func (vs Validators) Swap(i, j int) { vs[i], vs[j] = vs[j], vs[i] }
+func (vs Validators) Less(i, j int) bool {
+	pk1, pk2 := vs[i].PubKey.Bytes(), vs[j].PubKey.Bytes()
+	return bytes.Compare(pk1, pk2) == -1
+}
+
+// Sort - Sort validators by pubkey
+func (vs Validators) Sort() {
+	sort.Sort(vs)
+}
+
+// determine all changed validators between two validator sets
+func (vs Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
+
+	//first sort the validator sets
+	vs.Sort()
+	vs2.Sort()
+
+	max := len(vs) + len(vs2)
 	changed = make([]*abci.Validator, max)
-	i, j, n := 0, 0, 0 //counters for vs1 loop, vs2 loop, changed element
+	i, j, n := 0, 0, 0 //counters for vs loop, vs2 loop, changed element
 
-	for i < len(vs1) && j < len(vs2) {
+	for i < len(vs) && j < len(vs2) {
 
-		if !vs1[i].PubKey.Equals(vs2[j].PubKey) {
+		if !vs[i].PubKey.Equals(vs2[j].PubKey) {
 			// pk1 > pk2, a new validator was introduced between these pubkeys
-			if bytes.Compare(vs1[i].PubKey.Bytes(), vs2[j].PubKey.Bytes()) == 1 {
+			if bytes.Compare(vs[i].PubKey.Bytes(), vs2[j].PubKey.Bytes()) == 1 {
 				changed[n] = vs2[j].ABCIValidator()
 				n++
 				j++
 				continue
 			} // else, the old validator has been removed
-			changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+			changed[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
 			n++
 			i++
 			continue
 		}
 
-		if vs1[i].VotingPower != vs2[j].VotingPower {
+		if vs[i].VotingPower != vs2[j].VotingPower {
 			changed[n] = vs2[j].ABCIValidator()
 			n++
 		}
@@ -211,8 +230,8 @@ func (vs1 Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validat
 	}
 
 	// remove any excess validators left in set 1
-	for ; i < len(vs1); i, n = i+1, n+1 {
-		changed[n] = &abci.Validator{vs1[i].PubKey.Bytes(), 0}
+	for ; i < len(vs); i, n = i+1, n+1 {
+		changed[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
 	}
 
 	return changed[:n]
