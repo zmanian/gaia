@@ -9,7 +9,9 @@ jobs:
     steps:
       - checkout
       - run: make get_vendor_deps
-
+      - run:
+          name: install
+          command: make install
       - run:
           name: Run unit tests
           command: make test
