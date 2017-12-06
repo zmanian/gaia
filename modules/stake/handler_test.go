@@ -147,7 +147,8 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	// just send the same txunbond multiple times
 	unbondAmount := uint64(10)
 	txUndelegate := newTxUnbond(unbondAmount, pk1)
-	for i := 0; i < 5; i++ {
+	nUnbonds := 5
+	for i := 0; i < nUnbonds; i++ {
 		_, got := runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
@@ -163,6 +164,33 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
 		assert.Equal(expectedSender, gotSender, "%v, %v", expectedSender, gotSender)
 	}
+
+	// these are more than we have bonded now
+	errorCases := []uint64{
+		1<<64 - 1, // more than int64
+		1<<63 + 1, // more than int64
+		1<<63 - 1,
+		1 << 31,
+		uint64(initBond),
+	}
+	for _, c := range errorCases {
+		unbondAmount := c
+		txUndelegate := newTxUnbond(unbondAmount, pk1)
+		_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+		assert.Error(got, "expected unbond tx to fail")
+	}
+
+	leftBonded := uint64(initBond - int64(unbondAmount)*int64(nUnbonds))
+
+	// should be unable to unbond one more than we have
+	txUndelegate = newTxUnbond(leftBonded+1, pk1)
+	_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+	assert.Error(got, "expected unbond tx to fail")
+
+	// should be able to unbond just what we have
+	txUndelegate = newTxUnbond(leftBonded, pk1)
+	_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+	assert.NoError(got, "expected unbond tx to pass")
 }
 
 func TestMultipleTxDeclareCandidacy(t *testing.T) {

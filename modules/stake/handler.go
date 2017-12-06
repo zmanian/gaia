@@ -310,8 +310,9 @@ func runTxDelegate(store state.SimpleDB, params Params, sender sdk.Actor,
 	}
 
 	// Add shares to delegator bond and candidate
-	bond.Shares += uint64(tx.Bond.Amount)
-	candidate.Shares += uint64(tx.Bond.Amount)
+	bondAmount := uint64(tx.Bond.Amount) // XXX: checked for underflow in ValidateBasic
+	bond.Shares += bondAmount
+	candidate.Shares += bondAmount
 
 	// Save to store
 	saveCandidate(store, candidate)
@@ -339,10 +340,10 @@ func runTxUnbond(store state.SimpleDB, params Params, sender sdk.Actor,
 	}
 
 	// subtract bond tokens from bond
-	if bond.Shares < uint64(tx.Shares) {
+	if bond.Shares < tx.Shares {
 		return res, ErrInsufficientFunds()
 	}
-	bond.Shares -= uint64(tx.Shares)
+	bond.Shares -= tx.Shares
 
 	if bond.Shares == 0 {
 
@@ -359,7 +360,7 @@ func runTxUnbond(store state.SimpleDB, params Params, sender sdk.Actor,
 	}
 
 	// deduct shares from the candidate
-	candidate.Shares -= uint64(tx.Shares)
+	candidate.Shares -= tx.Shares
 	if candidate.Shares == 0 {
 		removeCandidate(store, tx.PubKey)
 	} else {
@@ -367,7 +368,8 @@ func runTxUnbond(store state.SimpleDB, params Params, sender sdk.Actor,
 	}
 
 	// transfer coins back to account
-	returnCoins := int64(tx.Shares) //currently each share is worth one coin
+	txShares := int64(tx.Shares) // XXX: watch overflow
+	returnCoins := txShares      //currently each share is worth one coin
 	err = transferFn(params.HoldAccount, sender,
 		coin.Coins{{params.AllowedBondDenom, returnCoins}})
 	return
