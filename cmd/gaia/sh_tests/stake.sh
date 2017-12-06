@@ -56,6 +56,44 @@ oneTimeTearDown() {
     quickTearDown
 }
 
+# XXX Ex Usage: checkCandidate $PUBKEY $EXPECTED_VOTING_POWER
+checkCandidate() {
+    CANDIDATE=$(${CLIENT_EXE} query candidate --pubkey=$1)
+    if ! assertTrue "line=${LINENO}, bad query" $?; then
+        return 1
+    fi
+    assertEquals "line=${LINENO}, proper voting power" "$2" $(echo $CANDIDATE | jq .data.voting_power)
+    return $?
+}
+
+# XXX Ex Usage: checkCandidate $PUBKEY
+checkCandidateEmpty() { 
+    CANDIDATE=$(${CLIENT_EXE} query candidate --pubkey=$1 2>/dev/null)
+    if ! assertFalse "line=${LINENO}, expected empty query" $?; then
+        return 1
+    fi
+}
+
+# XXX Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY $EXPECTED_SHARES
+checkDelegatorBond() {
+    BOND=$(${CLIENT_EXE} query delegator-bond --delegator-address=$1 --pubkey=$2)
+    if ! assertTrue "line=${LINENO}, account must exist" $?; then
+        return 1
+    fi
+    assertEquals "line=${LINENO}, proper bond amount" "$3" $(echo $BOND | jq .data.Shares)
+    return $?
+}
+
+# XXX Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY
+checkDelegatorBondEmpty() { 
+    BOND=$(${CLIENT_EXE} query delegator-bond --delegator-address=$1 --pubkey=$2 2>/dev/null)
+    if ! assertFalse "line=${LINENO}, expected empty query" $?; then
+        return 1
+    fi
+}
+
+#______________________________________________________________________________________
+
 test00GetAccount() {
     SENDER=$(getAddr $RICH)
     RECV=$(getAddr $POOR)
@@ -131,69 +169,102 @@ test02DeclareCandidacy() {
     # get the pubkey of the second validator
     PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
 
-    SENDER=$(getAddr $POOR)
-    gaia client query account ${SENDER}
-    #TODO save the account balance for test later
-
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=10fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
+    CAND_ADDR=$(getAddr $POOR)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --sequence=1 --amount=10fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
     if [ $? != 0 ]; then return 1; fi
     HASH=$(echo $TX | jq .hash | tr -d \")
     TX_HEIGHT=$(echo $TX | jq .height)
-
-    # better to parse data (like checkAccount) than printing out
-    gaia client query account ${SENDER} --height=${TX_HEIGHT}
-    gaia client query candidate --pubkey=$PK2
-    # TODO test $PK2 is the same and has 10fermions
-    # TODO test that account balance reduced by 10 fermions
+    checkAccount $CAND_ADDR "982" $TX_HEIGHT
+    checkCandidate $PK2 "10"
+    checkDelegatorBond $CAND_ADDR $PK2 "10"
 }
 
 test03Delegate() {
     # send some coins to a delegator
-    DELADDR=$(getAddr $DELEGATOR)
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=15fermion --sequence=2 --to=$DELADDR --name=$RICH)
-    txSucceeded $? "$TX" "$DELADDR"
-    echo "initial balance"
-    echo "$DELADDR"
-    echo "$SENDER"
+    DELA_ADDR=$(getAddr $DELEGATOR)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --sequence=2 --amount=15fermion --to=$DELA_ADDR --name=$RICH)
+    txSucceeded $? "$TX" "$DELA_ADDR"
     TX_HEIGHT=$(echo $TX | jq .height)
-    gaia client query account ${DELADDR} 
-    gaia client query account ${SENDER} 
-    # TODO test both account balances
+    checkAccount $DELA_ADDR "15" $TX_HEIGHT
 
     # delegate some coins to the new 
-    echo "first delegation of 10 fermion"
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=1 --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
-    sleep 1
     TX_HEIGHT=$(echo $TX | jq .height)
-    gaia client query account ${DELADDR} 
-    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
-    # TODO test account balance as well as candidate new amount
+    checkAccount $DELA_ADDR "5" $TX_HEIGHT
+    checkCandidate $PK2 "20"
+    checkDelegatorBond $DELA_ADDR $PK2 "10"
 
-    echo "second delegation of 3 fermion"
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
-    sleep 1
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=2 --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
+    if [ $? != 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    gaia client query account ${DELADDR} 
-    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
-    # TODO test account balance as well as candidate new amount
+    checkAccount $DELA_ADDR "2" $TX_HEIGHT
+    checkCandidate $PK2 "23"
+    checkDelegatorBond $DELA_ADDR $PK2 "13"
+
+    # attempt a delegation without enough funds
+    # NOTE the sequence number still increments here because it will fail 
+    #   only during DeliverTx - however this should be updated (TODO) in new
+    #   SDK when we can fail in CheckTx
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=3 --amount=3fermion --name=$DELEGATOR --pubkey=$PK2 2>/dev/null)
+    if [ $? == 0 ]; then return 1; fi
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $DELA_ADDR "2" $TX_HEIGHT
+    checkCandidate $PK2 "23"
+    checkDelegatorBond $DELA_ADDR $PK2 "13"
+
+    # perform the final delegation which should empty the delegators account
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=4 --amount=2fermion --name=$DELEGATOR --pubkey=$PK2)
+    if [ $? != 0 ]; then return 1; fi
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $DELA_ADDR "null" $TX_HEIGHT #empty account is null 
+    checkCandidate $PK2 "25"
 }
 
 test04Unbond() {
     # unbond from the delegator a bit
-    echo "unbond test"
-    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --shares=10 --name=$DELEGATOR --pubkey=$PK2)
-    sleep 1
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=5 --shares=10 --name=$DELEGATOR --pubkey=$PK2)
     TX_HEIGHT=$(echo $TX | jq .height)
-    gaia client query account ${DELADDR} 
-    gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
-    gaia client query candidates --height=${TX_HEIGHT}
-    gaia client query delegator-bond --delegator-address=$DELADDR --pubkey=$PK2 --height=${TX_HEIGHT}
-    gaia client query delegator-candidates --delegator-address=$DELADDR --height=${TX_HEIGHT}
+    checkAccount $DELA_ADDR "10" $TX_HEIGHT
+    checkCandidate $PK2 "15"
+    checkDelegatorBond $DELA_ADDR $PK2 "5"
+
+    # attempt to unbond more shares than exist
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=6 --shares=10 --name=$DELEGATOR --pubkey=$PK2 2>/dev/null)
+    if [ $? == 0 ]; then return 1; fi
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $DELA_ADDR "10" $TX_HEIGHT
+    checkCandidate $PK2 "15"
+    checkDelegatorBond $DELA_ADDR $PK2 "5"
 
     # unbond entirely from the delegator
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=6 --shares=5 --name=$DELEGATOR --pubkey=$PK2)
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $DELA_ADDR "15" $TX_HEIGHT
+    checkCandidate $PK2 "10"
+    checkDelegatorBondEmpty $DELA_ADDR $PK2
+
     # unbond a bit from the owner
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=2 --shares=5 --name=$POOR --pubkey=$PK2)
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $CAND_ADDR "987" $TX_HEIGHT
+    checkCandidate $PK2 "5"
+    checkDelegatorBond $CAND_ADDR $PK2 "5"
+
+    # attempt to unbond more shares than exist
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=3 --shares=10 --name=$POOR --pubkey=$PK2 2>/dev/null)
+    if [ $? == 0 ]; then return 1; fi
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $CAND_ADDR "987" $TX_HEIGHT
+    checkCandidate $PK2 "5"
+    checkDelegatorBond $CAND_ADDR $PK2 "5"
+
     # unbond entirely from the validator
+    TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=3 --shares=5 --name=$POOR --pubkey=$PK2)
+    TX_HEIGHT=$(echo $TX | jq .height)
+    checkAccount $CAND_ADDR "992" $TX_HEIGHT
+    checkCandidateEmpty $PK2
+    checkDelegatorBondEmpty $CAND_ADDR $PK2
 }
 
 # Load common then run these tests with shunit2!
