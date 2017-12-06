@@ -118,7 +118,6 @@ test02DeclareCandidacy() {
     seeds = "0.0.0.0:46656"' >$SERVER2/config.toml
 
     # start the second node
-    echo "starting second server"
     ${SERVER_EXE} start --home=$SERVER2 >>$SERVER_LOG2 2>&1 &
     sleep 1
     PID_SERVER2=$!
@@ -130,12 +129,11 @@ test02DeclareCandidacy() {
     fi
 
     # get the pubkey of the second validator
-
     PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
-    echo "PK2: $PK2"
 
     SENDER=$(getAddr $POOR)
     gaia client query account ${SENDER}
+    #TODO save the account balance for test later
 
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --amount=10fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)
     if [ $? != 0 ]; then return 1; fi
@@ -145,6 +143,8 @@ test02DeclareCandidacy() {
     # better to parse data (like checkAccount) than printing out
     gaia client query account ${SENDER} --height=${TX_HEIGHT}
     gaia client query candidate --pubkey=$PK2
+    # TODO test $PK2 is the same and has 10fermions
+    # TODO test that account balance reduced by 10 fermions
 }
 
 test03Delegate() {
@@ -158,6 +158,7 @@ test03Delegate() {
     TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query account ${SENDER} 
+    # TODO test both account balances
 
     # delegate some coins to the new 
     echo "first delegation of 10 fermion"
@@ -167,6 +168,7 @@ test03Delegate() {
     TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
+    # TODO test account balance as well as candidate new amount
 
     echo "second delegation of 3 fermion"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
@@ -174,6 +176,7 @@ test03Delegate() {
     TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
+    # TODO test account balance as well as candidate new amount
 }
 
 test04Unbond() {
@@ -184,11 +187,8 @@ test04Unbond() {
     TX_HEIGHT=$(echo $TX | jq .height)
     gaia client query account ${DELADDR} 
     gaia client query candidate --pubkey=$PK2 --height=${TX_HEIGHT}
-    echo "HEREHERHRE"
     gaia client query candidates --height=${TX_HEIGHT}
-    echo "sddddddddddddddddddddddd"
     gaia client query delegator-bond --delegator-address=$DELADDR --pubkey=$PK2 --height=${TX_HEIGHT}
-    echo "sddddddddddddddddddddddd"
     gaia client query delegator-candidates --delegator-address=$DELADDR --height=${TX_HEIGHT}
 
     # unbond entirely from the delegator

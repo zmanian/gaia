@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: 02bc39c6e63dce2d3284c2c95b1ff4af9fbf6464
+  version: 9120ad8ea48c0f3a3e3cd7f43e2f87fdd5cf22cc
   subpackages:
   - app
   - client
