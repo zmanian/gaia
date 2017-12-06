@@ -167,7 +167,15 @@ func TestValidatorsChanged(t *testing.T) {
 	testChange(t, vs2[0], changed[0])
 	testChange(t, vs2[2], changed[1])
 
+	// test validator added at the beginning
+	vs1 = Validators{v2, v4}
+	vs2 = Validators{v1, v2, v4}
+	changed = vs1.validatorsChanged(vs2)
+	require.Equal(1, len(changed))
+	testChange(t, vs2[0], changed[0])
+
 	// test validator added in the middle
+	vs1 = Validators{v1, v2, v4}
 	vs2 = Validators{v1, v2, v3, v4}
 	changed = vs1.validatorsChanged(vs2)
 	require.Equal(1, len(changed))
@@ -185,6 +193,12 @@ func TestValidatorsChanged(t *testing.T) {
 	require.Equal(2, len(changed))
 	testChange(t, vs2[2], changed[0])
 	testChange(t, vs2[4], changed[1])
+
+	// test validator removed at the beginning
+	vs2 = Validators{v2, v4}
+	changed = vs1.validatorsChanged(vs2)
+	require.Equal(1, len(changed))
+	testRemove(t, vs1[0], changed[0])
 
 	// test validator removed in the middle
 	vs2 = Validators{v1, v4}
@@ -238,12 +252,26 @@ func TestUpdateValidatorSet(t *testing.T) {
 	params.MaxVals = 4
 	saveParams(store, params)
 	change, err = UpdateValidatorSet(store)
-
 	require.Nil(err)
-	require.Equal(1, len(change), "%v", change) // change 1, remove 1, add 2
+	require.Equal(1, len(change), "%v", change)
 	testRemove(t, candidates[4].validator(), change[0])
-
-	// test that the new validator set has been saved properly to the store
 	candidates = loadCandidates(store)
 	assert.Equal(uint64(0), candidates[4].VotingPower)
+
+	//mess with the power's of the candidates and test
+	candidates[0].Shares = 10
+	candidates[1].Shares = 200
+	candidates[2].Shares = 1000
+	candidates[3].Shares = 1
+	candidates[4].Shares = 10
+	for _, c := range candidates {
+		saveCandidate(store, c)
+	}
+	change, err = UpdateValidatorSet(store)
+	require.Nil(err)
+	require.Equal(5, len(change), "%v", change) //3 changed, 1 added, 1 removed
+	//testRemove(t, candidates[3].validator(), change[0])
+	//candidates = loadCandidates(store)
+	//assert.Equal(uint64(0), candidates[4].VotingPower)
+
 }
