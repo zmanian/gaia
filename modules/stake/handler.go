@@ -15,26 +15,50 @@ import (
 )
 
 // nolint
-const (
-	stakingModuleName = "stake"
-)
+const stakingModuleName = "stake"
 
 // Name is the name of the modules.
 func Name() string {
 	return stakingModuleName
 }
 
+//_______________________________________________________________________
+
+// DelegatedProofOfStake - interface to enforce delegation stake
+type DelegatedProofOfStake interface {
+	DeclareCandidacy(tx) error
+	EditCandidacy(tx) error
+	Delegate(tx) error
+	Unbond(tx) error
+}
+
+type checker struct {
+	store  state.SimpleDB
+	sender sdk.Actor
+}
+
+type deliverer struct {
+	store      state.SimpleDB
+	sender     sdk.Actor
+	params     Params
+	transferFn transferFn
+	tx         TxUnbond
+}
+
+var _, _ DelegatedProofOfStake = deliverer{}, checker{} // enforce interface at compile time
+//_______________________________________________________________________
+
 // Handler - the transaction processing handler
 type Handler struct {
 	stack.PassInitValidate
 }
 
+var _ stack.Dispatchable = Handler{} // enforce interface at compile time
+
 // NewHandler returns a new Handler with the default Params
 func NewHandler() Handler {
 	return Handler{}
 }
-
-var _ stack.Dispatchable = Handler{} // enforce interface at compile time
 
 // Name - return stake namespace
 func (Handler) Name() string {
