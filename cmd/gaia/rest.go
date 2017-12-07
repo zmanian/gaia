@@ -8,7 +8,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/tendermint/tmlibs/cli"
 
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	rest "github.com/cosmos/cosmos-sdk/client/rest"
 	coinrest "github.com/cosmos/cosmos-sdk/modules/coin/rest"
@@ -41,9 +43,14 @@ func prepareRestServerCommands() {
 func cmdRestServer(cmd *cobra.Command, args []string) error {
 	router := mux.NewRouter()
 
+	rootDir := viper.GetString(cli.HomeFlag)
+	keyMan := client.GetKeyManager(rootDir)
+	serviceKeys := rest.NewServiceKeys(keyMan)
+	serviceTxs := rest.NewServiceTxs(commands.GetNode())
+
 	routeRegistrars := []func(*mux.Router) error{
 		// rest.Keys handlers
-		rest.NewDefaultKeysManager(defaultAlgo).RegisterAllCRUD,
+		serviceKeys.RegisterCRUD,
 
 		// Coin send handler
 		coinrest.RegisterCoinSend,
@@ -54,9 +61,9 @@ func cmdRestServer(cmd *cobra.Command, args []string) error {
 		rolerest.RegisterCreateRole,
 
 		// Gaia sign transactions handler
-		rest.RegisterSignTx,
+		serviceKeys.RegisterSignTx,
 		// Gaia post transaction handler
-		rest.RegisterPostTx,
+		serviceTxs.RegisterPostTx,
 
 		// Nonce query handler
 		noncerest.RegisterQueryNonce,
