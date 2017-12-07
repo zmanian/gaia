@@ -52,10 +52,8 @@ func cmdRestServer(cmd *cobra.Command, args []string) error {
 		// rest.Keys handlers
 		serviceKeys.RegisterCRUD,
 
-		// Coin send handler
-		coinrest.RegisterCoinSend,
-		// Coin query account handler
-		coinrest.RegisterQueryAccount,
+		// Coin handlers (Send, Query, SearchSent)
+		coinrest.RegisterAll,
 
 		// Roles createRole handler
 		rolerest.RegisterCreateRole,
