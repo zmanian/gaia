@@ -1,4 +1,5 @@
 #!/bin/bash
+set -u
 
 # These global variables are required for common.sh
 SERVER_EXE="gaia node"
@@ -15,6 +16,7 @@ SERVER2=$BASE_DIR2/server
 
 oneTimeSetUp() {
     #[ "$2" ] || echo "missing parameters, line=${LINENO}" ; exit 1;
+
 
     # These are passed in as args
     CHAIN_ID="stake_test"
@@ -96,7 +98,6 @@ checkDelegatorBondEmpty() {
 
 test00GetAccount() {
     SENDER=$(getAddr $RICH)
-    RECV=$(getAddr $POOR)
 
     assertFalse "line=${LINENO}, requires arg" "${CLIENT_EXE} query account"
 
