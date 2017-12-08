@@ -71,48 +71,61 @@ var (
 
 func TestDuplicatesTxDeclareCandidacy(t *testing.T) {
 	assert := assert.New(t)
-
-	store := state.NewMemKVStore()             // for bonds
 	senders, accStore := initAccounts(2, 1000) // for accounts
-	sender, sender2 := senders[0], senders[1]
-	params := loadParams(store)
+	store := state.NewMemKVStore()
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     senders[0],
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
+	checker := checker{
+		store:  store,
+		sender: senders[0],
+	}
 
 	txDeclareCandidacy := newTxDeclareCandidacy(10, pk1)
-	_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), txDeclareCandidacy)
+	got := deliverer.declareCandidacy(txDeclareCandidacy)
 	assert.NoError(got, "expected no error on runTxDeclareCandidacy")
 
 	// one sender can bond to two different pubKeys
 	txDeclareCandidacy.PubKey = pk2
-	err := checkTxDeclareCandidacy(txDeclareCandidacy, sender, store)
+	err := checker.declareCandidacy(txDeclareCandidacy)
 	assert.Nil(err, "didn't expected error on checkTx")
 
 	// two senders cant bond to the same pubkey
+	checker.sender = senders[1]
 	txDeclareCandidacy.PubKey = pk1
-	err = checkTxDeclareCandidacy(txDeclareCandidacy, sender2, store)
+	err = checker.declareCandidacy(txDeclareCandidacy)
 	assert.NotNil(err, "expected error on checkTx")
 }
 
 func TestIncrementsTxDelegate(t *testing.T) {
 	assert := assert.New(t)
-
-	store := state.NewMemKVStore() // for bonds
 	initSender := int64(1000)
 	senders, accStore := initAccounts(1, initSender) // for accounts
-	sender := senders[0]
-	holder := defaultParams().HoldAccount
-	params := loadParams(store)
+	store := state.NewMemKVStore()
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     senders[0],
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
 
 	// first declare candidacy
 	bondAmount := int64(10)
 	txDeclareCandidacy := newTxDeclareCandidacy(bondAmount, pk1)
-	_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), txDeclareCandidacy)
+	got := deliverer.declareCandidacy(txDeclareCandidacy)
 	assert.NoError(got, "expected declare candidacy tx to be ok, got %v", got)
 	expectedBond := bondAmount // 1 since we send 1 at the start of loop,
 
 	// just send the same txbond multiple times
+	holder := deliverer.params.HoldAccount
 	txDelegate := newTxDelegate(bondAmount, pk1)
 	for i := 0; i < 5; i++ {
-		_, got := runTxDelegate(store, params, sender, dummyTransferFn(accStore), txDelegate)
+		got := deliverer.delegate(txDelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the accounts and the bond account have the appropriate values
@@ -121,7 +134,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		expectedSender := initSender - expectedBond
 		gotBonded := int64(candidates[0].Shares)
 		gotHolder := accStore[string(holder.Address)]
-		gotSender := accStore[string(sender.Address)]
+		gotSender := accStore[string(deliverer.sender.Address)]
 		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
 		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
 		assert.Equal(expectedSender, gotSender, "%v, %v", expectedSender, gotSender)
@@ -130,26 +143,30 @@ func TestIncrementsTxDelegate(t *testing.T) {
 
 func TestIncrementsTxUnbond(t *testing.T) {
 	assert := assert.New(t)
-
 	store := state.NewMemKVStore() // for bonds
 	initSender := int64(0)
 	senders, accStore := initAccounts(1, initSender) // for accounts
-	sender := senders[0]
-	holder := defaultParams().HoldAccount
-	params := loadParams(store)
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     senders[0],
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
 
 	// set initial bond
 	initBond := int64(1000)
-	accStore[string(sender.Address)] = initBond
-	_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), newTxDeclareCandidacy(initBond, pk1))
+	accStore[string(deliverer.sender.Address)] = initBond
+	got := deliverer.declareCandidacy(newTxDeclareCandidacy(initBond, pk1))
 	assert.NoError(got, "expected initial bond tx to be ok, got %v", got)
 
 	// just send the same txunbond multiple times
+	holder := deliverer.params.HoldAccount
 	unbondAmount := uint64(10)
 	txUndelegate := newTxUnbond(unbondAmount, pk1)
 	nUnbonds := 5
 	for i := 0; i < nUnbonds; i++ {
-		_, got := runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+		got := deliverer.unbond(txUndelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the accounts and the bond account have the appropriate values
@@ -158,7 +175,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		expectedSender := initSender + (initBond - expectedBond)
 		gotBonded := int64(candidates[0].Shares)
 		gotHolder := accStore[string(holder.Address)]
-		gotSender := accStore[string(sender.Address)]
+		gotSender := accStore[string(deliverer.sender.Address)]
 
 		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
 		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
@@ -176,7 +193,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	for _, c := range errorCases {
 		unbondAmount := c
 		txUndelegate := newTxUnbond(unbondAmount, pk1)
-		_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+		got = deliverer.unbond(txUndelegate)
 		assert.Error(got, "expected unbond tx to fail")
 	}
 
@@ -184,28 +201,34 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 	// should be unable to unbond one more than we have
 	txUndelegate = newTxUnbond(leftBonded+1, pk1)
-	_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+	got = deliverer.unbond(txUndelegate)
 	assert.Error(got, "expected unbond tx to fail")
 
 	// should be able to unbond just what we have
 	txUndelegate = newTxUnbond(leftBonded, pk1)
-	_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+	got = deliverer.unbond(txUndelegate)
 	assert.NoError(got, "expected unbond tx to pass")
 }
 
 func TestMultipleTxDeclareCandidacy(t *testing.T) {
 	assert := assert.New(t)
-
 	store := state.NewMemKVStore()
 	initSender := int64(1000)
 	senders, accStore := initAccounts(3, initSender)
 	pubKeys := []crypto.PubKey{pk1, pk2, pk3}
-	params := loadParams(store)
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     senders[0],
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
 
 	// bond them all
 	for i, sender := range senders {
 		txDeclareCandidacy := newTxDeclareCandidacy(10, pubKeys[i])
-		_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), txDeclareCandidacy)
+		deliverer.sender = sender
+		got := deliverer.declareCandidacy(txDeclareCandidacy)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is bonded
@@ -221,7 +244,8 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 	for i, sender := range senders {
 		candidatePre := loadCandidate(store, pubKeys[i])
 		txUndelegate := newTxUnbond(10, pubKeys[i])
-		_, got := runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+		deliverer.sender = sender
+		got := deliverer.unbond(txUndelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is unbonded
@@ -241,17 +265,24 @@ func TestMultipleTxDelegate(t *testing.T) {
 	store := state.NewMemKVStore()
 	accounts, accStore := initAccounts(3, 1000)
 	sender, delegators := accounts[0], accounts[1:]
-	params := loadParams(store)
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     sender,
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
 
 	//first make a candidate
 	txDeclareCandidacy := newTxDeclareCandidacy(10, pk1)
-	_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), txDeclareCandidacy)
+	got := deliverer.declareCandidacy(txDeclareCandidacy)
 	require.NoError(got, "expected tx to be ok, got %v", got)
 
 	// delegate multiple parties
 	for i, delegator := range delegators {
 		txDelegate := newTxDelegate(10, pk1)
-		_, got := runTxDelegate(store, params, delegator, dummyTransferFn(accStore), txDelegate)
+		deliverer.sender = delegator
+		got := deliverer.delegate(txDelegate)
 		require.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is bonded
@@ -262,7 +293,8 @@ func TestMultipleTxDelegate(t *testing.T) {
 	// unbond them all
 	for i, delegator := range delegators {
 		txUndelegate := newTxUnbond(10, pk1)
-		_, got := runTxUnbond(store, params, delegator, dummyTransferFn(accStore), txUndelegate)
+		deliverer.sender = delegator
+		got := deliverer.unbond(txUndelegate)
 		require.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is unbonded
@@ -277,33 +309,42 @@ func TestVoidCandidacy(t *testing.T) {
 	store := state.NewMemKVStore()              // for bonds
 	accounts, accStore := initAccounts(2, 1000) // for accounts
 	sender, delegator := accounts[0], accounts[1]
-	params := loadParams(store)
+
+	deliverer := deliverer{
+		store:      store,
+		sender:     sender,
+		params:     loadParams(store),
+		transferFn: dummyTransferFn(accStore),
+	}
 
 	// create the candidate
 	txDeclareCandidacy := newTxDeclareCandidacy(10, pk1)
-	_, got := runTxDeclareCandidacy(store, params, sender, dummyTransferFn(accStore), txDeclareCandidacy)
+	got := deliverer.declareCandidacy(txDeclareCandidacy)
 	require.NoError(got, "expected no error on runTxDeclareCandidacy")
 
 	// bond a delegator
 	txDelegate := newTxDelegate(10, pk1)
-	_, got = runTxDelegate(store, params, delegator, dummyTransferFn(accStore), txDelegate)
+	deliverer.sender = delegator
+	got = deliverer.delegate(txDelegate)
 	require.NoError(got, "expected ok, got %v", got)
 
 	// unbond the candidates bond portion
 	txUndelegate := newTxUnbond(10, pk1)
-	_, got = runTxUnbond(store, params, sender, dummyTransferFn(accStore), txUndelegate)
+	deliverer.sender = sender
+	got = deliverer.unbond(txUndelegate)
 	require.NoError(got, "expected no error on runTxDeclareCandidacy")
 
 	// test that this pubkey cannot yet be bonded too
-	_, got = runTxDelegate(store, params, delegator, dummyTransferFn(accStore), txDelegate)
+	deliverer.sender = delegator
+	got = deliverer.delegate(txDelegate)
 	assert.Error(got, "expected error, got %v", got)
 
 	// test that the delegator can still withdraw their bonds
-	_, got = runTxUnbond(store, params, delegator, dummyTransferFn(accStore), txUndelegate)
+	got = deliverer.unbond(txUndelegate)
 	require.NoError(got, "expected no error on runTxDeclareCandidacy")
 
 	// verify that the pubkey can now be reused
-	_, got = runTxDeclareCandidacy(store, params, delegator, dummyTransferFn(accStore), txDeclareCandidacy)
+	got = deliverer.declareCandidacy(txDeclareCandidacy)
 	assert.NoError(got, "expected ok, got %v", got)
 
 }
