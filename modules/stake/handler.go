@@ -25,26 +25,36 @@ func Name() string {
 //_______________________________________________________________________
 
 // DelegatedProofOfStake - interface to enforce delegation stake
-type DelegatedProofOfStake interface {
+type delegatedProofOfStake interface {
 	declareCandidacy(TxDeclareCandidacy) error
 	editCandidacy(TxEditCandidacy) error
 	delegate(TxDelegate) error
 	unbond(TxUnbond) error
 }
 
-type checker struct {
+type coinSend interface {
+	transferFn(sender, receiver sdk.Actor, coins coin.Coins) error
+}
+
+type check struct {
 	store  state.SimpleDB
 	sender sdk.Actor
 }
 
-type deliverer struct {
-	store      state.SimpleDB
-	sender     sdk.Actor
-	params     Params
-	transferFn transferFn
+type deliver struct {
+	sendCoins
+	store  state.SimpleDB
+	sender sdk.Actor
+	params Params
 }
 
-var _, _ DelegatedProofOfStake = deliverer{}, checker{} // enforce interface at compile time
+type coinSender struct {
+	dispatch sdk.Deliver
+	ctx      sdk.Context
+}
+
+var _, _ delegatedProofOfStake = deliverer{}, checker{} // enforce interface at compile time
+var _, deliverer = deliverer{}, checker{}               // enforce interface at compile time
 //_______________________________________________________________________
 
 // Handler - the transaction processing handler
@@ -223,10 +233,11 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	params := loadParams(store)
 	fn := defaultTransferFn(ctx, store, dispatch)
 	deliverer := deliverer{
-		store:      store,
-		sender:     sender,
-		params:     params,
-		transferFn: fn,
+		store:    store,
+		sender:   sender,
+		params:   params,
+		dispatch: dispatch,
+		ctx:      ctx,
 	}
 
 	// Run the transaction
@@ -251,13 +262,17 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	return
 }
 
+func (d deliverer) transferFn(sender, receiver sdk.Actor, coins coin.Coins) error {
+	send := coin.NewSendOneTx(sender, receiver, coins)
+
+	// If the deduction fails (too high), abort the command
+	_, err := d.dispatch.DeliverTx(ctx, store, send)
+	return err
+}
+
 //---------------------------------------------------------------------
 // These functions assume everything has been authenticated,
 // now we just perform action and save
-
-// TODO: why not just return (sdk.DeliverResult, error)?
-// that is why the other interface is such, and err != nil
-// is more idiomatic than res.IsErr()
 func (d deliverer) declareCandidacy(tx TxDeclareCandidacy) error {
 
 	// create and save the empty candidate
