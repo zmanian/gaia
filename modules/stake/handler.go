@@ -36,25 +36,6 @@ type coinSend interface {
 	transferFn(sender, receiver sdk.Actor, coins coin.Coins) error
 }
 
-type check struct {
-	store  state.SimpleDB
-	sender sdk.Actor
-}
-
-type deliver struct {
-	sendCoins
-	store  state.SimpleDB
-	sender sdk.Actor
-	params Params
-}
-
-type coinSender struct {
-	dispatch sdk.Deliver
-	ctx      sdk.Context
-}
-
-var _, _ delegatedProofOfStake = deliverer{}, checker{} // enforce interface at compile time
-var _, deliverer = deliverer{}, checker{}               // enforce interface at compile time
 //_______________________________________________________________________
 
 // Handler - the transaction processing handler
@@ -137,7 +118,7 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	params := loadParams(store)
 
 	// create the new checker object to
-	checker := checker{
+	checker := check{
 		store:  store,
 		sender: sender,
 	}
@@ -161,56 +142,6 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 	return res, errors.ErrUnknownTxType(tx)
 }
 
-func (c checker) declareCandidacy(tx TxDeclareCandidacy) error {
-
-	// check to see if the pubkey or sender has been registered before
-	candidate := loadCandidate(c.store, tx.PubKey)
-	if candidate != nil {
-		return fmt.Errorf("cannot bond to pubkey which is already declared candidacy"+
-			" PubKey %v already registered with %v candidate address",
-			candidate.PubKey, candidate.Owner)
-	}
-
-	return checkDenom(tx.BondUpdate, c.store)
-}
-
-func (c checker) editCandidacy(tx TxEditCandidacy) error {
-
-	// candidate must already be registered
-	candidate := loadCandidate(c.store, tx.PubKey)
-	if candidate == nil { // does PubKey exist
-		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
-	}
-	return nil
-}
-
-func (c checker) delegate(tx TxDelegate) error {
-
-	candidate := loadCandidate(c.store, tx.PubKey)
-	if candidate == nil { // does PubKey exist
-		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
-	}
-	return checkDenom(tx.BondUpdate, c.store)
-}
-
-func (c checker) unbond(tx TxUnbond) error {
-
-	// check if have enough shares to unbond
-	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
-	if bond.Shares < tx.Shares {
-		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
-			bond.Shares, tx.Shares)
-	}
-	return nil
-}
-
-func checkDenom(tx BondUpdate, store state.SimpleDB) error {
-	if tx.Bond.Denom != loadParams(store).AllowedBondDenom {
-		return fmt.Errorf("Invalid coin denomination")
-	}
-	return nil
-}
-
 // DeliverTx executes the tx if valid
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
@@ -231,13 +162,15 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	}
 
 	params := loadParams(store)
-	fn := defaultTransferFn(ctx, store, dispatch)
-	deliverer := deliverer{
-		store:    store,
-		sender:   sender,
-		params:   params,
-		dispatch: dispatch,
-		ctx:      ctx,
+	deliverer := deliver{
+		store:  store,
+		sender: sender,
+		params: params,
+		transfer: coinSender{
+			store:    store,
+			dispatch: dispatch,
+			ctx:      ctx,
+		}.transferFn,
 	}
 
 	// Run the transaction
@@ -256,24 +189,118 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		params := loadParams(store)
 		res.GasUsed = params.GasUnbond
 		ctx2 := ctx.WithPermissions(params.HoldAccount)
-		deliverer.transferFn = defaultTransferFn(ctx2, store, dispatch)
+		deliverer.transfer = coinSender{
+			store:    store,
+			dispatch: dispatch,
+			ctx:      ctx2,
+		}.transferFn
 		return res, deliverer.unbond(_tx)
 	}
 	return
 }
 
-func (d deliverer) transferFn(sender, receiver sdk.Actor, coins coin.Coins) error {
+// get the sender from the ctx and ensure it matches the tx pubkey
+func getTxSender(ctx sdk.Context) (sender sdk.Actor, err error) {
+	senders := ctx.GetPermissions("", auth.NameSigs)
+	if len(senders) != 1 {
+		return sender, ErrMissingSignature()
+	}
+	return senders[0], nil
+}
+
+//_______________________________________________________________________
+
+type coinSender struct {
+	store    state.SimpleDB
+	dispatch sdk.Deliver
+	ctx      sdk.Context
+}
+
+var _ coinSend = coinSender{} // enforce interface at compile time
+
+func (c coinSender) transferFn(sender, receiver sdk.Actor, coins coin.Coins) error {
 	send := coin.NewSendOneTx(sender, receiver, coins)
 
 	// If the deduction fails (too high), abort the command
-	_, err := d.dispatch.DeliverTx(ctx, store, send)
+	_, err := c.dispatch.DeliverTx(c.ctx, c.store, send)
 	return err
 }
 
-//---------------------------------------------------------------------
+//_____________________________________________________________________
+
+type check struct {
+	store  state.SimpleDB
+	sender sdk.Actor
+}
+
+var _ delegatedProofOfStake = check{} // enforce interface at compile time
+
+func (c check) declareCandidacy(tx TxDeclareCandidacy) error {
+
+	// check to see if the pubkey or sender has been registered before
+	candidate := loadCandidate(c.store, tx.PubKey)
+	if candidate != nil {
+		return fmt.Errorf("cannot bond to pubkey which is already declared candidacy"+
+			" PubKey %v already registered with %v candidate address",
+			candidate.PubKey, candidate.Owner)
+	}
+
+	return checkDenom(tx.BondUpdate, c.store)
+}
+
+func (c check) editCandidacy(tx TxEditCandidacy) error {
+
+	// candidate must already be registered
+	candidate := loadCandidate(c.store, tx.PubKey)
+	if candidate == nil { // does PubKey exist
+		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
+	}
+	return nil
+}
+
+func (c check) delegate(tx TxDelegate) error {
+
+	candidate := loadCandidate(c.store, tx.PubKey)
+	if candidate == nil { // does PubKey exist
+		return fmt.Errorf("cannot delegate to non-existant PubKey %v", tx.PubKey)
+	}
+	return checkDenom(tx.BondUpdate, c.store)
+}
+
+func (c check) unbond(tx TxUnbond) error {
+
+	// check if have enough shares to unbond
+	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
+	if bond.Shares < tx.Shares {
+		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
+			bond.Shares, tx.Shares)
+	}
+	return nil
+}
+
+func checkDenom(tx BondUpdate, store state.SimpleDB) error {
+	if tx.Bond.Denom != loadParams(store).AllowedBondDenom {
+		return fmt.Errorf("Invalid coin denomination")
+	}
+	return nil
+}
+
+//_____________________________________________________________________
+
+type deliver struct {
+	store    state.SimpleDB
+	sender   sdk.Actor
+	params   Params
+	transfer transferFn
+}
+
+type transferFn func(sender, receiver sdk.Actor, coins coin.Coins) error
+
+var _ delegatedProofOfStake = deliver{} // enforce interface at compile time
+
 // These functions assume everything has been authenticated,
 // now we just perform action and save
-func (d deliverer) declareCandidacy(tx TxDeclareCandidacy) error {
+func (d deliver) declareCandidacy(tx TxDeclareCandidacy) error {
 
 	// create and save the empty candidate
 	bond := loadCandidate(d.store, tx.PubKey)
@@ -290,7 +317,7 @@ func (d deliverer) declareCandidacy(tx TxDeclareCandidacy) error {
 	return d.delegate(txDelegate)
 }
 
-func (d deliverer) editCandidacy(tx TxEditCandidacy) error {
+func (d deliver) editCandidacy(tx TxEditCandidacy) error {
 
 	// Get the pubKey bond account
 	candidate := loadCandidate(d.store, tx.PubKey)
@@ -319,7 +346,7 @@ func (d deliverer) editCandidacy(tx TxEditCandidacy) error {
 	return nil
 }
 
-func (d deliverer) delegate(tx TxDelegate) error {
+func (d deliver) delegate(tx TxDelegate) error {
 
 	// Get the pubKey bond account
 	candidate := loadCandidate(d.store, tx.PubKey)
@@ -331,7 +358,7 @@ func (d deliverer) delegate(tx TxDelegate) error {
 	}
 
 	// Move coins from the delegator account to the pubKey lock account
-	err := d.transferFn(d.sender, d.params.HoldAccount, coin.Coins{tx.Bond})
+	err := d.transfer(d.sender, d.params.HoldAccount, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
 	}
@@ -361,7 +388,7 @@ func (d deliverer) delegate(tx TxDelegate) error {
 	return nil
 }
 
-func (d deliverer) unbond(tx TxUnbond) error {
+func (d deliver) unbond(tx TxUnbond) error {
 
 	// get delegator bond
 	bond := loadDelegatorBond(d.store, d.sender, tx.PubKey)
@@ -406,15 +433,6 @@ func (d deliverer) unbond(tx TxUnbond) error {
 	// transfer coins back to account
 	txShares := int64(tx.Shares) // XXX: watch overflow
 	returnCoins := txShares      //currently each share is worth one coin
-	return d.transferFn(d.params.HoldAccount, d.sender,
+	return d.transfer(d.params.HoldAccount, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
-}
-
-// get the sender from the ctx and ensure it matches the tx pubkey
-func getTxSender(ctx sdk.Context) (sender sdk.Actor, err error) {
-	senders := ctx.GetPermissions("", auth.NameSigs)
-	if len(senders) != 1 {
-		return sender, ErrMissingSignature()
-	}
-	return senders[0], nil
 }

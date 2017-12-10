@@ -14,13 +14,21 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-func dummyTransferFn(store map[string]int64) transferFn {
-	return func(from, to sdk.Actor, coins coin.Coins) error {
-		store[string(from.Address)] -= int64(coins[0].Amount)
-		store[string(to.Address)] += int64(coins[0].Amount)
-		return nil
-	}
+//______________________________________________________________________
+
+type testCoinSender struct {
+	store map[string]int64
 }
+
+var _ coinSend = testCoinSender{} // enforce interface at compile time
+
+func (c testCoinSender) transferFn(sender, receiver sdk.Actor, coins coin.Coins) error {
+	c.store[string(sender.Address)] -= int64(coins[0].Amount)
+	c.store[string(receiver.Address)] += int64(coins[0].Amount)
+	return nil
+}
+
+//______________________________________________________________________
 
 func initAccounts(n int, amount int64) ([]sdk.Actor, map[string]int64) {
 	accStore := map[string]int64{}
@@ -74,13 +82,13 @@ func TestDuplicatesTxDeclareCandidacy(t *testing.T) {
 	senders, accStore := initAccounts(2, 1000) // for accounts
 	store := state.NewMemKVStore()
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     senders[0],
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   senders[0],
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
-	checker := checker{
+	checker := check{
 		store:  store,
 		sender: senders[0],
 	}
@@ -107,11 +115,11 @@ func TestIncrementsTxDelegate(t *testing.T) {
 	senders, accStore := initAccounts(1, initSender) // for accounts
 	store := state.NewMemKVStore()
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     senders[0],
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   senders[0],
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
 
 	// first declare candidacy
@@ -147,11 +155,11 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	initSender := int64(0)
 	senders, accStore := initAccounts(1, initSender) // for accounts
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     senders[0],
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   senders[0],
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
 
 	// set initial bond
@@ -217,11 +225,11 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 	senders, accStore := initAccounts(3, initSender)
 	pubKeys := []crypto.PubKey{pk1, pk2, pk3}
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     senders[0],
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   senders[0],
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
 
 	// bond them all
@@ -266,11 +274,11 @@ func TestMultipleTxDelegate(t *testing.T) {
 	accounts, accStore := initAccounts(3, 1000)
 	sender, delegators := accounts[0], accounts[1:]
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     sender,
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   sender,
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
 
 	//first make a candidate
@@ -310,11 +318,11 @@ func TestVoidCandidacy(t *testing.T) {
 	accounts, accStore := initAccounts(2, 1000) // for accounts
 	sender, delegator := accounts[0], accounts[1]
 
-	deliverer := deliverer{
-		store:      store,
-		sender:     sender,
-		params:     loadParams(store),
-		transferFn: dummyTransferFn(accStore),
+	deliverer := deliver{
+		store:    store,
+		sender:   sender,
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
 	}
 
 	// create the candidate
