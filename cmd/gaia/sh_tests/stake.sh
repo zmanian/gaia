@@ -43,10 +43,10 @@ oneTimeSetUp() {
     prepareClient
 
     # start the node server
-    initServer $BASE_DIR $CHAIN_ID
+    set +u ; initServer $BASE_DIR $CHAIN_ID ; set -u
     if [ $? != 0 ]; then return 1; fi
 
-    initClient $CHAIN_ID
+    set +u ; initClient $CHAIN_ID ; set -u
     if [ $? != 0 ]; then return 1; fi
 
     printf "...Testing may begin!\n\n\n"
@@ -55,7 +55,7 @@ oneTimeSetUp() {
 
 oneTimeTearDown() {
     kill -9 $PID_SERVER2 >/dev/null 2>&1
-    quickTearDown
+    set +u ; quickTearDown ; set -u
 }
 
 # XXX Ex Usage: checkCandidate $PUBKEY $EXPECTED_VOTING_POWER
@@ -98,19 +98,17 @@ checkDelegatorBondEmpty() {
 
 test00GetAccount() {
     SENDER=$(getAddr $RICH)
+    RECV=$(getAddr $POOR)
 
     assertFalse "line=${LINENO}, requires arg" "${CLIENT_EXE} query account"
 
-    checkAccount $SENDER "9007199254740992"
+    set +u ; checkAccount $SENDER "9007199254740992" ; set -u
 
     ACCT2=$(${CLIENT_EXE} query account $RECV 2>/dev/null)
     assertFalse "line=${LINENO}, has no genesis account" $?
 }
 
 test01SendTx() {
-    SENDER=$(getAddr $RICH)
-    RECV=$(getAddr $POOR)
-
     assertFalse "line=${LINENO}, missing dest" "${CLIENT_EXE} tx send --amount=992fermion --sequence=1"
     assertFalse "line=${LINENO}, bad password" "echo foo | ${CLIENT_EXE} tx send --amount=992fermion --sequence=1 --to=$RECV --name=$RICH"
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --amount=992fermion --sequence=1 --to=$RECV --name=$RICH)
@@ -118,13 +116,15 @@ test01SendTx() {
     HASH=$(echo $TX | jq .hash | tr -d \")
     TX_HEIGHT=$(echo $TX | jq .height)
 
-    checkAccount $SENDER "9007199254740000" $TX_HEIGHT
+    set +u 
+    checkAccount $SENDER "9007199254740000" $TX_HEIGHT 
     # make sure 0x prefix also works
     checkAccount "0x$SENDER" "9007199254740000" $TX_HEIGHT
-    checkAccount $RECV "992" $TX_HEIGHT
+    checkAccount $RECV "992" $TX_HEIGHT 
 
     # Make sure tx is indexed
-    checkSendTx $HASH $TX_HEIGHT $SENDER "992"
+    checkSendTx $HASH $TX_HEIGHT $SENDER "992" 
+    set -u
 }
 
 test02DeclareCandidacy() {
@@ -175,7 +175,7 @@ test02DeclareCandidacy() {
     if [ $? != 0 ]; then return 1; fi
     HASH=$(echo $TX | jq .hash | tr -d \")
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $CAND_ADDR "982" $TX_HEIGHT
+    set +u ; checkAccount $CAND_ADDR "982" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "10"
     checkDelegatorBond $CAND_ADDR $PK2 "10"
 }
@@ -186,20 +186,20 @@ test03Delegate() {
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx send --sequence=2 --amount=15fermion --to=$DELA_ADDR --name=$RICH)
     txSucceeded $? "$TX" "$DELA_ADDR"
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "15" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "15" $TX_HEIGHT ; set -u
 
     # delegate some coins to the new 
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=1 --amount=10fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "5" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "5" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "20"
     checkDelegatorBond $DELA_ADDR $PK2 "10"
 
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=2 --amount=3fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "2" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "2" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "23"
     checkDelegatorBond $DELA_ADDR $PK2 "13"
 
@@ -210,7 +210,7 @@ test03Delegate() {
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=3 --amount=3fermion --name=$DELEGATOR --pubkey=$PK2 2>/dev/null)
     if [ $? == 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "2" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "2" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "23"
     checkDelegatorBond $DELA_ADDR $PK2 "13"
 
@@ -218,7 +218,7 @@ test03Delegate() {
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx delegate --sequence=4 --amount=2fermion --name=$DELEGATOR --pubkey=$PK2)
     if [ $? != 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "null" $TX_HEIGHT #empty account is null 
+    set +u ; checkAccount $DELA_ADDR "null" $TX_HEIGHT ; set -u #empty account is null 
     checkCandidate $PK2 "25"
 }
 
@@ -226,7 +226,7 @@ test04Unbond() {
     # unbond from the delegator a bit
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=5 --shares=10 --name=$DELEGATOR --pubkey=$PK2)
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "10" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "10" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "15"
     checkDelegatorBond $DELA_ADDR $PK2 "5"
 
@@ -234,21 +234,21 @@ test04Unbond() {
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=6 --shares=10 --name=$DELEGATOR --pubkey=$PK2 2>/dev/null)
     if [ $? == 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "10" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "10" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "15"
     checkDelegatorBond $DELA_ADDR $PK2 "5"
 
     # unbond entirely from the delegator
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=6 --shares=5 --name=$DELEGATOR --pubkey=$PK2)
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $DELA_ADDR "15" $TX_HEIGHT
+    set +u ; checkAccount $DELA_ADDR "15" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "10"
     checkDelegatorBondEmpty $DELA_ADDR $PK2
 
     # unbond a bit from the owner
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=2 --shares=5 --name=$POOR --pubkey=$PK2)
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $CAND_ADDR "987" $TX_HEIGHT
+    set +u ; checkAccount $CAND_ADDR "987" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "5"
     checkDelegatorBond $CAND_ADDR $PK2 "5"
 
@@ -256,14 +256,14 @@ test04Unbond() {
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=3 --shares=10 --name=$POOR --pubkey=$PK2 2>/dev/null)
     if [ $? == 0 ]; then return 1; fi
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $CAND_ADDR "987" $TX_HEIGHT
+    set +u ; checkAccount $CAND_ADDR "987" $TX_HEIGHT ; set -u
     checkCandidate $PK2 "5"
     checkDelegatorBond $CAND_ADDR $PK2 "5"
 
     # unbond entirely from the validator
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx unbond --sequence=3 --shares=5 --name=$POOR --pubkey=$PK2)
     TX_HEIGHT=$(echo $TX | jq .height)
-    checkAccount $CAND_ADDR "992" $TX_HEIGHT
+    set +u ; checkAccount $CAND_ADDR "992" $TX_HEIGHT ; set -u
     checkCandidateEmpty $PK2
     checkDelegatorBondEmpty $CAND_ADDR $PK2
 }
