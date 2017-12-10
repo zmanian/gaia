@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -16,7 +17,6 @@ import (
 	scmds "github.com/cosmos/gaia/modules/stake/commands"
 
 	crypto "github.com/tendermint/go-crypto"
-	lightclient "github.com/tendermint/light-client"
 	"github.com/tendermint/tmlibs/common"
 )
 
@@ -70,7 +70,7 @@ func queryCandidate(w http.ResponseWriter, r *http.Request) {
 	var candidate stake.Candidate
 	key := stack.PrefixedKey(stake.Name(), stake.GetCandidateKey(pk))
 	height, err := query.GetParsed(key, &candidate, query.GetHeight(), prove)
-	if lightclient.IsNoDataErr(err) {
+	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("candidate bytes are empty for pubkey: %q", pkArg)
 		common.WriteError(w, err)
 		return
@@ -134,7 +134,7 @@ func queryDelegatorBond(w http.ResponseWriter, r *http.Request) {
 	var bond stake.DelegatorBond
 	key := stack.PrefixedKey(stake.Name(), stake.GetDelegatorBondKey(delegator, pk))
 	height, err := query.GetParsed(key, &bond, query.GetHeight(), prove)
-	if lightclient.IsNoDataErr(err) {
+	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("bond bytes are empty for pubkey: %q, address: %q", pkArg, delegatorAddr)
 		common.WriteError(w, err)
 		return
@@ -171,7 +171,7 @@ func queryDelegatorCandidates(w http.ResponseWriter, r *http.Request) {
 	var bond stake.DelegatorBond
 	key := stack.PrefixedKey(stake.Name(), stake.GetDelegatorBondsKey(delegator))
 	height, err := query.GetParsed(key, &bond, query.GetHeight(), prove)
-	if lightclient.IsNoDataErr(err) {
+	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("bond bytes are empty for address: %q", delegatorAddr)
 		common.WriteError(w, err)
 		return

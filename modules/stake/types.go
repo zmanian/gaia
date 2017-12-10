@@ -20,10 +20,10 @@ type Params struct {
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
-	GasDeclareCandidacy uint64 `json:"gas_declare_candidacy"`
-	GasEditCandidacy    uint64 `json:"gas_edit_candidacy"`
-	GasDelegate         uint64 `json:"gas_delegate"`
-	GasUnbond           uint64 `json:"gas_unbond"`
+	GasDeclareCandidacy int64 `json:"gas_declare_candidacy"`
+	GasEditCandidacy    int64 `json:"gas_edit_candidacy"`
+	GasDelegate         int64 `json:"gas_delegate"`
+	GasUnbond           int64 `json:"gas_unbond"`
 }
 
 func defaultParams() Params {
@@ -87,7 +87,7 @@ type Validator Candidate
 func (v Validator) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
 		PubKey: wire.BinaryBytes(v.PubKey),
-		Power:  v.VotingPower,
+		Power:  int64(v.VotingPower),
 	}
 }
 

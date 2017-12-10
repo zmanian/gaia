@@ -1,5 +1,5 @@
-hash: 2dd081a08130520bd7f3458aeb93aa1ef797a24b4b477c6bb51bf3c50280850c
-updated: 2017-12-01T18:16:03.968596+01:00
+hash: 349346ab67f6dab2c0df063a9bfae3a78d73b745a572fb3e5d464ec41d296b7f
+updated: 2017-12-10T22:19:12.831174596Z
 imports:
 - name: github.com/bgentry/speakeasy
   version: 4aabc24848ce5fd31929f7d1e4ea74d3709c14cd
@@ -10,7 +10,7 @@ imports:
 - name: github.com/BurntSushi/toml
   version: a368813c5e648fee92e5f6c30e3944ff9d5e8895
 - name: github.com/cosmos/cosmos-sdk
-  version: bbcb838bfef0dfb110d460f0df5a2b63144bb9b2
+  version: 71d8b36b619a3f200369ec9134ec4dd9cab5e99e
   subpackages:
   - app
   - client
@@ -70,6 +70,15 @@ imports:
   version: 71201497bace774495daed26a3874fd339e0b538
 - name: github.com/go-stack/stack
   version: 100eb0c0a9c5b306ca2fb4f165df21d80ada4b82
+- name: github.com/gogo/protobuf
+  version: 342cbe0a04158f6dcb03ca0079991a51a4248c02
+  subpackages:
+  - gogoproto
+  - jsonpb
+  - proto
+  - protoc-gen-gogo/descriptor
+  - sortkeys
+  - types
 - name: github.com/golang/protobuf
   version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
@@ -149,9 +158,10 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/tendermint/abci
-  version: 22b491bb1952125dd2fb0730d6ca8e59e310547c
+  version: fca2b508c185b855af1446ec4afc19bdfc7b315d
   subpackages:
   - client
+  - example/code
   - example/dummy
   - server
   - types
@@ -170,17 +180,15 @@ imports:
   - keys/wordlist
   - nano
 - name: github.com/tendermint/go-wire
-  version: 217a3c439f6497890d232ff5ed24084b43d9bfb3
+  version: 27be46e25124ddf775e23317a83647ce62a93f6b
   subpackages:
   - data
   - data/base58
-  - nowriter/tmencoding
+  - nowriter/tmlegacy
 - name: github.com/tendermint/iavl
   version: 595f3dcd5b6cd4a292e90757ae6d367fd7a6e653
-- name: github.com/tendermint/light-client
-  version: cb3f11b19e6d9b1392c85e0f09a66bfe75ca8baa
 - name: github.com/tendermint/tendermint
-  version: b2489b4318c843a64e2809517f93d906c5f9dc15
+  version: 12c5a57415f5e8dcc7b09422d66ba86a70668efa
   subpackages:
   - blockchain
   - cmd/tendermint/commands
@@ -212,7 +220,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: 21fb7819891997c96838308b4eba5a50b07ff03f
+  version: b49bce2bc3fb8fa25f676b9b49cce5e10f89b0c6
   subpackages:
   - autofile
   - cli
@@ -264,7 +272,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 844f573616520565fdc6fb4db242321b5456fd6d
+  version: 401e0e00e4bb830a10496d64cd95e068c5bf50de
   subpackages:
   - balancer
   - codes

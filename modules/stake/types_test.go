@@ -50,14 +50,14 @@ func candidatesFromActors(actors []sdk.Actor, amts []int) (candidates Candidates
 func testChange(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(val.VotingPower, chg.Power)
+	assert.Equal(int64(val.VotingPower), chg.Power)
 }
 
 // helper function test if Candidate is removed as abci.Validator
 func testRemove(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(uint64(0), chg.Power)
+	assert.Equal(int64(0), chg.Power)
 }
 
 //___________________________________________________________________________________

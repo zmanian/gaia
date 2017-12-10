@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/errors"
-
-	abci "github.com/tendermint/abci/types"
 )
 
 var (
@@ -26,30 +24,30 @@ var (
 	errInsufficientFunds     = fmt.Errorf("Insufficient bond shares")
 	errBadRemoveValidator    = fmt.Errorf("Error removing validator")
 
-	invalidInput = abci.CodeType_BaseInvalidInput
+	invalidInput = errors.CodeTypeBaseInvalidInput
 )
 
 func ErrBadValidatorAddr() error {
-	return errors.WithCode(errBadValidatorAddr, abci.CodeType_BaseUnknownAddress)
+	return errors.WithCode(errBadValidatorAddr, errors.CodeTypeBaseUnknownAddress)
 }
 func ErrCandidateExistsAddr() error {
-	return errors.WithCode(errCandidateExistsAddr, abci.CodeType_BaseInvalidInput)
+	return errors.WithCode(errCandidateExistsAddr, errors.CodeTypeBaseInvalidInput)
 }
 func ErrMissingSignature() error {
-	return errors.WithCode(errMissingSignature, abci.CodeType_BaseInvalidSignature)
+	return errors.WithCode(errMissingSignature, errors.CodeTypeUnauthorized)
 }
 func ErrBondNotNominated() error {
-	return errors.WithCode(errBondNotNominated, abci.CodeType_BaseInvalidOutput)
+	return errors.WithCode(errBondNotNominated, errors.CodeTypeBaseInvalidOutput)
 }
 func ErrNoCandidateForAddress() error {
-	return errors.WithCode(errNoCandidateForAddress, abci.CodeType_BaseUnknownAddress)
+	return errors.WithCode(errNoCandidateForAddress, errors.CodeTypeBaseUnknownAddress)
 }
 func ErrNoDelegatorForAddress() error {
-	return errors.WithCode(errNoDelegatorForAddress, abci.CodeType_BaseInvalidInput)
+	return errors.WithCode(errNoDelegatorForAddress, errors.CodeTypeBaseInvalidInput)
 }
 func ErrInsufficientFunds() error {
-	return errors.WithCode(errInsufficientFunds, abci.CodeType_InsufficientFunds)
+	return errors.WithCode(errInsufficientFunds, errors.CodeTypeBaseInvalidInput)
 }
 func ErrBadRemoveValidator() error {
-	return errors.WithCode(errBadRemoveValidator, abci.CodeType_InternalError)
+	return errors.WithCode(errBadRemoveValidator, errors.CodeTypeInternalErr)
 }

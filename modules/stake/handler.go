@@ -88,9 +88,9 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 		case "max_vals":
 			params.MaxVals = uint16(i)
 		case "gas_bond":
-			params.GasDelegate = uint64(i)
+			params.GasDelegate = int64(i)
 		case "gas_unbound":
-			params.GasUnbond = uint64(i)
+			params.GasUnbond = int64(i)
 		}
 	default:
 		return errors.ErrUnknownKey(key)
