@@ -8,9 +8,9 @@ Overall the Staking module should be rolled out in the following steps
 
 1. Self-Bonding
 2. Delegation
-4. Unbonding Period, Re-Delegation
-5. Validation Provision Atoms
-6. Fee Pool, Commission
+3. Unbonding Period, Re-Delegation
+4. Validation Provision Atoms
+5. Fee Pool, Commission
 
 ## Self-Bonding
 

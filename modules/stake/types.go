@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/cosmos/cosmos-sdk"
-	"github.com/cosmos/cosmos-sdk/modules/coin"
 	"github.com/cosmos/cosmos-sdk/state"
 
 	abci "github.com/tendermint/abci/types"
@@ -259,21 +258,4 @@ func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err err
 type DelegatorBond struct {
 	PubKey crypto.PubKey
 	Shares uint64
-}
-
-//_________________________________________________________________________
-
-// transfer coins
-type transferFn func(from sdk.Actor, to sdk.Actor, coins coin.Coins) error
-
-// default transfer runs full DeliverTX
-func defaultTransferFn(ctx sdk.Context, store state.SimpleDB, dispatch sdk.Deliver) transferFn {
-	return func(sender, receiver sdk.Actor, coins coin.Coins) error {
-		// Move coins from the delegator account to the pubKey lock account
-		send := coin.NewSendOneTx(sender, receiver, coins)
-
-		// If the deduction fails (too high), abort the command
-		_, err := dispatch.DeliverTx(ctx, store, send)
-		return err
-	}
 }
