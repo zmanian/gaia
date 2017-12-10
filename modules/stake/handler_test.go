@@ -63,6 +63,16 @@ func newTxUnbond(shares uint64, pubKey crypto.PubKey) TxUnbond {
 	}
 }
 
+func newDeliver(sender sdk.Actor, accStore map[string]int64) deliver {
+	store := state.NewMemKVStore()
+	return deliver{
+		store:    store,
+		sender:   sender,
+		params:   loadParams(store),
+		transfer: testCoinSender{accStore}.transferFn,
+	}
+}
+
 func newPubKey(pk string) crypto.PubKey {
 	pkBytes, _ := hex.DecodeString(pk)
 	var pkEd crypto.PubKeyEd25519
@@ -80,16 +90,10 @@ var (
 func TestDuplicatesTxDeclareCandidacy(t *testing.T) {
 	assert := assert.New(t)
 	senders, accStore := initAccounts(2, 1000) // for accounts
-	store := state.NewMemKVStore()
 
-	deliverer := deliver{
-		store:    store,
-		sender:   senders[0],
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(senders[0], accStore)
 	checker := check{
-		store:  store,
+		store:  deliverer.store,
 		sender: senders[0],
 	}
 
@@ -113,14 +117,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 	assert := assert.New(t)
 	initSender := int64(1000)
 	senders, accStore := initAccounts(1, initSender) // for accounts
-	store := state.NewMemKVStore()
-
-	deliverer := deliver{
-		store:    store,
-		sender:   senders[0],
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(senders[0], accStore)
 
 	// first declare candidacy
 	bondAmount := int64(10)
@@ -137,7 +134,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the accounts and the bond account have the appropriate values
-		candidates := loadCandidates(store)
+		candidates := loadCandidates(deliverer.store)
 		expectedBond += bondAmount
 		expectedSender := initSender - expectedBond
 		gotBonded := int64(candidates[0].Shares)
@@ -151,16 +148,9 @@ func TestIncrementsTxDelegate(t *testing.T) {
 
 func TestIncrementsTxUnbond(t *testing.T) {
 	assert := assert.New(t)
-	store := state.NewMemKVStore() // for bonds
 	initSender := int64(0)
 	senders, accStore := initAccounts(1, initSender) // for accounts
-
-	deliverer := deliver{
-		store:    store,
-		sender:   senders[0],
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(senders[0], accStore)
 
 	// set initial bond
 	initBond := int64(1000)
@@ -178,7 +168,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the accounts and the bond account have the appropriate values
-		candidates := loadCandidates(store)
+		candidates := loadCandidates(deliverer.store)
 		expectedBond := initBond - int64(i+1)*int64(unbondAmount) // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
 		gotBonded := int64(candidates[0].Shares)
@@ -220,17 +210,10 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 func TestMultipleTxDeclareCandidacy(t *testing.T) {
 	assert := assert.New(t)
-	store := state.NewMemKVStore()
 	initSender := int64(1000)
 	senders, accStore := initAccounts(3, initSender)
 	pubKeys := []crypto.PubKey{pk1, pk2, pk3}
-
-	deliverer := deliver{
-		store:    store,
-		sender:   senders[0],
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(senders[0], accStore)
 
 	// bond them all
 	for i, sender := range senders {
@@ -240,7 +223,7 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is bonded
-		candidates := loadCandidates(store)
+		candidates := loadCandidates(deliverer.store)
 		val := candidates[i]
 		balanceGot, balanceExpd := accStore[string(val.Owner.Address)], initSender-10
 		assert.Equal(i+1, len(candidates), "expected %d candidates got %d, candidates: %v", i+1, len(candidates), candidates)
@@ -250,17 +233,17 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 
 	// unbond them all
 	for i, sender := range senders {
-		candidatePre := loadCandidate(store, pubKeys[i])
+		candidatePre := loadCandidate(deliverer.store, pubKeys[i])
 		txUndelegate := newTxUnbond(10, pubKeys[i])
 		deliverer.sender = sender
 		got := deliverer.unbond(txUndelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is unbonded
-		candidates := loadCandidates(store)
+		candidates := loadCandidates(deliverer.store)
 		assert.Equal(len(senders)-(i+1), len(candidates), "expected %d candidates got %d", len(senders)-(i+1), len(candidates))
 
-		candidatePost := loadCandidate(store, pubKeys[i])
+		candidatePost := loadCandidate(deliverer.store, pubKeys[i])
 		balanceGot, balanceExpd := accStore[string(candidatePre.Owner.Address)], initSender
 		assert.Nil(candidatePost, "expected nil candidate retrieve, got %d", 0, candidatePost)
 		assert.Equal(balanceExpd, balanceGot, "expected account to have %d, got %d", balanceExpd, balanceGot)
@@ -269,17 +252,9 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 
 func TestMultipleTxDelegate(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
-
-	store := state.NewMemKVStore()
 	accounts, accStore := initAccounts(3, 1000)
 	sender, delegators := accounts[0], accounts[1:]
-
-	deliverer := deliver{
-		store:    store,
-		sender:   sender,
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(sender, accStore)
 
 	//first make a candidate
 	txDeclareCandidacy := newTxDeclareCandidacy(10, pk1)
@@ -294,7 +269,7 @@ func TestMultipleTxDelegate(t *testing.T) {
 		require.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is bonded
-		bond := loadDelegatorBond(store, delegator, pk1)
+		bond := loadDelegatorBond(deliverer.store, delegator, pk1)
 		assert.NotNil(bond, "expected delegatee bond %d to exist", bond)
 	}
 
@@ -306,24 +281,16 @@ func TestMultipleTxDelegate(t *testing.T) {
 		require.NoError(got, "expected tx %d to be ok, got %v", i, got)
 
 		//Check that the account is unbonded
-		bond := loadDelegatorBond(store, delegator, pk1)
+		bond := loadDelegatorBond(deliverer.store, delegator, pk1)
 		assert.Nil(bond, "expected delegatee bond %d to be nil", bond)
 	}
 }
 
 func TestVoidCandidacy(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
-
-	store := state.NewMemKVStore()              // for bonds
 	accounts, accStore := initAccounts(2, 1000) // for accounts
 	sender, delegator := accounts[0], accounts[1]
-
-	deliverer := deliver{
-		store:    store,
-		sender:   sender,
-		params:   loadParams(store),
-		transfer: testCoinSender{accStore}.transferFn,
-	}
+	deliverer := newDeliver(sender, accStore)
 
 	// create the candidate
 	txDeclareCandidacy := newTxDeclareCandidacy(10, pk1)

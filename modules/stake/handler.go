@@ -146,9 +146,6 @@ func (h Handler) CheckTx(ctx sdk.Context, store state.SimpleDB,
 func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 	tx sdk.Tx, dispatch sdk.Deliver) (res sdk.DeliverResult, err error) {
 
-	// TODO remove nessesity for this defer (and used function)
-	//defer updateVotingPower(store)
-
 	// TODO: remove redundancy
 	// also we don't need to check the res - gas is already deducted in sdk
 	_, err = h.CheckTx(ctx, store, tx, nil)
