@@ -3,6 +3,7 @@ package stake
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/tendermint/tmlibs/log"
 
@@ -75,21 +76,33 @@ func (Handler) initState(module, key, value string, store state.SimpleDB) error 
 	case "allowed_bond_denom":
 		params.AllowedBondDenom = value
 	case "max_vals",
-		"gas_bond",
+		"unbonding_period",
+		"gas_declare_candidacy",
+		"gas_edit_candidacy",
+		"gas_delegate",
+		"gas_unbound",
 		"gas_unbond":
 
-		// TODO: enforce non-negative integers in input
 		i, err := strconv.Atoi(value)
 		if err != nil {
 			return fmt.Errorf("input must be integer, Error: %v", err.Error())
+		}
+		if i < 0 {
+			return fmt.Errorf("input must be non-negative")
 		}
 
 		switch key {
 		case "max_vals":
 			params.MaxVals = uint16(i)
-		case "gas_bond":
+		case "unbonding_period":
+			params.UnbondingPeriod = time.Hour * time.Duration(i) //TODO make reference of this being in hours
+		case "gas_declare_candidacy":
+			params.GasDeclareCandidacy = int64(i)
+		case "gas_edit_candidacy":
+			params.GasEditCandidacy = int64(i)
+		case "gas_delegate":
 			params.GasDelegate = int64(i)
-		case "gas_unbound":
+		case "gas_unbond":
 			params.GasUnbond = int64(i)
 		}
 	default:

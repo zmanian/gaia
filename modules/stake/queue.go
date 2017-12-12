@@ -6,41 +6,54 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
+	crypto "github.com/tendermint/go-crypto"
 )
 
-// Queue - Abstract queue implementation object
-type Queue struct {
-	slot  byte           //Queue name in the store
-	store state.SimpleDB //Queue store
+// Queue - interface for a queue
+type Queue interface {
+	Push(bytes []byte)
+	Pop()
+	Peek() []byte
+}
+
+//______________________________________________________________________________
+
+// MerkleQueue - Abstract queue implementation object
+type MerkleQueue struct {
+	slot  byte           //MerkleQueue name in the store
+	store state.SimpleDB //MerkleQueue store
 	tail  uint64         //Start position of the queue
 	head  uint64         //End position of the queue
 }
 
-func (q Queue) headPositionKey() []byte { return []byte{q.slot, 0x00} }
-func (q Queue) tailPositionKey() []byte { return []byte{q.slot, 0x01} }
+var _ Queue = &MerkleQueue{} //enforce interface at compile time
+
+func (q MerkleQueue) headPositionKey() []byte { return []byte{q.slot, 0x00} }
+func (q MerkleQueue) tailPositionKey() []byte { return []byte{q.slot, 0x01} }
 
 // queueKey - get the key for the queue'd record at position 'n'
-func (q Queue) queueKey(n uint64) []byte {
+func (q MerkleQueue) queueKey(n uint64) []byte {
 	b := make([]byte, 9)
 	b[0] = q.slot //add prepended byte
 	binary.BigEndian.PutUint64(b[1:], n)
 	return b
 }
 
-// NewQueue - create a new generic queue under the designate slot
-func NewQueue(slot byte, store state.SimpleDB) (*Queue, error) {
-	q := &Queue{
+// NewMerkleQueue - create a new generic queue under the designate slot
+func NewMerkleQueue(slot byte, store state.SimpleDB) (*MerkleQueue, error) {
+	q := &MerkleQueue{
 		slot:  slot,
 		store: store,
 		tail:  0,
 		head:  0,
 	}
 
-	// Test to make sure that the Queue doesn't already exist
+	// Test to make sure that the MerkleQueue doesn't already exist
 	headBytes := store.Get(q.headPositionKey())
 	if headBytes != nil {
-		return q, fmt.Errorf("cannot create a Queue under the slot %v, Queue already exists", slot)
+		return q, fmt.Errorf("cannot create a MerkleQueue under the slot %v, MerkleQueue already exists", slot)
 	}
 
 	// Set the position bytes
@@ -52,9 +65,9 @@ func NewQueue(slot byte, store state.SimpleDB) (*Queue, error) {
 }
 
 // LoadQueue - load an existing queue for the slot
-func LoadQueue(slot byte, store state.SimpleDB) (*Queue, error) {
+func LoadQueue(slot byte, store state.SimpleDB) (*MerkleQueue, error) {
 
-	q := &Queue{
+	q := &MerkleQueue{
 		slot:  slot,
 		store: store,
 		tail:  0,
@@ -64,48 +77,48 @@ func LoadQueue(slot byte, store state.SimpleDB) (*Queue, error) {
 	headBytes := store.Get(q.headPositionKey())
 	if headBytes == nil {
 		//Create a new queue if the head information doesn't exist
-		return NewQueue(slot, store)
+		return NewMerkleQueue(slot, store)
 
-		//return q, fmt.Errorf("cannot load Queue under the slot %v, head does not exists", slot)
+		//return q, fmt.Errorf("cannot load MerkleQueue under the slot %v, head does not exists", slot)
 	}
 	q.head = binary.BigEndian.Uint64(headBytes)
 
 	tailBytes := store.Get(q.tailPositionKey())
 	if tailBytes == nil {
-		return q, fmt.Errorf("cannot load Queue under the slot %v, tail does not exists", slot)
+		return q, fmt.Errorf("cannot load MerkleQueue under the slot %v, tail does not exists", slot)
 	}
 	q.tail = binary.BigEndian.Uint64(tailBytes)
 
 	return q, nil
 }
 
-func (q *Queue) incrementHead() {
+func (q *MerkleQueue) incrementHead() {
 	q.head++
 	headBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(headBytes, q.head)
 	q.store.Set(q.headPositionKey(), headBytes)
 }
 
-func (q *Queue) incrementTail() {
+func (q *MerkleQueue) incrementTail() {
 	q.tail++
 	tailBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(tailBytes, q.tail)
 	q.store.Set(q.tailPositionKey(), tailBytes)
 }
 
-func (q Queue) length() uint64 {
+func (q MerkleQueue) length() uint64 {
 	return (q.tail - q.head)
 }
 
 // Push - Add to the beginning/tail of the queue
-func (q *Queue) Push(bytes []byte) {
+func (q *MerkleQueue) Push(bytes []byte) {
 	pushKey := q.queueKey(q.tail)
 	q.store.Set(pushKey, bytes)
 	q.incrementTail()
 }
 
 // Pop - Remove from the end/head of queue
-func (q *Queue) Pop() {
+func (q *MerkleQueue) Pop() {
 	if q.length() == 0 {
 		return
 	}
@@ -115,7 +128,7 @@ func (q *Queue) Pop() {
 }
 
 // Peek - Get the end/head record on the queue
-func (q Queue) Peek() []byte {
+func (q MerkleQueue) Peek() []byte {
 	if q.length() == 0 {
 		return nil
 	}
@@ -123,19 +136,31 @@ func (q Queue) Peek() []byte {
 	return q.store.Get(peekKey)
 }
 
-// GetAll - Return an array of all the elements inside the queue
-//func (q Queue) GetAll() [][]byte {
-////panic(fmt.Sprintf("length %v, head %v, tail %v", q.length() == 0, q.head, q.tail))
-//if q.length() == 0 {
-//return nil
-//}
-//var res [][]byte
-//for i := q.head; i < q.tail; i++ {
-//key := q.queueKey(i)
-//res = append(res, q.store.Get(key))
-////panic(fmt.Sprintf("%v", q.store.Get(key)))
-////panic(fmt.Sprintf("%v", q.Peek()))
-//}
-////panic(fmt.Sprintf("%v", res))
-//return res
-//}
+//______________________________________________________________________________
+
+// QueueElem - TODO
+type QueueElem struct {
+	Candidate  crypto.PubKey
+	InitHeight uint64 // when the queue was initiated
+}
+
+// QueueElemUnbondDelegation - TODO
+type QueueElemUnbondDelegation struct {
+	QueueElem
+	Payout          sdk.Actor // account to pay out to
+	Amount          uint64    // amount of shares which are unbonding
+	StartSlashRatio uint64    // old candidate slash ratio at start of re-delegation
+}
+
+// QueueElemReDelegate - TODO
+type QueueElemReDelegate struct {
+	QueueElem
+	Payout       sdk.Actor     // account to pay out to
+	Shares       uint64        // amount of shares which are unbonding
+	NewCandidate crypto.PubKey // validator to bond to after unbond
+}
+
+// QueueElemUnbondCandidate - TODO
+type QueueElemUnbondCandidate struct {
+	QueueElem
+}

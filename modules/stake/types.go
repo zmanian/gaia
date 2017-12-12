@@ -3,6 +3,7 @@ package stake
 import (
 	"bytes"
 	"sort"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
@@ -16,8 +17,9 @@ import (
 type Params struct {
 	HoldAccount sdk.Actor `json:"hold_account"` // PubKey where all bonded coins are held
 
-	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
-	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
+	MaxVals          uint16        `json:"max_vals"`           // maximum number of validators
+	UnbondingPeriod  time.Duration `json:"unbonding_period"`   // duration of time blocks are held in the unbonding queue
+	AllowedBondDenom string        `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
 	GasDeclareCandidacy int64 `json:"gas_declare_candidacy"`
@@ -30,6 +32,7 @@ func defaultParams() Params {
 	return Params{
 		HoldAccount:         sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
 		MaxVals:             100,
+		UnbondingPeriod:     time.Hour * 24 * 21, // three weeks
 		AllowedBondDenom:    "fermion",
 		GasDeclareCandidacy: 20,
 		GasEditCandidacy:    20,
@@ -40,6 +43,16 @@ func defaultParams() Params {
 
 //_________________________________________________________________________
 
+// CandidateStatus - status of the candidate
+type CandidateStatus byte
+
+const (
+	//nolint
+	Active    CandidateStatus = 0x00
+	Unbonding CandidateStatus = 0x01
+	Unbonded  CandidateStatus = 0x02
+)
+
 // Candidate defines the total amount of bond shares and their exchange rate to
 // coins. Accumulation of interest is modelled as an in increase in the
 // exchange rate, and slashing as a decrease.  When coins are delegated to this
@@ -49,19 +62,24 @@ func defaultParams() Params {
 // exchange rate.
 // NOTE if the Owner.Empty() == true then this is a candidate who has revoked candidacy
 type Candidate struct {
-	PubKey      crypto.PubKey `json:"pub_key"`      // Pubkey of candidate
-	Owner       sdk.Actor     `json:"owner"`        // Sender of BondTx - UnbondTx returns here
-	Shares      uint64        `json:"shares"`       // Total number of delegated shares to this candidate, equivalent to coins held in bond account
-	VotingPower uint64        `json:"voting_power"` // Voting power if pubKey is a considered a validator
-	Description Description   `json:"description"`  // Description terms for the candidate
+	Status             CandidateStatus
+	ValidateHeight     uint64        `json:"slashratio"`          // the height candidate became a validator
+	PubKey             crypto.PubKey `json:"pub_key"`             // Pubkey of candidate
+	Owner              sdk.Actor     `json:"owner"`               // Sender of BondTx - UnbondTx returns here
+	ReDelegatingShares uint64        `json:"redelegating_shares"` // Delegator shares currently re-delegating
+	Shares             uint64        `json:"shares"`              // Total number of delegated shares to this candidate
+	VotingPower        uint64        `json:"voting_power"`        // Voting power if pubKey is a considered a validator
+	SlashRatio         uint64        `json:"slashratio"`          // multiplicative slash ratio for this candidate
+	Description        Description   `json:"description"`         // description terms for the candidate
 }
 
 // Description - description fields for a candidate
 type Description struct {
-	Moniker  string `json:"moniker"`
-	Identity string `json:"identity"`
-	Website  string `json:"website"`
-	Details  string `json:"details"`
+	Moniker     string    `json:"moniker"`
+	Identity    string    `json:"identity"`
+	Website     string    `json:"website"`
+	Details     string    `json:"details"`
+	DeclareTime time.Time `json:"declare_time"` // unix time which the candidate declared it's candidacy
 }
 
 // NewCandidate - initialize a new candidate
