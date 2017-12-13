@@ -64,6 +64,6 @@ func tickFn(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, er
 	store = stack.PrefixedStore(stake.Name(), store)
 
 	// execute Tick
-	change, err = stake.UpdateValidatorSet(store)
+	change, err = stake.Tick(ctx, store)
 	return
 }

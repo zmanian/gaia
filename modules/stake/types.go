@@ -14,7 +14,10 @@ import (
 
 // Params defines the high level settings for staking
 type Params struct {
-	HoldAccount sdk.Actor `json:"hold_account"` // PubKey where all bonded coins are held
+	IssuedGlobalStakeShares int64     `json:"issued_stake_shares"` // sum of all the validators global shares
+	BondedTokenPool         int64     `json:"bonded_token_pool"`   // reserve of all bonded tokens
+	HoldBonded              sdk.Actor `json:"hold_bonded"`         // PubKey where all bonded coins are held
+	HoldUnbonded            sdk.Actor `json:"hold_unbonded"`       // PubKey where all delegated but unbonded coins are held
 
 	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
@@ -28,17 +31,29 @@ type Params struct {
 
 func defaultParams() Params {
 	return Params{
-		HoldAccount:         sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
-		MaxVals:             100,
-		AllowedBondDenom:    "fermion",
-		GasDeclareCandidacy: 20,
-		GasEditCandidacy:    20,
-		GasDelegate:         20,
-		GasUnbond:           20,
+		IssuedGlobalStakeShares: 0,
+		BondedTokenPool:         0,
+		HoldBonded:              sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
+		HoldUnbonded:            sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
+		MaxVals:                 100,
+		AllowedBondDenom:        "fermion",
+		GasDeclareCandidacy:     20,
+		GasEditCandidacy:        20,
+		GasDelegate:             20,
+		GasUnbond:               20,
 	}
 }
 
 //_________________________________________________________________________
+
+// CandidateStatus - status of a validator-candidate
+type CandidateStatus byte
+
+const (
+	// nolint
+	Active   CandidateStatus = 0x00
+	Unbonded CandidateStatus = 0x01
+)
 
 // Candidate defines the total amount of bond shares and their exchange rate to
 // coins. Accumulation of interest is modelled as an in increase in the
@@ -47,13 +62,15 @@ func defaultParams() Params {
 // bond shares is based on the amount of coins delegated divided by the current
 // exchange rate. Voting power can be calculated as total bonds multiplied by
 // exchange rate.
-// NOTE if the Owner.Empty() == true then this is a candidate who has revoked candidacy
 type Candidate struct {
-	PubKey      crypto.PubKey `json:"pub_key"`      // Pubkey of candidate
-	Owner       sdk.Actor     `json:"owner"`        // Sender of BondTx - UnbondTx returns here
-	Shares      uint64        `json:"shares"`       // Total number of delegated shares to this candidate, equivalent to coins held in bond account
-	VotingPower uint64        `json:"voting_power"` // Voting power if pubKey is a considered a validator
-	Description Description   `json:"description"`  // Description terms for the candidate
+	Status                CandidateStatus `json:"status"`                  // Bonded status of validator
+	PubKey                crypto.PubKey   `json:"pub_key"`                 // Pubkey of candidate
+	Owner                 sdk.Actor       `json:"owner"`                   // Sender of BondTx - UnbondTx returns here
+	SharesPool            uint64          `json:"shares_global_stake"`     // total shares of the glo
+	SharesIssuedDelegator uint64          `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
+	Shares                uint64          `json:"shares"`                  // Total number of delegated shares to this candidate
+	VotingPower           uint64          `json:"voting_power"`            // Voting power if pubKey is a considered a validator
+	Description           Description     `json:"description"`             // Description terms for the candidate
 }
 
 // Description - description fields for a candidate

@@ -63,7 +63,7 @@ BondedTokens are held in a global account.
 ``` golang
 type Param struct {
 	BondedTokenPool    uint64     // reserve of all bonded tokens  
-	HoldBondedBonded auth.Account  // Protocol account for bonded tokens 
+	HoldBonded auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -322,8 +322,8 @@ is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 ``` golang
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
-	BondedTokenPool           uint64  // reserve of all bonded tokens  
-	HoldBondedBonded        auth.Account  // Protocol account for bonded tokens 
+	BondedTokenPool          uint64  // reserve of all bonded tokens  
+	HoldBonded               auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -515,8 +515,8 @@ type Param struct {
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
 	FeeHoldingsShares        uint64       // total accumulated shares created for the fee holdings
 	FeeHoldingsBondedTokens  uint64       // total bonded tokens of validators considered when adding shares to FeeHoldings
-	HoldBondedBonded        auth.Account // Protocol account for bonded tokens 
-	HoldBondedFeePool       auth.Account // Protocol account for the fee pool 
+	HoldBonded               auth.Account // Protocol account for bonded tokens 
+	HoldFeePool              auth.Account // Protocol account for the fee pool 
 	DateLastCommissionReset  uint64       // Unix Timestamp for last commission accounting reset
 }
 ```

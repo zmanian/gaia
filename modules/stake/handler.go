@@ -185,7 +185,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		//context with hold account permissions
 		params := loadParams(store)
 		res.GasUsed = params.GasUnbond
-		ctx2 := ctx.WithPermissions(params.HoldAccount)
+		ctx2 := ctx.WithPermissions(params.HoldBonded)
 		deliverer.transfer = coinSender{
 			store:    store,
 			dispatch: dispatch,
@@ -312,6 +312,8 @@ func (d deliver) declareCandidacy(tx TxDeclareCandidacy) error {
 	// the candidate account will be updated automatically here
 	txDelegate := TxDelegate{tx.BondUpdate}
 	return d.delegate(txDelegate)
+
+	//XXX Update the params IssuedGlobalStakeShares and also Candidate.SharesPool
 }
 
 func (d deliver) editCandidacy(tx TxEditCandidacy) error {
@@ -321,7 +323,7 @@ func (d deliver) editCandidacy(tx TxEditCandidacy) error {
 	if candidate == nil {
 		return ErrBondNotNominated()
 	}
-	if candidate.Owner.Empty() { //candidate has been withdrawn
+	if candidate.Status == Unbonded { //candidate has been withdrawn
 		return ErrBondNotNominated()
 	}
 
@@ -350,12 +352,12 @@ func (d deliver) delegate(tx TxDelegate) error {
 	if candidate == nil {
 		return ErrBondNotNominated()
 	}
-	if candidate.Owner.Empty() { //candidate has been withdrawn
+	if candidate.Status == Unbonded { //candidate has been withdrawn
 		return ErrBondNotNominated()
 	}
 
 	// Move coins from the delegator account to the pubKey lock account
-	err := d.transfer(d.sender, d.params.HoldAccount, coin.Coins{tx.Bond})
+	err := d.transfer(d.sender, d.params.HoldBonded, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
 	}
@@ -382,6 +384,8 @@ func (d deliver) delegate(tx TxDelegate) error {
 	saveCandidate(d.store, candidate)
 	saveDelegatorBond(d.store, d.sender, bond)
 
+	//XXX Update the params IssuedGlobalStakeShares and also Candidate.SharesPool
+
 	return nil
 }
 
@@ -405,12 +409,13 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 	bond.Shares -= tx.Shares
 
+	rejectCandidacy := false
 	if bond.Shares == 0 {
 
 		// if the bond is the owner of the candidate then
-		// trigger a reject candidacy by setting Owner to Empty Actor
+		// trigger a reject candidacy
 		if d.sender.Equals(candidate.Owner) {
-			candidate.Owner = sdk.Actor{}
+			rejectCandidacy = true
 		}
 
 		// remove the bond
@@ -429,7 +434,25 @@ func (d deliver) unbond(tx TxUnbond) error {
 
 	// transfer coins back to account
 	txShares := int64(tx.Shares) // XXX: watch overflow
-	returnCoins := txShares      //currently each share is worth one coin
-	return d.transfer(d.params.HoldAccount, d.sender,
+	returnCoins := txShares      // XXX NEEDS UPDATE
+	err := d.transfer(d.params.HoldBonded, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
+	if err != nil {
+		return err
+	}
+	// XXX Adjust the params.IssuedGlobalStakeShares to the new rate for the unbonding pool
+
+	// lastly if an reject candidate if necessary
+	if rejectCandidacy {
+		candidate.Status = Unbonded
+
+		transferCoins := candidate.SharesPool // XXX NEEDS UPDATE
+
+		// XXX Adjust the SharesPool to the new rate for the unbonding pool
+
+		return d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
+			coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
+	}
+
+	// XXX save the params
 }
