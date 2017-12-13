@@ -49,7 +49,7 @@ Within the store, each `ValidatorBond` is stored by validator-pubkey.
  - value: `ValidatorBond` object
 
 A second key-value pair is also maintained by the store in order to quickly
-sort though the the group of all validator-candidates: 
+sort though the group of all validator-candidates: 
 
  - key: `ValidatorBond.BondedTokens`
  - value: `ValidatorBond.PubKey`
@@ -63,7 +63,7 @@ BondedTokens are held in a global account.
 ``` golang
 type Param struct {
 	BondedTokenPool    uint64     // reserve of all bonded tokens  
-	HoldAccountBonded auth.Account  // Protocol account for bonded tokens 
+	HoldBondedBonded auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -116,7 +116,7 @@ staking provisions is introduced, the shares will not be equal to the number of
 coins bonded to the candidate. 
 
 DelegatorBond represents some bond shares held by an account. It is owned by
-one delegator, and is associated with the voting power of one delegatee. The
+one delegator, and is associated with the voting power of one validator. The
 sender of the transaction is considered to be the owner of the bond being sent. 
 
 ``` golang
@@ -201,8 +201,8 @@ type QueueElemUnbondDelegation struct {
 
 The queue is ordered so the next to unbond is at the head.  Every tick the head
 of the queue is checked and if the unbonding period has passed since
-`InitHeight` commence with final settlment of the unbonding and pop the queue.
-Currently the each share to unbond is equivelent to a single unbonding token,
+`InitHeight` commence with final settlement of the unbonding and pop the queue.
+Currently the each share to unbond is equivalent to a single unbonding token,
 although in later phases shares are used along with other terms to calculate
 the coins.
 
@@ -323,7 +323,7 @@ is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 type Param struct {
 	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
 	BondedTokenPool           uint64  // reserve of all bonded tokens  
-	HoldAccountBonded        auth.Account  // Protocol account for bonded tokens 
+	HoldBondedBonded        auth.Account  // Protocol account for bonded tokens 
 }
 ```
 
@@ -515,8 +515,8 @@ type Param struct {
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
 	FeeHoldingsShares        uint64       // total accumulated shares created for the fee holdings
 	FeeHoldingsBondedTokens  uint64       // total bonded tokens of validators considered when adding shares to FeeHoldings
-	HoldAccountBonded        auth.Account // Protocol account for bonded tokens 
-	HoldAccountFeePool       auth.Account // Protocol account for the fee pool 
+	HoldBondedBonded        auth.Account // Protocol account for bonded tokens 
+	HoldBondedFeePool       auth.Account // Protocol account for the fee pool 
 	DateLastCommissionReset  uint64       // Unix Timestamp for last commission accounting reset
 }
 ```
@@ -534,7 +534,7 @@ as fees are collected.  When the validator is the proposer of a block then the
 passive calculation of the fee pool shares takes place.  Additionally, when the
 validator is the proposer of the round then a skew factor is provided to this
 block give this validator an incentive to provide non-empty blocks. The skew
-factor is calculated from precommits Tendermint messages and will be 1 for
+factor is calculated from pre-commits Tendermint messages and will be 1 for
 non-proposer nodes and between 1.01 and 1.05 for proposer nodes.  
 
 ```
