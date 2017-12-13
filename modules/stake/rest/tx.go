@@ -45,7 +45,7 @@ type unbondInput struct {
 
 	Pubkey crypto.PubKey `json:"pub_key"`
 	From   *sdk.Actor    `json:"from"`
-	Amount uint64        `json:"amount"`
+	Amount int64        `json:"amount"`
 }
 
 // RegisterDelegate is a mux.Router handler that exposes

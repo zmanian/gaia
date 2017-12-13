@@ -376,7 +376,7 @@ func (d deliver) delegate(tx TxDelegate) error {
 	}
 
 	// Add shares to delegator bond and candidate
-	bondAmount := uint64(tx.Bond.Amount) // XXX: checked for underflow in ValidateBasic
+	bondAmount := tx.Bond.Amount // XXX: checked for underflow in ValidateBasic
 	bond.Shares += bondAmount
 	candidate.Shares += bondAmount
 
@@ -433,8 +433,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// transfer coins back to account
-	txShares := int64(tx.Shares) // XXX: watch overflow
-	returnCoins := txShares      // XXX NEEDS UPDATE
+	returnCoins := tx.Shares // XXX NEEDS UPDATE
 	err := d.transfer(d.params.HoldBonded, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 	if err != nil {

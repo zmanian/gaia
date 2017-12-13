@@ -23,8 +23,8 @@ type testCoinSender struct {
 var _ coinSend = testCoinSender{} // enforce interface at compile time
 
 func (c testCoinSender) transferFn(sender, receiver sdk.Actor, coins coin.Coins) error {
-	c.store[string(sender.Address)] -= int64(coins[0].Amount)
-	c.store[string(receiver.Address)] += int64(coins[0].Amount)
+	c.store[string(sender.Address)] -= coins[0].Amount
+	c.store[string(receiver.Address)] += coins[0].Amount
 	return nil
 }
 
@@ -56,7 +56,7 @@ func newTxDelegate(amt int64, pubKey crypto.PubKey) TxDelegate {
 	}}
 }
 
-func newTxUnbond(shares uint64, pubKey crypto.PubKey) TxUnbond {
+func newTxUnbond(shares int64, pubKey crypto.PubKey) TxUnbond {
 	return TxUnbond{
 		PubKey: pubKey,
 		Shares: shares,
@@ -137,7 +137,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond += bondAmount
 		expectedSender := initSender - expectedBond
-		gotBonded := int64(candidates[0].Shares)
+		gotBonded := candidates[0].Shares
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
 		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
@@ -160,7 +160,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 	// just send the same txunbond multiple times
 	holder := deliverer.params.HoldAccount
-	unbondAmount := uint64(10)
+	unbondAmount := int64(10)
 	txUndelegate := newTxUnbond(unbondAmount, pk1)
 	nUnbonds := 5
 	for i := 0; i < nUnbonds; i++ {
@@ -169,9 +169,9 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 		//Check that the accounts and the bond account have the appropriate values
 		candidates := loadCandidates(deliverer.store)
-		expectedBond := initBond - int64(i+1)*int64(unbondAmount) // +1 since we send 1 at the start of loop
+		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
-		gotBonded := int64(candidates[0].Shares)
+		gotBonded := candidates[0].Shares
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
 
@@ -181,12 +181,12 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	}
 
 	// these are more than we have bonded now
-	errorCases := []uint64{
+	errorCases := []int64{
 		1<<64 - 1, // more than int64
 		1<<63 + 1, // more than int64
 		1<<63 - 1,
 		1 << 31,
-		uint64(initBond),
+		initBond,
 	}
 	for _, c := range errorCases {
 		unbondAmount := c
@@ -195,7 +195,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		assert.Error(got, "expected unbond tx to fail")
 	}
 
-	leftBonded := uint64(initBond - int64(unbondAmount)*int64(nUnbonds))
+	leftBonded := initBond - unbondAmount*nUnbonds
 
 	// should be unable to unbond one more than we have
 	txUndelegate = newTxUnbond(leftBonded+1, pk1)

@@ -32,13 +32,13 @@ var pks = []crypto.PubKey{
 
 // NOTE: PubKey is supposed to be the binaryBytes of the crypto.PubKey
 // instead this is just being set the address here for testing purposes
-func candidatesFromActors(actors []sdk.Actor, amts []int) (candidates Candidates) {
+func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidates) {
 	for i := 0; i < len(actors); i++ {
 		c := &Candidate{
 			PubKey:      pks[i],
 			Owner:       actors[i],
-			Shares:      uint64(amts[i]),
-			VotingPower: uint64(amts[i]),
+			Shares:      amts[i],
+			VotingPower: amts[i],
 		}
 		candidates = append(candidates, c)
 	}
@@ -50,7 +50,7 @@ func candidatesFromActors(actors []sdk.Actor, amts []int) (candidates Candidates
 func testChange(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(int64(val.VotingPower), chg.Power)
+	assert.Equal(val.VotingPower, chg.Power)
 }
 
 // helper function test if Candidate is removed as abci.Validator
@@ -113,20 +113,20 @@ func TestUpdateVotingPower(t *testing.T) {
 	// test a basic change in voting power
 	candidates[0].Shares = 500
 	candidates.updateVotingPower(store)
-	assert.Equal(uint64(500), candidates[0].VotingPower, "%v", candidates[0])
+	assert.Equal(int64(500), candidates[0].VotingPower, "%v", candidates[0])
 
 	// test a swap in voting power
 	candidates[1].Shares = 600
 	candidates.updateVotingPower(store)
-	assert.Equal(uint64(600), candidates[0].VotingPower, "%v", candidates[0])
-	assert.Equal(uint64(500), candidates[1].VotingPower, "%v", candidates[1])
+	assert.Equal(int64(600), candidates[0].VotingPower, "%v", candidates[0])
+	assert.Equal(int64(500), candidates[1].VotingPower, "%v", candidates[1])
 
 	// test the max validators term
 	params := loadParams(store)
 	params.MaxVals = 4
 	saveParams(store, params)
 	candidates.updateVotingPower(store)
-	assert.Equal(uint64(0), candidates[4].VotingPower, "%v", candidates[4])
+	assert.Equal(int64(0), candidates[4].VotingPower, "%v", candidates[4])
 }
 
 func TestGetValidators(t *testing.T) {
@@ -276,7 +276,7 @@ func TestUpdateValidatorSet(t *testing.T) {
 	require.Equal(1, len(change), "%v", change)
 	testRemove(t, candidates[4].validator(), change[0])
 	candidates = loadCandidates(store)
-	assert.Equal(uint64(0), candidates[4].VotingPower)
+	assert.Equal(int64(0), candidates[4].VotingPower)
 
 	//mess with the power's of the candidates and test
 	candidates[0].Shares = 10

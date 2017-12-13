@@ -58,8 +58,8 @@ func TestAllAreTx(t *testing.T) {
 
 	// make sure all types construct properly
 	pubKey := newPubKey("1234567890")
-	bondAmt := uint64(1234321)
-	bond := coin.Coin{Denom: "ATOM", Amount: int64(bondAmt)}
+	bondAmt := int64(1234321)
+	bond := coin.Coin{Denom: "ATOM", Amount: bondAmt}
 
 	// Note that Wrap is only defined on BondUpdate, so when you call it,
 	// you lose all info on the embedding type. Please add Wrap()
@@ -86,8 +86,8 @@ func TestSerializeTx(t *testing.T) {
 
 	// make sure all types construct properly
 	pubKey := newPubKey("1234567890")
-	bondAmt := uint64(1234321)
-	bond := coin.Coin{Denom: "ATOM", Amount: int64(bondAmt)}
+	bondAmt := int64(1234321)
+	bond := coin.Coin{Denom: "ATOM", Amount: bondAmt}
 
 	cases := []struct {
 		tx sdk.Tx

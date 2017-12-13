@@ -22,8 +22,8 @@ validator bond is defined as the object below.
 type ValidatorBond struct {
 	PubKey       crypto.PubKey  // validator PubKey
 	Owner        auth.Account   // account coins are bonded from and unbonded to
-	BondedTokens uint64         // total number of bond tokens from the validator 
-	VotingPower  uint64         // voting power for tendermint consensus 
+	BondedTokens int64         // total number of bond tokens from the validator 
+	VotingPower  int64         // voting power for tendermint consensus 
 	Description  Description    // arbitrary information for the UI 
 }
 
@@ -62,7 +62,7 @@ BondedTokens are held in a global account.
 
 ``` golang
 type Param struct {
-	BondedTokenPool    uint64     // reserve of all bonded tokens  
+	BondedTokenPool    int64     // reserve of all bonded tokens  
 	HoldBonded auth.Account  // Protocol account for bonded tokens 
 }
 ```
@@ -104,8 +104,8 @@ Each validator-candidate bond is defined as the object below.
 type Candidate struct {
 	PubKey       crypto.PubKey
 	Owner        auth.Account
-	Shares       uint64    
-	VotingPower  uint64   
+	Shares       int64    
+	VotingPower  int64   
     Description  Description     
 }
 ```
@@ -122,7 +122,7 @@ sender of the transaction is considered to be the owner of the bond being sent.
 ``` golang
 type DelegatorBond struct {
 	PubKey crypto.PubKey
-	Shares uint64
+	Shares int64
 } 
 ```
 
@@ -156,7 +156,7 @@ type TxDeclareCandidacy struct {
 
 type TxUnbond struct { 
 	PubKey crypto.PubKey
-	Shares uint64       
+	Shares int64       
 }
 ```
 
@@ -172,8 +172,8 @@ Candidate will put your coins in a queue before being returned.
 type MerkleQueue struct {
 	slot  byte           //Queue name in the store
 	store state.SimpleDB //Queue store
-	tail  uint64         //Start position of the queue
-	head  uint64         //End position of the queue
+	tail  int64         //Start position of the queue
+	head  int64         //End position of the queue
 }
 
 type Queue interface {
@@ -188,14 +188,14 @@ The queue element struct for unbonding delegator bond should look like this:
 ``` golang
 type QueueElem struct {
 	Candidate   crypto.PubKey
-	InitHeight  uint64    // when the queue was initiated
+	InitHeight  int64    // when the queue was initiated
 }
 
 type QueueElemUnbondDelegation struct {
 	QueueElem
 	Payout           auth.Account // account to pay out to
-    Amount           uint64    // amount of shares which are unbonding
-    StartSlashRatio  uint64    // old candidate slash ratio at start of re-delegation
+    Amount           int64    // amount of shares which are unbonding
+    StartSlashRatio  int64    // old candidate slash ratio at start of re-delegation
 }
 ```
 
@@ -230,7 +230,7 @@ maturity of the unbonding.
 type QueueElemReDelegate struct {
 	QueueElem
 	Payout       auth.Account  // account to pay out to
-    Shares       uint64        // amount of shares which are unbonding
+    Shares       int64        // amount of shares which are unbonding
     NewCandidate crypto.PubKey // validator to bond to after unbond
 }
 ```
@@ -285,10 +285,10 @@ type Candidate struct {
 	Status             CandidateStatus
 	PubKey             crypto.PubKey
 	Owner              auth.Account
-	Shares             uint64    
-	ReDelegatingShares uint64  // Delegator shares currently re-delegating
-	VotingPower        uint64   
-    SlashRatio         uint64  // multiplicative slash ratio for this candidate
+	Shares             int64    
+	ReDelegatingShares int64  // Delegator shares currently re-delegating
+	VotingPower        int64   
+    SlashRatio         int64  // multiplicative slash ratio for this candidate
     Description        Description
 }
 ```
@@ -321,8 +321,8 @@ is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 
 ``` golang
 type Param struct {
-	IssuedGlobalStakeShares  uint64  // sum of all the validators bonded shares
-	BondedTokenPool          uint64  // reserve of all bonded tokens  
+	IssuedGlobalStakeShares  int64  // sum of all the validators bonded shares
+	BondedTokenPool          int64  // reserve of all bonded tokens  
 	HoldBonded               auth.Account  // Protocol account for bonded tokens 
 }
 ```
@@ -334,10 +334,10 @@ type Candidate struct {
 	Status                    byte       
 	PubKey                    crypto.PubKey
 	Owner                     auth.Account
-	IssuedDelegatorShares     uint64    
-	UnbondingDelegatorShares  uint64    
-	GlobalStakeShares         uint64  
-	VotingPower               uint64   
+	IssuedDelegatorShares     int64    
+	UnbondingDelegatorShares  int64    
+	GlobalStakeShares         int64  
+	VotingPower               int64   
     Description               Description
 }
 ```
@@ -347,7 +347,7 @@ The delegator struct will also need to account for the last liquid withdrawal:
 ``` golang
 type DelegatorBond struct {
 	PubKey crypto.PubKey
-	Shares uint64
+	Shares int64
 } 
 ```
 
@@ -447,17 +447,17 @@ type Candidate struct {
 	Status                 byte       
 	PubKey                 crypto.PubKey
 	Owner                  auth.Account
-	IssuedDelegatorShares  uint64    
-	GlobalStakeShares      uint64  
-	VotingPower            uint64   
-    Commission             uint64
-    CommissionMax          uint64
-    CommissionChangeRate   uint64
+	IssuedDelegatorShares  int64    
+	GlobalStakeShares      int64  
+	VotingPower            int64   
+    Commission             int64
+    CommissionMax          int64
+    CommissionChangeRate   int64
     CommissionChangeToday  int64
-    FeeShares              uint64
-    FeeCommissionShares    uint64
-    LastFeesHeight         uint64
-    LastFeesStakedShares   uint64
+    FeeShares              int64
+    FeeCommissionShares    int64
+    LastFeesHeight         int64
+    LastFeesStakedShares   int64
     Description            Description
 }
 ```
@@ -484,8 +484,8 @@ based on the Height of the previous withdrawal.
 ``` golang
 type DelegatorBond struct {
 	Candidate           crypto.PubKey
-	Shares              uint64
-    FeeWithdrawalHeight uint64 // last height fees were withdrawn from Candidate.FeeShares
+	Shares              int64
+    FeeWithdrawalHeight int64 // last height fees were withdrawn from Candidate.FeeShares
 } 
 ```
 
@@ -495,9 +495,9 @@ type DelegatorBond struct {
 type TxDeclareCandidacy struct {
 	BondUpdate
     Description         Description
-	Commission          uint64  
-	CommissionMax       uint64 
-	CommissionMaxChange uint64 
+	Commission          int64  
+	CommissionMax       int64 
+	CommissionMaxChange int64 
 }
 ```
 
@@ -507,17 +507,17 @@ calculation fee portions
 
 ``` golang
 type Param struct {
-	IssuedGlobalStakeShares  uint64       // sum of all the validators bonded shares
-	IssuedFeeShares          uint64       // sum of all fee pool shares issued 
-	BondedTokenPool          uint64       // reserve of all bonded tokens  
+	IssuedGlobalStakeShares  int64       // sum of all the validators bonded shares
+	IssuedFeeShares          int64       // sum of all fee pool shares issued 
+	BondedTokenPool          int64       // reserve of all bonded tokens  
 	FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
-	FeePoolShares            uint64       // total accumulated shares created for the fee pool
+	FeePoolShares            int64       // total accumulated shares created for the fee pool
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
-	FeeHoldingsShares        uint64       // total accumulated shares created for the fee holdings
-	FeeHoldingsBondedTokens  uint64       // total bonded tokens of validators considered when adding shares to FeeHoldings
+	FeeHoldingsShares        int64       // total accumulated shares created for the fee holdings
+	FeeHoldingsBondedTokens  int64       // total bonded tokens of validators considered when adding shares to FeeHoldings
 	HoldBonded               auth.Account // Protocol account for bonded tokens 
 	HoldFeePool              auth.Account // Protocol account for the fee pool 
-	DateLastCommissionReset  uint64       // Unix Timestamp for last commission accounting reset
+	DateLastCommissionReset  int64       // Unix Timestamp for last commission accounting reset
 }
 ```
 

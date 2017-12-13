@@ -66,10 +66,10 @@ type Candidate struct {
 	Status                CandidateStatus `json:"status"`                  // Bonded status of validator
 	PubKey                crypto.PubKey   `json:"pub_key"`                 // Pubkey of candidate
 	Owner                 sdk.Actor       `json:"owner"`                   // Sender of BondTx - UnbondTx returns here
-	SharesPool            uint64          `json:"shares_global_stake"`     // total shares of the glo
-	SharesIssuedDelegator uint64          `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
-	Shares                uint64          `json:"shares"`                  // Total number of delegated shares to this candidate
-	VotingPower           uint64          `json:"voting_power"`            // Voting power if pubKey is a considered a validator
+	SharesPool            int64           `json:"shares_global_stake"`     // total shares of the glo
+	SharesIssuedDelegator int64           `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
+	Shares                int64           `json:"shares"`                  // Total number of delegated shares to this candidate
+	VotingPower           int64           `json:"voting_power"`            // Voting power if pubKey is a considered a validator
 	Description           Description     `json:"description"`             // Description terms for the candidate
 }
 
@@ -104,7 +104,7 @@ type Validator Candidate
 func (v Validator) ABCIValidator() *abci.Validator {
 	return &abci.Validator{
 		PubKey: wire.BinaryBytes(v.PubKey),
-		Power:  int64(v.VotingPower),
+		Power:  v.VotingPower,
 	}
 }
 
@@ -274,5 +274,5 @@ func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err err
 // pubKey.
 type DelegatorBond struct {
 	PubKey crypto.PubKey
-	Shares uint64
+	Shares int64
 }
