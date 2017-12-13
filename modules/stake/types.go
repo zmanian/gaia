@@ -15,11 +15,13 @@ import (
 
 // Params defines the high level settings for staking
 type Params struct {
-	HoldAccount sdk.Actor `json:"hold_account"` // PubKey where all bonded coins are held
+	HoldBonded    sdk.Actor `json:"hold_account"`           // PubKey where all bonded coins are held
+	HoldUnbonding sdk.Actor `json:"hold_unbonding_account"` // PubKey where all unbonding coins are held
 
-	MaxVals          uint16        `json:"max_vals"`           // maximum number of validators
-	UnbondingPeriod  time.Duration `json:"unbonding_period"`   // duration of time blocks are held in the unbonding queue
-	AllowedBondDenom string        `json:"allowed_bond_denom"` // bondable coin denomination
+	MaxVals uint16 `json:"max_vals"` // maximum number of validators
+	//UnbondingPeriod  time.Duration `json:"unbonding_period"`   // duration of time blocks are held in the unbonding queue
+	UnbondingPeriod  int64  `json:"unbonding_period"`   // duration of time blocks are held in the unbonding queue
+	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
 
 	// gas costs for txs
 	GasDeclareCandidacy int64 `json:"gas_declare_candidacy"`
@@ -30,9 +32,11 @@ type Params struct {
 
 func defaultParams() Params {
 	return Params{
-		HoldAccount:         sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
-		MaxVals:             100,
-		UnbondingPeriod:     time.Hour * 24 * 21, // three weeks
+		HoldBonded:    sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
+		HoldUnbonding: sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
+		MaxVals:       100,
+		//UnbondingPeriod:     time.Hour * 24 * 21, // three weeks
+		UnbondingPeriod:     10, // ten blocks
 		AllowedBondDenom:    "fermion",
 		GasDeclareCandidacy: 20,
 		GasEditCandidacy:    20,

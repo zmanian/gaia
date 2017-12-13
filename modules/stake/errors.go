@@ -27,6 +27,7 @@ var (
 	invalidInput = errors.CodeTypeBaseInvalidInput
 )
 
+//nolint
 func ErrBadValidatorAddr() error {
 	return errors.WithCode(errBadValidatorAddr, errors.CodeTypeBaseUnknownAddress)
 }

@@ -198,7 +198,7 @@ func (h Handler) DeliverTx(ctx sdk.Context, store state.SimpleDB,
 		//context with hold account permissions
 		params := loadParams(store)
 		res.GasUsed = params.GasUnbond
-		ctx2 := ctx.WithPermissions(params.HoldAccount)
+		ctx2 := ctx.WithPermissions(params.HoldBonded)
 		deliverer.transfer = coinSender{
 			store:    store,
 			dispatch: dispatch,
@@ -368,7 +368,7 @@ func (d deliver) delegate(tx TxDelegate) error {
 	}
 
 	// Move coins from the delegator account to the pubKey lock account
-	err := d.transfer(d.sender, d.params.HoldAccount, coin.Coins{tx.Bond})
+	err := d.transfer(d.sender, d.params.HoldBonded, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
 	}
@@ -443,6 +443,6 @@ func (d deliver) unbond(tx TxUnbond) error {
 	// transfer coins back to account
 	txShares := int64(tx.Shares) // XXX: watch overflow
 	returnCoins := txShares      //currently each share is worth one coin
-	return d.transfer(d.params.HoldAccount, d.sender,
+	return d.transfer(d.params.HoldBonded, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 }
