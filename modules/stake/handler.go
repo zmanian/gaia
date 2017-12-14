@@ -449,9 +449,14 @@ func (d deliver) unbond(tx TxUnbond) error {
 
 		// XXX Adjust the SharesPool to the new rate for the unbonding pool
 
-		return d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
+		err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
 			coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
+		if err != nil {
+			return err
+		}
 	}
 
-	// XXX save the params
+	// Last, save the update global pools (in params)
+	saveParams(d.store, d.params)
+	return nil
 }

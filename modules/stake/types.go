@@ -15,9 +15,17 @@ import (
 // Params defines the high level settings for staking
 type Params struct {
 	IssuedGlobalStakeShares int64     `json:"issued_stake_shares"` // sum of all the validators global shares
-	BondedTokenPool         int64     `json:"bonded_token_pool"`   // reserve of all bonded tokens
-	HoldBonded              sdk.Actor `json:"hold_bonded"`         // PubKey where all bonded coins are held
-	HoldUnbonded            sdk.Actor `json:"hold_unbonded"`       // PubKey where all delegated but unbonded coins are held
+	TotalSupply             int64     `json:"total_supply"`        // total supply of all tokens
+	BondedPool              int64     `json:"bonded_pool"`         // reserve of all bonded tokens
+	UnbondedPool            int64     `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
+	HoldBonded              sdk.Actor `json:"hold_bonded"`         // account  where all bonded coins are held
+	HoldUnbonded            sdk.Actor `json:"hold_unbonded"`       // account where all delegated but unbonded coins are held
+
+	Inflation           Fraction `json:"inflation"`             // current annual inflation rate
+	InflationRateChange Fraction `json:"inflation_rate_change"` // maximum annual change in inflation rate
+	InflationMax        Fraction `json:"inflation_max"`         // maximum inflation rate
+	InflationMin        Fraction `json:"inflation_min"`         // minimum inflation rate
+	GoalBonded          Fraction `json:"goal_bonded"`           // Goal of percent bonded atoms
 
 	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
@@ -32,9 +40,16 @@ type Params struct {
 func defaultParams() Params {
 	return Params{
 		IssuedGlobalStakeShares: 0,
-		BondedTokenPool:         0,
+		TotalSupply:             0,
+		BondedPool:              0,
+		UnbondedPool:            0,
 		HoldBonded:              sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
 		HoldUnbonded:            sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
+		Inflation:               NewFraction(7, 100),
+		InflationRateChange:     NewFraction(13, 100),
+		InflationMax:            NewFraction(20, 100),
+		InflationMin:            NewFraction(7, 100),
+		BondRatioGoal:           NewFraction(67, 100),
 		MaxVals:                 100,
 		AllowedBondDenom:        "fermion",
 		GasDeclareCandidacy:     20,
@@ -142,7 +157,7 @@ func (cs Candidates) Sort() {
 //}
 
 // update the voting power and save
-func (cs Candidates) updateVotingPower(store state.SimpleDB) Candidates {
+func (cs Candidates) updateVotingPower(store state.SimpleDB, params Params) Candidates {
 
 	// update voting power
 	for _, c := range cs {
@@ -153,7 +168,7 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB) Candidates {
 	cs.Sort()
 	for i, c := range cs {
 		// truncate the power
-		if i >= int(loadParams(store).MaxVals) {
+		if i >= int(params.MaxVals) {
 			c.VotingPower = 0
 		}
 		saveCandidate(store, c)
@@ -255,13 +270,13 @@ func (vs Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validato
 
 // UpdateValidatorSet - Updates the voting power for the candidate set and
 // returns the subset of validators which have changed for Tendermint
-func UpdateValidatorSet(store state.SimpleDB) (change []*abci.Validator, err error) {
+func UpdateValidatorSet(store state.SimpleDB, params Params) (change []*abci.Validator, err error) {
 
 	// get the validators before update
 	candidates := loadCandidates(store)
 
 	v1 := candidates.Validators()
-	v2 := candidates.updateVotingPower(store).Validators()
+	v2 := candidates.updateVotingPower(store, params).Validators()
 
 	change = v1.validatorsChanged(v2)
 	return

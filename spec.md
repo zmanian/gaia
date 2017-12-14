@@ -62,7 +62,7 @@ BondedTokens are held in a global account.
 
 ``` golang
 type Param struct {
-	BondedTokenPool    int64     // reserve of all bonded tokens  
+	BondedPool    int64     // reserve of all bonded tokens  
 	HoldBonded auth.Account  // Protocol account for bonded tokens 
 }
 ```
@@ -316,13 +316,13 @@ validators as opposed to delegators, therefor validators are not permitted to
 charge validators a commission on their stake of the validation previsions.
 
 Validation provisions are payed directly to a global hold account
-(`BondedTokenPool`) and proportions of that hold account owned by each validator
+(`BondedPool`) and proportions of that hold account owned by each validator
 is defined as the `GlobalStakeBonded`. The tokens are payed as bonded tokens.
 
 ``` golang
 type Param struct {
 	IssuedGlobalStakeShares  int64  // sum of all the validators bonded shares
-	BondedTokenPool          int64  // reserve of all bonded tokens  
+	BondedPool          int64  // reserve of all bonded tokens  
 	HoldBonded               auth.Account  // Protocol account for bonded tokens 
 }
 ```
@@ -354,7 +354,7 @@ type DelegatorBond struct {
 Here, the bonded tokens that a candidate has can be calculated as:
 
 ```
-globalStakeExRate = params.BondedTokenPool / params.IssuedGlobalStakeShares
+globalStakeExRate = params.BondedPool / params.IssuedGlobalStakeShares
 candidateCoins = candidate.GlobalStakeShares * globalStakeExRate 
 ```
 
@@ -370,18 +370,18 @@ createShares = coinsDeposited / delegatorExRate
 candidate.IssuedDelegatorShares += createShares
 ```
 
-Whenever a validator has new tokens added to it, the `BondedTokenPool` is
+Whenever a validator has new tokens added to it, the `BondedPool` is
 increased and must be reflected in the global parameter as well as the
 validators `GlobalStakeShares`.  This calculation ensures that the worth of
 the `GlobalStakeShares` of other validators remains worth a constant absolute
-amount of the `BondedTokenPool`
+amount of the `BondedPool`
 
 ```
 createdGlobalStakeShares = coinsDeposited / globalStakeExRate 
 validator.GlobalStakeShares +=  createdGlobalStakeShares
 params.IssuedGlobalStakeShares +=  createdGlobalStakeShares
 
-params.BondedTokenPool += coinsDeposited
+params.BondedPool += coinsDeposited
 ```
 
 Similarly, if a delegator wanted to unbond coins:
@@ -392,7 +392,7 @@ coinsWithdrawn = withdrawlShares * delegatorExRate
 destroyedGlobalStakeShares = coinsWithdrawn / globalStakeExRate 
 validator.GlobalStakeShares -= destroyedGlobalStakeShares
 params.IssuedGlobalStakeShares -= destroyedGlobalStakeShares
-params.BondedTokenPool -= coinsWithdrawn
+params.BondedPool -= coinsWithdrawn
 ```
 
 Note that when an unbond occurs the shares to withdraw are placed in an
@@ -411,7 +411,6 @@ defined to be 13% per year, however the annual inflation is capped as between
 7% and 20%.
 
 ```
-inflationRateChange(0) = 0
 annualInflation(0) = 0.07
 
 bondedRatio = bondedTokenPool / totalTokenSupply
@@ -427,10 +426,10 @@ provisionTokensHourly = totalTokenSupply * annualInflation / (365.25*24)
 
 Because the validators hold a relative bonded share (`GlobalStakeShare`), when
 more bonded tokens are added proportionally to all validators the only term
-which needs to be updated is the `BondedTokenPool`. So for each previsions cycle:
+which needs to be updated is the `BondedPool`. So for each previsions cycle:
 
 ```
-params.BondedTokenPool += provisionTokensHourly
+params.BondedPool += provisionTokensHourly
 ```
 
 ## Fee Pool, Commission
@@ -509,7 +508,7 @@ calculation fee portions
 type Param struct {
 	IssuedGlobalStakeShares  int64       // sum of all the validators bonded shares
 	IssuedFeeShares          int64       // sum of all fee pool shares issued 
-	BondedTokenPool          int64       // reserve of all bonded tokens  
+	BondedPool          int64       // reserve of all bonded tokens  
 	FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
 	FeePoolShares            int64       // total accumulated shares created for the fee pool
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
