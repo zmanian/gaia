@@ -51,26 +51,37 @@ func defaultParams() Params {
 
 //_________________________________________________________________________
 
+// There are two types of shares distributed, first shares distributed from the
+// network to either candidates to represent stake in either the bonded or
+// unbonded pools; and next, shares distributed from a candidate or validator
+// to there delegators.
+
+// nolint
+type PoolShares Fraction
+type DelegatorShares Fraction
+
+//_________________________________________________________________________
+
 // GlobalState - dynamic parameters of the current state
 type GlobalState struct {
-	TotalSupply        int64    `json:"total_supply"`         // total supply of all tokens
-	SharesBondedPool   Fraction `json:"shares_bonded_pool"`   // sum of all shares distributed for the Bonded Pool
-	SharesUnbondedPool Fraction `json:"shares_unbonded_pool"` // sum of all shares distributed for the Unbonded Pool
-	BondedPool         int64    `json:"bonded_pool"`          // reserve of bonded tokens
-	UnbondedPool       int64    `json:"unbonded_pool"`        // reserve of unbonded tokens held with candidates
-	InflationLastTime  int64    `json:"inflation_last_time"`  // block which the last inflation was processed // TODO make time
-	Inflation          Fraction `json:"inflation"`            // current annual inflation rate
+	TotalSupply       int64      `json:"total_supply"`        // total supply of all tokens
+	BondedShares      PoolShares `json:"bonded_shares"`       // sum of all shares distributed for the Bonded Pool
+	UnbondedShares    PoolShares `json:"unbonded_shares"`     // sum of all shares distributed for the Unbonded Pool
+	BondedPool        int64      `json:"bonded_pool"`         // reserve of bonded tokens
+	UnbondedPool      int64      `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
+	InflationLastTime int64      `json:"inflation_last_time"` // block which the last inflation was processed // TODO make time
+	Inflation         Fraction   `json:"inflation"`           // current annual inflation rate
 }
 
 func initialGlobalState() *GlobalState {
 	return GlobalState{
-		TotalSupply:        0,
-		SharesBondedPool:   Zero,
-		SharesUnbondedPool: Zero,
-		BondedPool:         0,
-		UnbondedPool:       0,
-		InflationLastTime:  0,
-		Inflation:          NewFraction(7, 100),
+		TotalSupply:       0,
+		BondedShares:      Zero,
+		UnbondedShares:    Zero,
+		BondedPool:        0,
+		UnbondedPool:      0,
+		InflationLastTime: 0,
+		Inflation:         NewFraction(7, 100),
 	}
 }
 
@@ -79,7 +90,7 @@ func (gs *GlobalState) bondedShareExRate() Fraction {
 	if gs.SharesBondedPool.Equal(Zero) {
 		return One
 	}
-	return NewFraction(gs.BondedPool, gs.SharesBondedPool)
+	return gs.BondedShares.Inv().Mul(gs.BondedPool)
 }
 
 // get the exchange rate of unbonded tokens held in candidates per issued share
@@ -87,15 +98,35 @@ func (gs *GlobalState) unbondedShareExRate() Fraction {
 	if gs.UnbondedPool.Equal(Zero) {
 		return One
 	}
-	return NewFraction(gs.UnbondedPool, gs.UnbondedPool)
+	return gs.UnbondedShares.Inv().Mul(gs.UnbondedPool)
 }
 
-// add tokens to a candidate
-func (gs *GlobalState) addBondedTokens(amount int64) (issuedShares Fraction) {
-	issuedShares = gs.bondedShareExRate().MulInt(amount)
-	gs.SharesBondedPool += issuedShares
+func (gs *GlobalState) addTokensBonded(amount int64) (issuedShares Fraction) {
+	issuedShares = gs.bondedShareExRate().Inv().MulInt(amount) // (tokens/shares)^-1 * tokens
+	gs.BondedShares = gs.BondedShares.Add(issuedShares)
 	gs.BondedPool += amount
 	return issuedShares
+}
+
+func (gs *GlobalState) removeSharesBonded(shares PoolShares) (removedTokens int64) {
+	removedTokens = gs.bondedShareExRate().MulInt(amount) // (tokens/shares) * shares
+	gs.BondedShares = gs.BondedShares.Sub(shares)
+	gs.BondedPool -= withdrawnTokens
+	return removedTokens
+}
+
+func (gs *GlobalState) addTokensUnbonded(amount int64) (issuedShares Fraction) {
+	issuedShares = gs.unbondedShareExRate().Inv().MulInt(amount) // (tokens/shares)^-1 * tokens
+	gs.UnbondedShares = gs.UnbondedShares.Add(issuedShares)
+	gs.UnbondedPool += amount
+	return issuedShares
+}
+
+func (gs *GlobalState) removeSharesUnbonded(shares PoolShares) (removedTokens int64) {
+	removedTokens = gs.unbondedShareExRate().MulInt(amount) // (tokens/shares) * shares
+	gs.UnbondedShares = gs.UnbondedShares.Sub(shares)
+	gs.UnbondedPool -= withdrawnTokens
+	return removedTokens
 }
 
 //_______________________________________________________________________________________________________
@@ -105,8 +136,9 @@ type CandidateStatus byte
 
 const (
 	// nolint
-	Active   CandidateStatus = 0x00
+	Bonded   CandidateStatus = 0x00
 	Unbonded CandidateStatus = 0x01
+	Revoked  CandidateStatus = 0x02
 )
 
 // Candidate defines the total amount of bond shares and their exchange rate to
@@ -117,13 +149,13 @@ const (
 // exchange rate. Voting power can be calculated as total bonds multiplied by
 // exchange rate.
 type Candidate struct {
-	Status           CandidateStatus `json:"status"`            // Bonded status of validator
-	PubKey           crypto.PubKey   `json:"pub_key"`           // Pubkey of candidate
-	Owner            sdk.Actor       `json:"owner"`             // Sender of BondTx - UnbondTx returns here
-	SharesPool       Fraction        `json:"shares_pool"`       // total shares of a global hold pools
-	SharesDelegators Fraction        `json:"shares_delegators"` // total shares issued to a candidates delegators
-	VotingPower      int64           `json:"voting_power"`      // Voting power if pubKey is a considered a validator
-	Description      Description     `json:"description"`       // Description terms for the candidate
+	Status      CandidateStatus `json:"status"`       // Bonded status of validator
+	PubKey      crypto.PubKey   `json:"pub_key"`      // Pubkey of candidate
+	Owner       sdk.Actor       `json:"owner"`        // Sender of BondTx - UnbondTx returns here
+	Assets      PoolShares      `json:"assets"`       // total shares of a global hold pools
+	Liablities  DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
+	VotingPower int64           `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Description Description     `json:"description"`  // Description terms for the candidate
 }
 
 // Description - description fields for a candidate
@@ -137,30 +169,53 @@ type Description struct {
 // NewCandidate - initialize a new candidate
 func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description) *Candidate {
 	return &Candidate{
-		Status:           Active,
-		PubKey:           pubKey,
-		Owner:            owner,
-		SharesPool:       Zero,
-		SharesDelegators: Zero,
-		VotingPower:      0,
-		Description:      description,
+		Status:      Unbonded,
+		PubKey:      pubKey,
+		Owner:       owner,
+		Assets:      Zero,
+		Liablities:  Zero,
+		VotingPower: 0,
+		Description: description,
 	}
 }
 
-// get the exchange rate of bonded token per issued share
+// get the exchange rate of global pool shares over delegator shares
 func (c *Candidate) delegatorShareExRate() Fraction {
-	// XXX deal with the Zero SharesIssuedDelegatore case
-	return NewFraction(c.SharesPool, gs.SharesDelegators)
+	if Liablities.Equal(Zero) {
+		return One
+	}
+	return NewFraction(c.Assets, gs.Liablities)
 }
 
 // add tokens to a candidate
-func (c *Candidate) addBondedTokens(amount int64, gs *GlobalState) (issuedDelegatorShares Fraction) {
+func (c *Candidate) addTokens(amount int64, gs *GlobalState) (issuedDelegatorShares Fraction) {
 
-	receivedGlobalShares := gs.addBondedTokens(amount)
-	c.SharesPool += receivedGlobalShares
+	var receivedGlobalShares PoolShares
+	if c.Status == Bonded {
+		receivedGlobalShares = gs.addTokensBonded(amount)
+	} else {
+		receivedGlobalShares = gs.addTokensUnbonded(amount)
+	}
+	c.Assets = c.Assets.Add(receivedGlobalShares)
 
-	issuedDelegatorShares = c.delegatorShareExRate().Mul(createdGlobalShares)
-	c.SharesDelegators += c.SharesDelegators.Add(issuedDelegatorShares)
+	issuedDelegatorShares = c.delegatorShareExRate().Mul(receivedGlobalShares)
+	c.Liablities = c.Liablities.Add(issuedDelegatorShares)
+	return
+}
+
+// remove shares from a candidate
+func (c *Candidate) removeShares(shares DelegatorShares, gs *GlobalState) (removedTokens int64) {
+
+	globalPoolSharesToRemove = c.delegatorShareExRate().Mul(shares)
+
+	if c.Status == Bonded {
+		removedTokens = gs.removeSharesBonded(globalPoolSharesToRemove)
+	} else {
+		removedTokens = gs.removeSharesUnbonded(globalPoolSharesToRemove)
+	}
+	c.Assets = c.Assets.Sub(globalPoolSharesToRemove)
+
+	c.Liablities = c.Liablities.Sub(shares)
 	return
 }
 

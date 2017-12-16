@@ -268,7 +268,7 @@ func (c check) unbond(tx TxUnbond) error {
 
 	// check if have enough shares to unbond
 	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
-	if bond.Shares < tx.Shares {
+	if bond.Shares.SubInt(tx.Shares).Negative() {
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
 			bond.Shares, tx.Shares)
 	}
@@ -369,13 +369,13 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	if bond == nil {
 		bond = &DelegatorBond{
 			PubKey: tx.PubKey,
-			Shares: 0,
+			Shares: Zero,
 		}
 	}
 
 	// Account new shares, save
 	gs := loadGlobalState(d.store)
-	bond.Shares += candidate.addBondedTokens(tx.Bond.Amount, loadGlobalState(d.store))
+	bond.Shares = bond.Shares.Add(candidate.addBondedTokens(tx.Bond.Amount, loadGlobalState(d.store)))
 	saveCandidate(d.store, candidate)
 	saveDelegatorBond(d.store, d.sender, bond)
 	saveGlobalState(d.store, gs)
@@ -391,25 +391,26 @@ func (d deliver) unbond(tx TxUnbond) error {
 		return ErrNoDelegatorForAddress()
 	}
 
+	// subtract bond tokens from delegator bond
+	if bond.Shares.SubInt(tx.Shares).Negative() {
+		return ErrInsufficientFunds()
+	}
+	bond.Shares = bond.Shares.SubInt(tx.Shares)
+
 	// get pubKey candidate
 	candidate := loadCandidate(d.store, tx.PubKey)
 	if candidate == nil {
 		return ErrNoCandidateForAddress()
 	}
 
-	// subtract bond tokens from bond
-	if bond.Shares < tx.Shares {
-		return ErrInsufficientFunds()
-	}
-	bond.Shares -= tx.Shares
-
 	rejectCandidacy := false
-	if bond.Shares == 0 {
+	if bond.Shares.Equal(Zero) {
 
 		// if the bond is the owner of the candidate then
-		// trigger a reject candidacy
-		if d.sender.Equals(candidate.Owner) {
-			rejectCandidacy = true
+		// trigger a revoke candidacy
+		if d.sender.Equals(candidate.Owner) &&
+			Candidate.Status != Revoked {
+			revokeCandidacy = true
 		}
 
 		// remove the bond
@@ -419,38 +420,48 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// deduct shares from the candidate
-	candidate.SharesDelegators -= tx.Shares
-	if candidate.SharesDelegators.Equal(Zero) { //XXX This check won't work as expected
+	returnCoins := candidate.removeShares(tx.Shares)
+	if candidate.SharesDelegators.Equal(Zero) {
 		removeCandidate(d.store, tx.PubKey)
 	} else {
 		saveCandidate(d.store, candidate)
 	}
 
 	// transfer coins back to account
-	returnCoins := tx.Shares // XXX NEEDS UPDATE
-	err := d.transfer(d.params.HoldBonded, d.sender,
+	var PoolAccount sdk.Actor
+	if candidate.Status == Bonded {
+		PoolAccount = d.params.HoldBonded
+	} else {
+		PoolAccount = d.params.HoldUnbonded
+	}
+
+	err := d.transfer(PoolAccount, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 	if err != nil {
 		return err
 	}
-	// XXX Adjust the params.IssuedGlobalStakeShares to the new rate for the unbonding pool
 
-	// lastly if an reject candidate if necessary
-	if rejectCandidacy {
-		candidate.Status = Unbonded
+	// lastly if an revoke candidate if necessary
+	if revokeCandidacy {
 
-		transferCoins := candidate.SharesPool // XXX NEEDS UPDATE
+		// change the share types to unbonded if they were not already
+		if candidate.Status == Bonded {
+			tokens := removeSharesBonded(candidate.Assets)
+			candidate.Assets = addTokensUbonded(tokens)
 
-		// XXX Adjust the SharesPool to the new rate for the unbonding pool
-
-		err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
-			coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
-		if err != nil {
-			return err
+			err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
+				coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
+			if err != nil {
+				return err
+			}
 		}
+
+		// lastly update the status
+		candidate.Status = Revoked
 	}
 
 	// Last, save the update global pools (in params)
 	saveParams(d.store, d.params)
+	// XXX save global state
 	return nil
 }

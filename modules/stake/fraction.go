@@ -65,6 +65,9 @@ func (f Fraction) Positive() bool {
 
 // Equal - test if two Fractions are equal, does not simplify
 func (f Fraction) Equal(f2 Fraction) bool {
+	if f.Numerator == 0 {
+		return f2.Numerator == 0
+	}
 	return ((f.Numerator == f2.Numerator) && (f.Denominator == f2.Denominator))
 }
 

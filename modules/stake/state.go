@@ -241,19 +241,19 @@ func saveParams(store state.SimpleDB, params Params) {
 //_______________________________________________________________________
 
 // load/save the global staking state
-func loadGlobalState(store state.SimpleDB) (gs GlobalState) {
+func loadGlobalState(store state.SimpleDB) (gs *GlobalState) {
 	b := store.Get(ParamKey)
 	if b == nil {
 		return initialGlobalState()
 	}
-	gs := new(GlobalState)
+	gs = new(GlobalState)
 	err := wire.ReadBinaryBytes(b, gs)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
 	return
 }
-func saveGlobalState(store state.SimpleDB, gs GlobalState) {
-	b := wire.BinaryBytes(gs)
+func saveGlobalState(store state.SimpleDB, gs *GlobalState) {
+	b := wire.BinaryBytes(*gs)
 	store.Set(GlobalStateKey, b)
 }
