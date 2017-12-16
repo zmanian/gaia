@@ -12,14 +12,20 @@ func Tick(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, err 
 
 	// retrieve params
 	params := loadParams(store)
+	height := ctx.BlockHeight()
 
 	// Process Validator Provisions
-	processProvisions(store, params)
+	// TODO right now just process every 5 blocks, in new SDK make hourly
+	if InflationLastHeight+5 <= height {
+		params.InflationLastHeight = height
+		processProvisions(store, params)
+	}
 
 	//XXX Confirm that there it's okay to use old params here, or must update?
 	return UpdateValidatorSet(store, params)
 }
 
+// XXX test this function
 func processProvisions(store state.SimpleDB, params Params) {
 
 	//The target annual inflation rate is recalculated for each previsions cycle. The
@@ -29,8 +35,8 @@ func processProvisions(store state.SimpleDB, params Params) {
 	//7% and 20%.
 
 	bondedRatio := NewFraction(params.BondedPool, params.TotalSupply)
-	annualInflationRateChange = One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
-	annualInflation = params.Inflation.Add(annualInflationRateChange)
+	annualInflationRateChange := One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
+	annualInflation := params.Inflation.Add(annualInflationRateChange)
 	if annualInflation.Sub(params.InflationMax).Positive() {
 		annualInflation = params.InflationMax
 	}
@@ -38,7 +44,7 @@ func processProvisions(store state.SimpleDB, params Params) {
 		annualInflation = params.InflationMin
 	}
 	hoursPerYear := NewFraction(876582, 100)
-	provisionTokensHourly = totalTokenSupply.Mul(annualInflation).Div(hoursPerYear)
+	provisionTokensHourly := annualInflation.Div(hoursPerYear).MulInt(params.TotalSupply)
 
 	// save the new inflation for the next tick
 	params.Inflation = annualInflation
@@ -48,7 +54,10 @@ func processProvisions(store state.SimpleDB, params Params) {
 	//which needs to be updated is the `BondedPool`. So for each previsions cycle:
 
 	params.BondedPool += provisionTokensHourly.Evaluate()
+
+	//XXX XXX XXX XXX XXX XXX XXX XXX XXX
 	//XXX Mint them to the hold account
+	//XXX XXX XXX XXX XXX XXX XXX XXX XXX
 
 	// save the params
 	saveParams(store, params)

@@ -216,7 +216,7 @@ func removeDelegatorBond(store state.SimpleDB, delegator sdk.Actor, candidate cr
 //store.Set(GetDelegatorBondsKey(delegator), b)
 //}
 
-//---------------------------------------------------------------------
+//_______________________________________________________________________
 
 // load/save the global staking params
 func loadParams(store state.SimpleDB) (params Params) {
@@ -234,5 +234,26 @@ func loadParams(store state.SimpleDB) (params Params) {
 }
 func saveParams(store state.SimpleDB, params Params) {
 	b := wire.BinaryBytes(params)
+	store.Set(ParamKey, b)
+}
+
+//_______________________________________________________________________
+
+// load/save the global staking state
+func loadGlobalState(store state.SimpleDB) (state GlobalState) {
+	b := store.Get(ParamKey)
+	if b == nil {
+		return initialGlobalState()
+	}
+
+	err := wire.ReadBinaryBytes(b, &state)
+	if err != nil {
+		panic(err) // This error should never occure big problem if does
+	}
+
+	return
+}
+func saveGlobalState(store state.SimpleDB, state GlobalState) {
+	b := wire.BinaryBytes(state)
 	store.Set(ParamKey, b)
 }

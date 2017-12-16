@@ -304,16 +304,13 @@ func (d deliver) declareCandidacy(tx TxDeclareCandidacy) error {
 	if bond != nil {
 		return ErrCandidateExistsAddr()
 	}
-	candidate := NewCandidate(tx.PubKey, d.sender)
-	candidate.Description = tx.Description // add the description parameters
+	candidate := NewCandidate(tx.PubKey, d.sender, tx.Description)
 	saveCandidate(d.store, candidate)
 
 	// move coins from the d.sender account to a (self-bond) delegator account
-	// the candidate account will be updated automatically here
+	// the candidate account and global shares are updated within here
 	txDelegate := TxDelegate{tx.BondUpdate}
-	return d.delegate(txDelegate)
-
-	//XXX Update the params IssuedGlobalStakeShares and also Candidate.SharesPool
+	return d.delegateWithCandidate(txDelegate, candidate)
 }
 
 func (d deliver) editCandidacy(tx TxEditCandidacy) error {
@@ -346,17 +343,21 @@ func (d deliver) editCandidacy(tx TxEditCandidacy) error {
 }
 
 func (d deliver) delegate(tx TxDelegate) error {
-
 	// Get the pubKey bond account
 	candidate := loadCandidate(d.store, tx.PubKey)
 	if candidate == nil {
 		return ErrBondNotNominated()
 	}
+	return delegateWithCandidate(tx, candidate)
+}
+
+func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) error {
+
 	if candidate.Status == Unbonded { //candidate has been withdrawn
 		return ErrBondNotNominated()
 	}
 
-	// Move coins from the delegator account to the pubKey lock account
+	// Move coins from the delegator account to the bonded pool account
 	err := d.transfer(d.sender, d.params.HoldBonded, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
@@ -375,8 +376,12 @@ func (d deliver) delegate(tx TxDelegate) error {
 		}
 	}
 
+	// retrieve the rate candidate exchange rate
+
+	// XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+
 	// Add shares to delegator bond and candidate
-	bondAmount := tx.Bond.Amount // XXX: checked for underflow in ValidateBasic
+	bondAmount := tx.Bond.Amount
 	bond.Shares += bondAmount
 	candidate.Shares += bondAmount
 

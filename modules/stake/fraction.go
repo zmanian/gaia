@@ -1,16 +1,23 @@
 package stake
 
+// XXX test fractions!
+
 // FractionI -  basic fraction functionality
 type FractionI interface {
 	Inv() Fraction
 	Simplify() Fraction
 	Negative() bool
 	Positive() bool
+	Equal(Fraction) bool
 	Mul(Fraction) Fraction
 	Div(Fraction) Fraction
 	Add(Fraction) Fraction
 	Sub(Fraction) Fraction
-	Evaluate() Fraction
+	Evaluate() int64
+	MulInt(int64) Fraction
+	DivInt(int64) Fraction
+	AddInt(int64) Fraction
+	SubInt(int64) Fraction
 }
 
 // Fraction - basic fraction
@@ -18,18 +25,19 @@ type Fraction struct {
 	Numerator, Denominator int64
 }
 
-var _ Fraction = Frac{} // enforce at compile time
+var _ FractionI = Fraction{} // enforce at compile time
 
 // NewFraction - create a new fraction object
-func NewFraction(numerator, Denominator int64) {
-	return Fraction{Numerator, Denominator}
+func NewFraction(numerator, denominator int64) Fraction {
+	return Fraction{numerator, denominator}
 }
 
-// One - special case fraction of 1
+// nolint sprecial predefined fractions
 var One = Fraction{1, 1}
+var Zero = Fraction{0, 1}
 
 // Inv - Inverse
-func (f Fraction) Inv(f2 Fraction) Fraction {
+func (f Fraction) Inv() Fraction {
 	return Fraction{f.Denominator, f.Numerator}
 }
 
@@ -55,6 +63,11 @@ func (f Fraction) Positive() bool {
 	return (f.Numerator / f.Denominator) > 0
 }
 
+// Equal - test if two Fractions are equal, does not simplify
+func (f Fraction) Equal(f2 Fraction) bool {
+	return ((f.Numerator == f2.Numerator) && (f.Denominator == f2.Denominator))
+}
+
 // Mul - multiply
 func (f Fraction) Mul(f2 Fraction) Fraction {
 	return Fraction{
@@ -63,11 +76,27 @@ func (f Fraction) Mul(f2 Fraction) Fraction {
 	}
 }
 
+// MulInt - multiply fraction by integer
+func (f Fraction) MulInt(i int64) Fraction {
+	return Fraction{
+		f.Numerator * i,
+		f.Denominator,
+	}
+}
+
 // Div - divide
 func (f Fraction) Div(f2 Fraction) Fraction {
 	return Fraction{
 		f.Numerator * f2.Denominator,
 		f.Denominator * f2.Numerator,
+	}
+}
+
+// DivInt - divide fraction by and integer
+func (f Fraction) DivInt(i int64) Fraction {
+	return Fraction{
+		f.Numerator,
+		f.Denominator * i,
 	}
 }
 
@@ -80,8 +109,16 @@ func (f Fraction) Add(f2 Fraction) Fraction {
 		}
 	}
 	return Fraction{
-		f.Numerator*f2.Denominator + f2.Numerator*f.Denomoninator,
+		f.Numerator*f2.Denominator + f2.Numerator*f.Denominator,
 		f.Denominator * f2.Denominator,
+	}
+}
+
+// AddInt - add fraction with integer, no simplication
+func (f Fraction) AddInt(i int64) Fraction {
+	return Fraction{
+		f.Numerator + i*f.Denominator,
+		f.Denominator,
 	}
 }
 
@@ -94,8 +131,16 @@ func (f Fraction) Sub(f2 Fraction) Fraction {
 		}
 	}
 	return Fraction{
-		f.Numerator*f2.Denominator - f2.Numerator*f.Denomoninator,
+		f.Numerator*f2.Denominator - f2.Numerator*f.Denominator,
 		f.Denominator * f2.Denominator,
+	}
+}
+
+// SubInt - subtract fraction with integer, no simplication
+func (f Fraction) SubInt(i int64) Fraction {
+	return Fraction{
+		f.Numerator - i*f.Denominator,
+		f.Denominator,
 	}
 }
 

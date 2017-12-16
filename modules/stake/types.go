@@ -14,14 +14,9 @@ import (
 
 // Params defines the high level settings for staking
 type Params struct {
-	IssuedGlobalStakeShares int64     `json:"issued_stake_shares"` // sum of all the validators global shares
-	TotalSupply             int64     `json:"total_supply"`        // total supply of all tokens
-	BondedPool              int64     `json:"bonded_pool"`         // reserve of all bonded tokens
-	UnbondedPool            int64     `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
-	HoldBonded              sdk.Actor `json:"hold_bonded"`         // account  where all bonded coins are held
-	HoldUnbonded            sdk.Actor `json:"hold_unbonded"`       // account where all delegated but unbonded coins are held
+	HoldBonded   sdk.Actor `json:"hold_bonded"`   // account  where all bonded coins are held
+	HoldUnbonded sdk.Actor `json:"hold_unbonded"` // account where all delegated but unbonded coins are held
 
-	Inflation           Fraction `json:"inflation"`             // current annual inflation rate
 	InflationRateChange Fraction `json:"inflation_rate_change"` // maximum annual change in inflation rate
 	InflationMax        Fraction `json:"inflation_max"`         // maximum inflation rate
 	InflationMin        Fraction `json:"inflation_min"`         // minimum inflation rate
@@ -39,35 +34,84 @@ type Params struct {
 
 func defaultParams() Params {
 	return Params{
-		IssuedGlobalStakeShares: 0,
-		TotalSupply:             0,
-		BondedPool:              0,
-		UnbondedPool:            0,
-		HoldBonded:              sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
-		HoldUnbonded:            sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
-		Inflation:               NewFraction(7, 100),
-		InflationRateChange:     NewFraction(13, 100),
-		InflationMax:            NewFraction(20, 100),
-		InflationMin:            NewFraction(7, 100),
-		BondRatioGoal:           NewFraction(67, 100),
-		MaxVals:                 100,
-		AllowedBondDenom:        "fermion",
-		GasDeclareCandidacy:     20,
-		GasEditCandidacy:        20,
-		GasDelegate:             20,
-		GasUnbond:               20,
+		HoldBonded:          sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
+		HoldUnbonded:        sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
+		InflationRateChange: NewFraction(13, 100),
+		InflationMax:        NewFraction(20, 100),
+		InflationMin:        NewFraction(7, 100),
+		GoalBonded:          NewFraction(67, 100),
+		MaxVals:             100,
+		AllowedBondDenom:    "fermion",
+		GasDeclareCandidacy: 20,
+		GasEditCandidacy:    20,
+		GasDelegate:         20,
+		GasUnbond:           20,
 	}
 }
 
 //_________________________________________________________________________
+
+// GlobalState - dynamic parameters of the current state
+type GlobalState struct {
+	TotalSupply        int64    `json:"total_supply"`         // total supply of all tokens
+	SharesBondedPool   Fraction `json:"shares_bonded_pool"`   // sum of all shares distributed for the Bonded Pool
+	SharesUnbondedPool Fraction `json:"shares_unbonded_pool"` // sum of all shares distributed for the Unbonded Pool
+	BondedPool         int64    `json:"bonded_pool"`          // reserve of bonded tokens
+	UnbondedPool       int64    `json:"unbonded_pool"`        // reserve of unbonded tokens held with candidates
+	InflationLastTime  int64    `json:"inflation_last_time"`  // block which the last inflation was processed // TODO make time
+	Inflation          Fraction `json:"inflation"`            // current annual inflation rate
+}
+
+func initialGlobalState() *GlobalState {
+	return GlobalState{
+		TotalSupply:        0,
+		SharesBondedPool:   Zero,
+		SharesUnbondedPool: Zero,
+		BondedPool:         0,
+		UnbondedPool:       0,
+		InflationLastTime:  0,
+		Inflation:          NewFraction(7, 100),
+	}
+}
+
+// get the exchange rate of bonded token per issued share
+func (gs *GlobalState) bondedShareExRate() Fraction {
+	if gs.SharesBondedPool.Equal(Zero) {
+		return One
+	}
+	return NewFraction(gs.BondedPool, gs.SharesBondedPool)
+}
+
+// get the exchange rate of unbonded tokens held in candidates per issued share
+func (gs *GlobalState) unbondedShareExRate() Fraction {
+	if gs.UnbondedPool.Equal(Zero) {
+		return One
+	}
+	return NewFraction(gs.UnbondedPool, gs.UnbondedPool)
+}
+
+// add tokens to a candidate
+func (gs *GlobalState) addBondedTokens(amount int64) (issuedShares Fraction) {
+
+	sharesCreated := gs.bondedShareExRate().MulInt(amount)
+	gs.SharesBondedPool += sharesCreated
+	gs.BondedPool += amount
+
+	// XXX should we send the coins the hold account right in here?
+
+	return issuedShares
+}
+
+//_______________________________________________________________________________________________________
 
 // CandidateStatus - status of a validator-candidate
 type CandidateStatus byte
 
 const (
 	// nolint
-	Active   CandidateStatus = 0x00
-	Unbonded CandidateStatus = 0x01
+	Uninitialized CandidateStatus = 0x00
+	Active        CandidateStatus = 0x01
+	Unbonded      CandidateStatus = 0x02
 )
 
 // Candidate defines the total amount of bond shares and their exchange rate to
@@ -81,9 +125,8 @@ type Candidate struct {
 	Status                CandidateStatus `json:"status"`                  // Bonded status of validator
 	PubKey                crypto.PubKey   `json:"pub_key"`                 // Pubkey of candidate
 	Owner                 sdk.Actor       `json:"owner"`                   // Sender of BondTx - UnbondTx returns here
-	SharesPool            int64           `json:"shares_global_stake"`     // total shares of the glo
-	SharesIssuedDelegator int64           `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
-	Shares                int64           `json:"shares"`                  // Total number of delegated shares to this candidate
+	SharesPool            Fraction        `json:"shares_global_stake"`     // total shares of a global hold pools
+	SharesIssuedDelegator Fraction        `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
 	VotingPower           int64           `json:"voting_power"`            // Voting power if pubKey is a considered a validator
 	Description           Description     `json:"description"`             // Description terms for the candidate
 }
@@ -97,13 +140,32 @@ type Description struct {
 }
 
 // NewCandidate - initialize a new candidate
-func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor) *Candidate {
+func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description) *Candidate {
 	return &Candidate{
-		PubKey:      pubKey,
-		Owner:       owner,
-		Shares:      0,
-		VotingPower: 0,
+		Status:                Uninitialized,
+		PubKey:                pubKey,
+		Owner:                 owner,
+		SharesPool:            Zero,
+		SharesIssuedDelegator: Zero,
+		VotingPower:           0,
+		Description:           description,
 	}
+}
+
+// get the exchange rate of bonded token per issued share
+func (c *Candidate) delegatorShareExRate() Fraction {
+	// XXX deal with the Zero SharesIssuedDelegatore case
+	return NewFraction(c.SharesPool, gs.SharesIssuedDelegator)
+}
+
+// add tokens to a candidate
+func (c *Candidate) addBondedTokens(amount int64, gs GlobalState) (issuedDeleegatorShares int64) {
+
+	createdGlobalShares := gs.addBondedTokens(amount)
+	c.SharesPool += createdGlobalShares
+
+	delegatorSharesCreated := c.delegatorShareExRate().Mul(createdGlobalShares)
+	c.SharesIssuedDelegator += c.SharesIssuedDelegator.Add(delegatorSharesCreated)
 }
 
 // Validator returns a copy of the Candidate as a Validator.
@@ -150,11 +212,6 @@ func (cs Candidates) Less(i, j int) bool {
 func (cs Candidates) Sort() {
 	sort.Sort(cs)
 }
-
-//func updateVotingPower(store state.SimpleDB) {
-//candidates := loadCandidates(store)
-//candidates.updateVotingPower(store)
-//}
 
 // update the voting power and save
 func (cs Candidates) updateVotingPower(store state.SimpleDB, params Params) Candidates {
@@ -220,35 +277,35 @@ func (vs Validators) Sort() {
 	sort.Sort(vs)
 }
 
-// determine all changed validators between two validator sets
-func (vs Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validator) {
+// determine all updated validators between two validator sets
+func (vs Validators) validatorsUpdated(vs2 Validators) (updated []*abci.Validator) {
 
 	//first sort the validator sets
 	vs.Sort()
 	vs2.Sort()
 
 	max := len(vs) + len(vs2)
-	changed = make([]*abci.Validator, max)
-	i, j, n := 0, 0, 0 //counters for vs loop, vs2 loop, changed element
+	updated = make([]*abci.Validator, max)
+	i, j, n := 0, 0, 0 //counters for vs loop, vs2 loop, updated element
 
 	for i < len(vs) && j < len(vs2) {
 
 		if !vs[i].PubKey.Equals(vs2[j].PubKey) {
 			// pk1 > pk2, a new validator was introduced between these pubkeys
 			if bytes.Compare(vs[i].PubKey.Bytes(), vs2[j].PubKey.Bytes()) == 1 {
-				changed[n] = vs2[j].ABCIValidator()
+				updated[n] = vs2[j].ABCIValidator()
 				n++
 				j++
 				continue
 			} // else, the old validator has been removed
-			changed[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
+			updated[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
 			n++
 			i++
 			continue
 		}
 
 		if vs[i].VotingPower != vs2[j].VotingPower {
-			changed[n] = vs2[j].ABCIValidator()
+			updated[n] = vs2[j].ABCIValidator()
 			n++
 		}
 		j++
@@ -257,19 +314,19 @@ func (vs Validators) validatorsChanged(vs2 Validators) (changed []*abci.Validato
 
 	// add any excess validators in set 2
 	for ; j < len(vs2); j, n = j+1, n+1 {
-		changed[n] = vs2[j].ABCIValidator()
+		updated[n] = vs2[j].ABCIValidator()
 	}
 
 	// remove any excess validators left in set 1
 	for ; i < len(vs); i, n = i+1, n+1 {
-		changed[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
+		updated[n] = &abci.Validator{vs[i].PubKey.Bytes(), 0}
 	}
 
-	return changed[:n]
+	return updated[:n]
 }
 
 // UpdateValidatorSet - Updates the voting power for the candidate set and
-// returns the subset of validators which have changed for Tendermint
+// returns the subset of validators which have been updated for Tendermint
 func UpdateValidatorSet(store state.SimpleDB, params Params) (change []*abci.Validator, err error) {
 
 	// get the validators before update
