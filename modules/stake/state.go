@@ -13,6 +13,7 @@ var (
 	// Keys for store prefixes
 	CandidatesPubKeysKey = []byte{0x01} // key for all candidates' pubkeys
 	ParamKey             = []byte{0x02} // key for global parameters relating to staking
+	GlobalStateKey       = []byte{0x03} // key for global parameters relating to staking
 
 	// Key prefixes
 	CandidateKeyPrefix      = []byte{0x03} // prefix for each key to a candidate
@@ -240,20 +241,19 @@ func saveParams(store state.SimpleDB, params Params) {
 //_______________________________________________________________________
 
 // load/save the global staking state
-func loadGlobalState(store state.SimpleDB) (state GlobalState) {
+func loadGlobalState(store state.SimpleDB) (gs GlobalState) {
 	b := store.Get(ParamKey)
 	if b == nil {
 		return initialGlobalState()
 	}
-
-	err := wire.ReadBinaryBytes(b, &state)
+	gs := new(GlobalState)
+	err := wire.ReadBinaryBytes(b, gs)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
-
 	return
 }
-func saveGlobalState(store state.SimpleDB, state GlobalState) {
-	b := wire.BinaryBytes(state)
-	store.Set(ParamKey, b)
+func saveGlobalState(store state.SimpleDB, gs GlobalState) {
+	b := wire.BinaryBytes(gs)
+	store.Set(GlobalStateKey, b)
 }

@@ -348,7 +348,7 @@ func (d deliver) delegate(tx TxDelegate) error {
 	if candidate == nil {
 		return ErrBondNotNominated()
 	}
-	return delegateWithCandidate(tx, candidate)
+	return d.delegateWithCandidate(tx, candidate)
 }
 
 func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) error {
@@ -357,15 +357,12 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 		return ErrBondNotNominated()
 	}
 
+	// TODO maybe refactor into GlobalState.addBondedTokens(), maybe with new SDK
 	// Move coins from the delegator account to the bonded pool account
 	err := d.transfer(d.sender, d.params.HoldBonded, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
 	}
-	//key := stack.PrefixedKey(coin.NameCoin, d.sender.Address)
-	//acc := coin.Account{}
-	//query.GetParsed(key, &acc, query.GetHeight(), false)
-	//panic(fmt.Sprintf("debug acc: %v\n", acc))
 
 	// Get or create the delegator bond
 	bond := loadDelegatorBond(d.store, d.sender, tx.PubKey)
@@ -376,20 +373,12 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 		}
 	}
 
-	// retrieve the rate candidate exchange rate
-
-	// XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
-
-	// Add shares to delegator bond and candidate
-	bondAmount := tx.Bond.Amount
-	bond.Shares += bondAmount
-	candidate.Shares += bondAmount
-
-	// Save to d.store
+	// Account new shares, save
+	gs := loadGlobalState(d.store)
+	bond.Shares += candidate.addBondedTokens(tx.Bond.Amount, loadGlobalState(d.store))
 	saveCandidate(d.store, candidate)
 	saveDelegatorBond(d.store, d.sender, bond)
-
-	//XXX Update the params IssuedGlobalStakeShares and also Candidate.SharesPool
+	saveGlobalState(d.store, gs)
 
 	return nil
 }
@@ -430,8 +419,8 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// deduct shares from the candidate
-	candidate.Shares -= tx.Shares
-	if candidate.Shares == 0 {
+	candidate.SharesDelegators -= tx.Shares
+	if candidate.SharesDelegators.Equal(Zero) { //XXX This check won't work as expected
 		removeCandidate(d.store, tx.PubKey)
 	} else {
 		saveCandidate(d.store, candidate)

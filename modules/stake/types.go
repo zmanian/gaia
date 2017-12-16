@@ -92,13 +92,9 @@ func (gs *GlobalState) unbondedShareExRate() Fraction {
 
 // add tokens to a candidate
 func (gs *GlobalState) addBondedTokens(amount int64) (issuedShares Fraction) {
-
-	sharesCreated := gs.bondedShareExRate().MulInt(amount)
-	gs.SharesBondedPool += sharesCreated
+	issuedShares = gs.bondedShareExRate().MulInt(amount)
+	gs.SharesBondedPool += issuedShares
 	gs.BondedPool += amount
-
-	// XXX should we send the coins the hold account right in here?
-
 	return issuedShares
 }
 
@@ -109,9 +105,8 @@ type CandidateStatus byte
 
 const (
 	// nolint
-	Uninitialized CandidateStatus = 0x00
-	Active        CandidateStatus = 0x01
-	Unbonded      CandidateStatus = 0x02
+	Active   CandidateStatus = 0x00
+	Unbonded CandidateStatus = 0x01
 )
 
 // Candidate defines the total amount of bond shares and their exchange rate to
@@ -122,13 +117,13 @@ const (
 // exchange rate. Voting power can be calculated as total bonds multiplied by
 // exchange rate.
 type Candidate struct {
-	Status                CandidateStatus `json:"status"`                  // Bonded status of validator
-	PubKey                crypto.PubKey   `json:"pub_key"`                 // Pubkey of candidate
-	Owner                 sdk.Actor       `json:"owner"`                   // Sender of BondTx - UnbondTx returns here
-	SharesPool            Fraction        `json:"shares_global_stake"`     // total shares of a global hold pools
-	SharesIssuedDelegator Fraction        `json:"shares_issued_delegator"` // total shares issued to a candidates delegators
-	VotingPower           int64           `json:"voting_power"`            // Voting power if pubKey is a considered a validator
-	Description           Description     `json:"description"`             // Description terms for the candidate
+	Status           CandidateStatus `json:"status"`            // Bonded status of validator
+	PubKey           crypto.PubKey   `json:"pub_key"`           // Pubkey of candidate
+	Owner            sdk.Actor       `json:"owner"`             // Sender of BondTx - UnbondTx returns here
+	SharesPool       Fraction        `json:"shares_pool"`       // total shares of a global hold pools
+	SharesDelegators Fraction        `json:"shares_delegators"` // total shares issued to a candidates delegators
+	VotingPower      int64           `json:"voting_power"`      // Voting power if pubKey is a considered a validator
+	Description      Description     `json:"description"`       // Description terms for the candidate
 }
 
 // Description - description fields for a candidate
@@ -142,30 +137,31 @@ type Description struct {
 // NewCandidate - initialize a new candidate
 func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description) *Candidate {
 	return &Candidate{
-		Status:                Uninitialized,
-		PubKey:                pubKey,
-		Owner:                 owner,
-		SharesPool:            Zero,
-		SharesIssuedDelegator: Zero,
-		VotingPower:           0,
-		Description:           description,
+		Status:           Active,
+		PubKey:           pubKey,
+		Owner:            owner,
+		SharesPool:       Zero,
+		SharesDelegators: Zero,
+		VotingPower:      0,
+		Description:      description,
 	}
 }
 
 // get the exchange rate of bonded token per issued share
 func (c *Candidate) delegatorShareExRate() Fraction {
 	// XXX deal with the Zero SharesIssuedDelegatore case
-	return NewFraction(c.SharesPool, gs.SharesIssuedDelegator)
+	return NewFraction(c.SharesPool, gs.SharesDelegators)
 }
 
 // add tokens to a candidate
-func (c *Candidate) addBondedTokens(amount int64, gs GlobalState) (issuedDeleegatorShares int64) {
+func (c *Candidate) addBondedTokens(amount int64, gs *GlobalState) (issuedDelegatorShares Fraction) {
 
-	createdGlobalShares := gs.addBondedTokens(amount)
-	c.SharesPool += createdGlobalShares
+	receivedGlobalShares := gs.addBondedTokens(amount)
+	c.SharesPool += receivedGlobalShares
 
-	delegatorSharesCreated := c.delegatorShareExRate().Mul(createdGlobalShares)
-	c.SharesIssuedDelegator += c.SharesIssuedDelegator.Add(delegatorSharesCreated)
+	issuedDelegatorShares = c.delegatorShareExRate().Mul(createdGlobalShares)
+	c.SharesDelegators += c.SharesDelegators.Add(issuedDelegatorShares)
+	return
 }
 
 // Validator returns a copy of the Candidate as a Validator.
@@ -346,5 +342,5 @@ func UpdateValidatorSet(store state.SimpleDB, params Params) (change []*abci.Val
 // pubKey.
 type DelegatorBond struct {
 	PubKey crypto.PubKey
-	Shares int64
+	Shares Fraction
 }
