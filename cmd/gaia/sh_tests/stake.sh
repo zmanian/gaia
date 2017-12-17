@@ -58,7 +58,7 @@ oneTimeTearDown() {
     set +u ; quickTearDown ; set -u
 }
 
-# XXX Ex Usage: checkCandidate $PUBKEY $EXPECTED_VOTING_POWER
+# Ex Usage: checkCandidate $PUBKEY $EXPECTED_VOTING_POWER
 checkCandidate() {
     CANDIDATE=$(${CLIENT_EXE} query candidate --pubkey=$1)
     if ! assertTrue "line=${LINENO}, bad query" $?; then
@@ -68,7 +68,7 @@ checkCandidate() {
     return $?
 }
 
-# XXX Ex Usage: checkCandidate $PUBKEY
+# Ex Usage: checkCandidate $PUBKEY
 checkCandidateEmpty() { 
     CANDIDATE=$(${CLIENT_EXE} query candidate --pubkey=$1 2>/dev/null)
     if ! assertFalse "line=${LINENO}, expected empty query" $?; then
@@ -76,7 +76,7 @@ checkCandidateEmpty() {
     fi
 }
 
-# XXX Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY $EXPECTED_SHARES
+# Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY $EXPECTED_SHARES
 checkDelegatorBond() {
     BOND=$(${CLIENT_EXE} query delegator-bond --delegator-address=$1 --pubkey=$2)
     if ! assertTrue "line=${LINENO}, account must exist" $?; then
@@ -86,7 +86,7 @@ checkDelegatorBond() {
     return $?
 }
 
-# XXX Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY
+# Ex Usage: checkCandidate $DELEGATOR_ADDR $PUBKEY
 checkDelegatorBondEmpty() { 
     BOND=$(${CLIENT_EXE} query delegator-bond --delegator-address=$1 --pubkey=$2 2>/dev/null)
     if ! assertFalse "line=${LINENO}, expected empty query" $?; then

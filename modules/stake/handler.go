@@ -288,6 +288,7 @@ type deliver struct {
 	store    state.SimpleDB
 	sender   sdk.Actor
 	params   Params
+	gs       GlobalState
 	transfer transferFn
 }
 
@@ -375,11 +376,10 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 
 	// Account new shares, save
 	gs := loadGlobalState(d.store)
-	bond.Shares = bond.Shares.Add(candidate.addBondedTokens(tx.Bond.Amount, loadGlobalState(d.store)))
+	bond.Shares = bond.Shares.Add(candidate.addTokens(tx.Bond.Amount, gs))
 	saveCandidate(d.store, candidate)
 	saveDelegatorBond(d.store, d.sender, bond)
 	saveGlobalState(d.store, gs)
-
 	return nil
 }
 
@@ -403,13 +403,13 @@ func (d deliver) unbond(tx TxUnbond) error {
 		return ErrNoCandidateForAddress()
 	}
 
-	rejectCandidacy := false
+	revokeCandidacy := false
 	if bond.Shares.Equal(Zero) {
 
 		// if the bond is the owner of the candidate then
 		// trigger a revoke candidacy
 		if d.sender.Equals(candidate.Owner) &&
-			Candidate.Status != Revoked {
+			candidate.Status != Revoked {
 			revokeCandidacy = true
 		}
 
@@ -417,14 +417,6 @@ func (d deliver) unbond(tx TxUnbond) error {
 		removeDelegatorBond(d.store, d.sender, tx.PubKey)
 	} else {
 		saveDelegatorBond(d.store, d.sender, bond)
-	}
-
-	// deduct shares from the candidate
-	returnCoins := candidate.removeShares(tx.Shares)
-	if candidate.SharesDelegators.Equal(Zero) {
-		removeCandidate(d.store, tx.PubKey)
-	} else {
-		saveCandidate(d.store, candidate)
 	}
 
 	// transfer coins back to account
@@ -446,8 +438,10 @@ func (d deliver) unbond(tx TxUnbond) error {
 
 		// change the share types to unbonded if they were not already
 		if candidate.Status == Bonded {
-			tokens := removeSharesBonded(candidate.Assets)
-			candidate.Assets = addTokensUbonded(tokens)
+
+			// replace bonded shares with unbonded shares
+			tokens := d.gs.removeSharesBonded(candidate.Assets)
+			candidate.Assets = d.gs.addTokensUbonded(tokens)
 
 			err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
 				coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
@@ -460,8 +454,14 @@ func (d deliver) unbond(tx TxUnbond) error {
 		candidate.Status = Revoked
 	}
 
-	// Last, save the update global pools (in params)
-	saveParams(d.store, d.params)
-	// XXX save global state
+	// deduct shares from the candidate and save
+	returnCoins := candidate.removeShares(tx.Shares)
+	if candidate.SharesDelegators.Equal(Zero) {
+		removeCandidate(d.store, tx.PubKey)
+	} else {
+		saveCandidate(d.store, candidate)
+	}
+
+	saveGlobalState(d.store, d.gs)
 	return nil
 }
