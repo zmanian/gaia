@@ -51,57 +51,6 @@ func defaultParams() Params {
 
 //_________________________________________________________________________
 
-// There are two types of shares distributed, first shares distributed from the
-// network to either candidates to represent stake in either the bonded or
-// unbonded pools; and next, shares distributed from a candidate or validator
-// to there delegators.
-
-// nolint
-type PoolShares struct{ Fraction }
-type DelegatorShares struct{ Fraction }
-
-//nolint
-func (s PoolShares) Inv() PoolShares              { return PoolShares{s.Fraction.Inv()} }
-func (s PoolShares) Simplify() PoolShares         { return PoolShares{s.Fraction.Simplify()} }
-func (s PoolShares) Mul(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Mul(s2.Fraction)} }
-func (s PoolShares) Div(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Div(s2.Fraction)} }
-func (s PoolShares) Add(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Add(s2.Fraction)} }
-func (s PoolShares) Sub(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Sub(s2.Fraction)} }
-func (s PoolShares) MulInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.MulInt(s2)} }
-func (s PoolShares) DivInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.DivInt(s2)} }
-func (s PoolShares) AddInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.AddInt(s2)} }
-func (s PoolShares) SubInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.SubInt(s2)} }
-
-//nolint
-func (s DelegatorShares) Inv() DelegatorShares      { return DelegatorShares{s.Fraction.Inv()} }
-func (s DelegatorShares) Simplify() DelegatorShares { return DelegatorShares{s.Fraction.Simplify()} }
-func (s DelegatorShares) Mul(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Mul(s2.Fraction)}
-}
-func (s DelegatorShares) Div(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Div(s2.Fraction)}
-}
-func (s DelegatorShares) Add(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Add(s2.Fraction)}
-}
-func (s DelegatorShares) Sub(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Sub(s2.Fraction)}
-}
-func (s DelegatorShares) MulInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.MulInt(s2)}
-}
-func (s DelegatorShares) DivInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.DivInt(s2)}
-}
-func (s DelegatorShares) AddInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.AddInt(s2)}
-}
-func (s DelegatorShares) SubInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.SubInt(s2)}
-}
-
-//_________________________________________________________________________
-
 // GlobalState - dynamic parameters of the current state
 type GlobalState struct {
 	TotalSupply       int64      `json:"total_supply"`        // total supply of all tokens
@@ -167,6 +116,61 @@ func (gs *GlobalState) removeSharesUnbonded(shares PoolShares) (removedTokens in
 	gs.UnbondedShares = gs.UnbondedShares.Sub(shares)
 	gs.UnbondedPool -= removedTokens
 	return
+}
+
+//_________________________________________________________________________
+
+// There are two types of shares distributed, first shares distributed from the
+// network to either candidates to represent stake in either the bonded or
+// unbonded pools; and next, shares distributed from a candidate or validator
+// to there delegators.
+
+// nolint
+type PoolShares struct{ Fraction }
+type DelegatorShares struct{ Fraction }
+
+//nolint
+func (s PoolShares) Inv() PoolShares              { return PoolShares{s.Fraction.Inv()} }
+func (s PoolShares) Simplify() PoolShares         { return PoolShares{s.Fraction.Simplify()} }
+func (s PoolShares) Mul(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Mul(s2.Fraction)} }
+func (s PoolShares) Div(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Div(s2.Fraction)} }
+func (s PoolShares) Add(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Add(s2.Fraction)} }
+func (s PoolShares) Sub(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Sub(s2.Fraction)} }
+func (s PoolShares) MulInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.MulInt(s2)} }
+func (s PoolShares) DivInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.DivInt(s2)} }
+func (s PoolShares) AddInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.AddInt(s2)} }
+func (s PoolShares) SubInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.SubInt(s2)} }
+
+//nolint
+func (s DelegatorShares) Inv() DelegatorShares {
+	return DelegatorShares{s.Fraction.Inv()}
+}
+func (s DelegatorShares) Simplify() DelegatorShares {
+	return DelegatorShares{s.Fraction.Simplify()}
+}
+func (s DelegatorShares) Mul(s2 DelegatorShares) DelegatorShares {
+	return DelegatorShares{s.Fraction.Mul(s2.Fraction)}
+}
+func (s DelegatorShares) Div(s2 DelegatorShares) DelegatorShares {
+	return DelegatorShares{s.Fraction.Div(s2.Fraction)}
+}
+func (s DelegatorShares) Add(s2 DelegatorShares) DelegatorShares {
+	return DelegatorShares{s.Fraction.Add(s2.Fraction)}
+}
+func (s DelegatorShares) Sub(s2 DelegatorShares) DelegatorShares {
+	return DelegatorShares{s.Fraction.Sub(s2.Fraction)}
+}
+func (s DelegatorShares) MulInt(s2 int64) DelegatorShares {
+	return DelegatorShares{s.Fraction.MulInt(s2)}
+}
+func (s DelegatorShares) DivInt(s2 int64) DelegatorShares {
+	return DelegatorShares{s.Fraction.DivInt(s2)}
+}
+func (s DelegatorShares) AddInt(s2 int64) DelegatorShares {
+	return DelegatorShares{s.Fraction.AddInt(s2)}
+}
+func (s DelegatorShares) SubInt(s2 int64) DelegatorShares {
+	return DelegatorShares{s.Fraction.SubInt(s2)}
 }
 
 //_______________________________________________________________________________________________________
@@ -436,6 +440,6 @@ func UpdateValidatorSet(store state.SimpleDB, params Params) (change []*abci.Val
 // owned by one delegator, and is associated with the voting power of one
 // pubKey.
 type DelegatorBond struct {
-	PubKey crypto.PubKey
-	Shares DelegatorShares
+	PubKey crypto.PubKey   `json:"pub_key"`
+	Shares DelegatorShares `json:"shares"`
 }

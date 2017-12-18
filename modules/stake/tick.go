@@ -37,7 +37,7 @@ func processProvisions(store state.SimpleDB, params Params, gs *GlobalState) {
 	bondedRatio := NewFraction(gs.BondedPool, gs.TotalSupply)
 	annualInflationRateChange := One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
 	annualInflation := gs.Inflation.Add(annualInflationRateChange)
-	if annualInflation.Sub(params.InflationMax).Positive() {
+	if annualInflation.GT(params.InflationMax) {
 		annualInflation = params.InflationMax
 	}
 	if annualInflation.LT(params.InflationMin) {

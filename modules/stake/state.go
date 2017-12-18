@@ -16,9 +16,9 @@ var (
 	GlobalStateKey       = []byte{0x03} // key for global parameters relating to staking
 
 	// Key prefixes
-	CandidateKeyPrefix      = []byte{0x03} // prefix for each key to a candidate
-	DelegatorBondKeyPrefix  = []byte{0x04} // prefix for each key to a delegator's bond
-	DelegatorBondsKeyPrefix = []byte{0x05} // prefix for each key to a delegator's bond
+	CandidateKeyPrefix      = []byte{0x04} // prefix for each key to a candidate
+	DelegatorBondKeyPrefix  = []byte{0x05} // prefix for each key to a delegator's bond
+	DelegatorBondsKeyPrefix = []byte{0x06} // prefix for each key to a delegator's bond
 )
 
 // GetCandidateKey - get the key for the candidate with pubKey

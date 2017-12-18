@@ -3,6 +3,7 @@ package stake
 // XXX test fractions!
 
 // FractionI -  basic fraction functionality
+// TODO better name that FractionI?
 type FractionI interface {
 	Inv() Fraction
 	Simplify() Fraction
@@ -15,11 +16,11 @@ type FractionI interface {
 	Div(Fraction) Fraction
 	Add(Fraction) Fraction
 	Sub(Fraction) Fraction
-	Evaluate() int64
 	MulInt(int64) Fraction
 	DivInt(int64) Fraction
 	AddInt(int64) Fraction
 	SubInt(int64) Fraction
+	Evaluate() int64
 }
 
 // Fraction - basic fraction
@@ -34,7 +35,7 @@ func NewFraction(numerator, denominator int64) Fraction {
 	return Fraction{numerator, denominator}
 }
 
-// nolint sprecial predefined fractions
+// nolint special predefined fractions
 var One = Fraction{1, 1}
 var Zero = Fraction{0, 1}
 
@@ -55,14 +56,38 @@ func (f Fraction) Simplify() Fraction {
 	return Fraction{f.Numerator / gcd, f.Denominator / gcd}
 }
 
-// Negative - is negative TODO make more efficient?
+// Negative - is the fractior negative
 func (f Fraction) Negative() bool {
-	return (f.Numerator / f.Denominator) < 0
+	switch {
+	case f.Numerator > 0:
+		if f.Denominator > 0 {
+			return false
+		}
+		return true
+	case f.Numerator < 0:
+		if f.Denominator < 0 {
+			return false
+		}
+		return true
+	}
+	return false
 }
 
-// Positive - is negative TODO make more efficient?
+// Positive - is the fraction positive
 func (f Fraction) Positive() bool {
-	return (f.Numerator / f.Denominator) > 0
+	switch {
+	case f.Numerator > 0:
+		if f.Denominator > 0 {
+			return true
+		}
+		return false
+	case f.Numerator < 0:
+		if f.Denominator < 0 {
+			return true
+		}
+		return false
+	}
+	return false
 }
 
 // GT - greater than
