@@ -8,6 +8,8 @@ type FractionI interface {
 	Simplify() Fraction
 	Negative() bool
 	Positive() bool
+	GT(Fraction) bool
+	LT(Fraction) bool
 	Equal(Fraction) bool
 	Mul(Fraction) Fraction
 	Div(Fraction) Fraction
@@ -61,6 +63,26 @@ func (f Fraction) Negative() bool {
 // Positive - is negative TODO make more efficient?
 func (f Fraction) Positive() bool {
 	return (f.Numerator / f.Denominator) > 0
+}
+
+// GT - greater than
+func (f Fraction) GT(f2 Fraction) bool {
+	return f.Sub(f2).Positive()
+}
+
+// LT - less than
+func (f Fraction) LT(f2 Fraction) bool {
+	return f.Sub(f2).Negative()
+}
+
+// GTint - greater than integer
+func (f Fraction) GTint(i int64) bool {
+	return f.SubInt(i).Positive()
+}
+
+// LTint - less than integer
+func (f Fraction) LTint(i int64) bool {
+	return f.SubInt(i).Negative()
 }
 
 // Equal - test if two Fractions are equal, does not simplify

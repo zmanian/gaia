@@ -268,7 +268,7 @@ func (c check) unbond(tx TxUnbond) error {
 
 	// check if have enough shares to unbond
 	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
-	if bond.Shares.SubInt(tx.Shares).Negative() {
+	if bond.Shares.LTint(tx.Shares) { // bond shares < tx shares
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
 			bond.Shares, tx.Shares)
 	}
@@ -288,7 +288,7 @@ type deliver struct {
 	store    state.SimpleDB
 	sender   sdk.Actor
 	params   Params
-	gs       GlobalState
+	gs       *GlobalState
 	transfer transferFn
 }
 
@@ -370,7 +370,7 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	if bond == nil {
 		bond = &DelegatorBond{
 			PubKey: tx.PubKey,
-			Shares: Zero,
+			Shares: DelegatorShares{Zero},
 		}
 	}
 
@@ -392,7 +392,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// subtract bond tokens from delegator bond
-	if bond.Shares.SubInt(tx.Shares).Negative() {
+	if bond.Shares.LTint(tx.Shares) { // bond shares < tx shares
 		return ErrInsufficientFunds()
 	}
 	bond.Shares = bond.Shares.SubInt(tx.Shares)
@@ -427,6 +427,10 @@ func (d deliver) unbond(tx TxUnbond) error {
 		PoolAccount = d.params.HoldUnbonded
 	}
 
+	//XXX make shares able to be received as a decimal place and converted to fraction?
+	sharesFrac := DelegatorShares{NewFraction(tx.Shares, 1)}
+
+	returnCoins := candidate.removeShares(sharesFrac, d.gs)
 	err := d.transfer(PoolAccount, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 	if err != nil {
@@ -441,10 +445,10 @@ func (d deliver) unbond(tx TxUnbond) error {
 
 			// replace bonded shares with unbonded shares
 			tokens := d.gs.removeSharesBonded(candidate.Assets)
-			candidate.Assets = d.gs.addTokensUbonded(tokens)
+			candidate.Assets = d.gs.addTokensUnbonded(tokens)
 
 			err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
-				coin.Coins{{d.params.AllowedBondDenom, transferCoins}})
+				coin.Coins{{d.params.AllowedBondDenom, tokens}})
 			if err != nil {
 				return err
 			}
@@ -455,8 +459,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// deduct shares from the candidate and save
-	returnCoins := candidate.removeShares(tx.Shares)
-	if candidate.SharesDelegators.Equal(Zero) {
+	if candidate.Liablities.Equal(Zero) {
 		removeCandidate(d.store, tx.PubKey)
 	} else {
 		saveCandidate(d.store, candidate)

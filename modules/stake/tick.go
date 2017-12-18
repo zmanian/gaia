@@ -17,16 +17,16 @@ func Tick(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, err 
 
 	// Process Validator Provisions
 	// TODO right now just process every 5 blocks, in new SDK make hourly
-	if InflationLastHeight+5 <= height {
-		params.InflationLastHeight = height
-		processProvisions(store, params)
+	if gs.InflationLastTime+5 <= height {
+		gs.InflationLastTime = height
+		processProvisions(store, params, gs)
 	}
 
 	return UpdateValidatorSet(store, params)
 }
 
 // XXX test processProvisions
-func processProvisions(store state.SimpleDB, params Params, gs GlobalState) {
+func processProvisions(store state.SimpleDB, params Params, gs *GlobalState) {
 
 	//The target annual inflation rate is recalculated for each previsions cycle. The
 	//inflation is also subject to a rate change (positive of negative) depending or
@@ -34,17 +34,17 @@ func processProvisions(store state.SimpleDB, params Params, gs GlobalState) {
 	//defined to be 13% per year, however the annual inflation is capped as between
 	//7% and 20%.
 
-	bondedRatio := NewFraction(params.BondedPool, params.TotalSupply)
+	bondedRatio := NewFraction(gs.BondedPool, gs.TotalSupply)
 	annualInflationRateChange := One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
-	annualInflation := params.Inflation.Add(annualInflationRateChange)
+	annualInflation := gs.Inflation.Add(annualInflationRateChange)
 	if annualInflation.Sub(params.InflationMax).Positive() {
 		annualInflation = params.InflationMax
 	}
-	if annualInflation.Sub(params.InflationMin).Negative() {
+	if annualInflation.LT(params.InflationMin) {
 		annualInflation = params.InflationMin
 	}
 	hoursPerYear := NewFraction(876582, 100)
-	provisionTokensHourly := annualInflation.Div(hoursPerYear).MulInt(params.TotalSupply)
+	provisionTokensHourly := annualInflation.Div(hoursPerYear).MulInt(gs.TotalSupply)
 
 	// save the new inflation for the next tick
 	gs.Inflation = annualInflation
@@ -53,7 +53,9 @@ func processProvisions(store state.SimpleDB, params Params, gs GlobalState) {
 	//more bonded tokens are added proportionally to all validators the only term
 	//which needs to be updated is the `BondedPool`. So for each previsions cycle:
 
-	gs.BondedPool += provisionTokensHourly.Evaluate()
+	newProvisions := provisionTokensHourly.Evaluate()
+	gs.BondedPool += newProvisions
+	gs.TotalSupply += newProvisions
 
 	//XXX XXX XXX XXX XXX XXX XXX XXX XXX
 	//XXX Mint them to the hold account
