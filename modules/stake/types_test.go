@@ -115,19 +115,19 @@ func TestUpdateVotingPower(t *testing.T) {
 	// test a basic change in voting power
 	candidates[0].Liabilities = NewFraction(500)
 	candidates.updateVotingPower(store, params)
-	assert.Equal(int64(500), candidates[0].VotingPower, "%v", candidates[0])
+	assert.Equal(int64(500), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 
 	// test a swap in voting power
 	candidates[1].Liabilities = NewFraction(600)
 	candidates.updateVotingPower(store, params)
-	assert.Equal(int64(600), candidates[0].VotingPower, "%v", candidates[0])
-	assert.Equal(int64(500), candidates[1].VotingPower, "%v", candidates[1])
+	assert.Equal(int64(600), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
+	assert.Equal(int64(500), candidates[1].VotingPower.Evaluate(), "%v", candidates[1])
 
 	// test the max validators term
 	params.MaxVals = 4
 	saveParams(store, params)
 	candidates.updateVotingPower(store, params)
-	assert.Equal(int64(0), candidates[4].VotingPower, "%v", candidates[4])
+	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate(), "%v", candidates[4])
 }
 
 func TestGetValidators(t *testing.T) {

@@ -358,9 +358,16 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 		return ErrBondNotNominated()
 	}
 
+	var poolAccount sdk.Actor
+	if candidate.Status == Bonded {
+		poolAccount = d.params.HoldBonded
+	} else {
+		poolAccount = d.params.HoldUnbonded
+	}
+
 	// TODO maybe refactor into GlobalState.addBondedTokens(), maybe with new SDK
 	// Move coins from the delegator account to the bonded pool account
-	err := d.transfer(d.sender, d.params.HoldBonded, coin.Coins{tx.Bond})
+	err := d.transfer(d.sender, poolAccount, coin.Coins{tx.Bond})
 	if err != nil {
 		return err
 	}
@@ -419,18 +426,18 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// transfer coins back to account
-	var PoolAccount sdk.Actor
+	var poolAccount sdk.Actor
 	if candidate.Status == Bonded {
-		PoolAccount = d.params.HoldBonded
+		poolAccount = d.params.HoldBonded
 	} else {
-		PoolAccount = d.params.HoldUnbonded
+		poolAccount = d.params.HoldUnbonded
 	}
 
 	//XXX make shares able to be received as a decimal place and converted to fraction?
 	sharesFrac := NewFraction(tx.Shares, 1)
 
 	returnCoins := candidate.removeShares(sharesFrac, d.gs)
-	err := d.transfer(PoolAccount, d.sender,
+	err := d.transfer(poolAccount, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 	if err != nil {
 		return err

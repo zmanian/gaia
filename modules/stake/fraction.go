@@ -157,7 +157,7 @@ func (f Fraction) Mul(f2 FractionI) FractionI {
 	return Fraction{
 		f.Numerator * f2.GetNumerator(),
 		f.Denominator * f2.GetDenominator(),
-	}
+	}.Simplify()
 }
 
 // MulInt - multiply fraction by integer
@@ -165,7 +165,7 @@ func (f Fraction) MulInt(i int64) FractionI {
 	return Fraction{
 		f.Numerator * i,
 		f.Denominator,
-	}
+	}.Simplify()
 }
 
 // Div - divide
@@ -173,7 +173,7 @@ func (f Fraction) Div(f2 FractionI) FractionI {
 	return Fraction{
 		f.Numerator * f2.GetDenominator(),
 		f.Denominator * f2.GetNumerator(),
-	}
+	}.Simplify()
 }
 
 // DivInt - divide fraction by and integer
@@ -181,7 +181,7 @@ func (f Fraction) DivInt(i int64) FractionI {
 	return Fraction{
 		f.Numerator,
 		f.Denominator * i,
-	}
+	}.Simplify()
 }
 
 // Add - add without simplication
@@ -190,12 +190,12 @@ func (f Fraction) Add(f2 FractionI) FractionI {
 		return Fraction{
 			f.Numerator + f2.GetNumerator(),
 			f.Denominator,
-		}
+		}.Simplify()
 	}
 	return Fraction{
 		f.Numerator*f2.GetDenominator() + f2.GetNumerator()*f.Denominator,
 		f.Denominator * f2.GetDenominator(),
-	}
+	}.Simplify()
 }
 
 // AddInt - add fraction with integer, no simplication
@@ -203,7 +203,7 @@ func (f Fraction) AddInt(i int64) FractionI {
 	return Fraction{
 		f.Numerator + i*f.Denominator,
 		f.Denominator,
-	}
+	}.Simplify()
 }
 
 // Sub - subtract without simplication
@@ -212,12 +212,12 @@ func (f Fraction) Sub(f2 FractionI) FractionI {
 		return Fraction{
 			f.Numerator - f2.GetNumerator(),
 			f.Denominator,
-		}
+		}.Simplify()
 	}
 	return Fraction{
 		f.Numerator*f2.GetDenominator() - f2.GetNumerator()*f.Denominator,
 		f.Denominator * f2.GetDenominator(),
-	}
+	}.Simplify()
 }
 
 // SubInt - subtract fraction with integer, no simplication
@@ -225,7 +225,7 @@ func (f Fraction) SubInt(i int64) FractionI {
 	return Fraction{
 		f.Numerator - i*f.Denominator,
 		f.Denominator,
-	}
+	}.Simplify()
 }
 
 // Evaluate - evaluate the fraction using bankers rounding
