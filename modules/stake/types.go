@@ -17,10 +17,10 @@ type Params struct {
 	HoldBonded   sdk.Actor `json:"hold_bonded"`   // account  where all bonded coins are held
 	HoldUnbonded sdk.Actor `json:"hold_unbonded"` // account where all delegated but unbonded coins are held
 
-	InflationRateChange Fraction `json:"inflation_rate_change"` // maximum annual change in inflation rate
-	InflationMax        Fraction `json:"inflation_max"`         // maximum inflation rate
-	InflationMin        Fraction `json:"inflation_min"`         // minimum inflation rate
-	GoalBonded          Fraction `json:"goal_bonded"`           // Goal of percent bonded atoms
+	InflationRateChange FractionI `json:"inflation_rate_change"` // maximum annual change in inflation rate
+	InflationMax        FractionI `json:"inflation_max"`         // maximum inflation rate
+	InflationMin        FractionI `json:"inflation_min"`         // minimum inflation rate
+	GoalBonded          FractionI `json:"goal_bonded"`           // Goal of percent bonded atoms
 
 	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
@@ -59,14 +59,14 @@ type GlobalState struct {
 	BondedPool        int64      `json:"bonded_pool"`         // reserve of bonded tokens
 	UnbondedPool      int64      `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
 	InflationLastTime int64      `json:"inflation_last_time"` // block which the last inflation was processed // TODO make time
-	Inflation         Fraction   `json:"inflation"`           // current annual inflation rate
+	Inflation         FractionI  `json:"inflation"`           // current annual inflation rate
 }
 
 func initialGlobalState() *GlobalState {
 	return &GlobalState{
 		TotalSupply:       0,
-		BondedShares:      PoolShares{Zero},
-		UnbondedShares:    PoolShares{Zero},
+		BondedShares:      Zero,
+		UnbondedShares:    Zero,
 		BondedPool:        0,
 		UnbondedPool:      0,
 		InflationLastTime: 0,
@@ -77,7 +77,7 @@ func initialGlobalState() *GlobalState {
 // get the exchange rate of bonded token per issued share
 func (gs *GlobalState) bondedShareExRate() PoolShares {
 	if gs.BondedShares.Equal(Zero) {
-		return PoolShares{One}
+		return One
 	}
 	return gs.BondedShares.Inv().MulInt(gs.BondedPool)
 }
@@ -85,7 +85,7 @@ func (gs *GlobalState) bondedShareExRate() PoolShares {
 // get the exchange rate of unbonded tokens held in candidates per issued share
 func (gs *GlobalState) unbondedShareExRate() PoolShares {
 	if gs.UnbondedShares.Equal(Zero) {
-		return PoolShares{One}
+		return One
 	}
 	return gs.UnbondedShares.Inv().MulInt(gs.UnbondedPool)
 }
@@ -126,52 +126,8 @@ func (gs *GlobalState) removeSharesUnbonded(shares PoolShares) (removedTokens in
 // to there delegators.
 
 // nolint
-type PoolShares struct{ Fraction }
-type DelegatorShares struct{ Fraction }
-
-//nolint
-func (s PoolShares) Inv() PoolShares              { return PoolShares{s.Fraction.Inv()} }
-func (s PoolShares) Simplify() PoolShares         { return PoolShares{s.Fraction.Simplify()} }
-func (s PoolShares) Mul(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Mul(s2.Fraction)} }
-func (s PoolShares) Div(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Div(s2.Fraction)} }
-func (s PoolShares) Add(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Add(s2.Fraction)} }
-func (s PoolShares) Sub(s2 PoolShares) PoolShares { return PoolShares{s.Fraction.Sub(s2.Fraction)} }
-func (s PoolShares) MulInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.MulInt(s2)} }
-func (s PoolShares) DivInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.DivInt(s2)} }
-func (s PoolShares) AddInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.AddInt(s2)} }
-func (s PoolShares) SubInt(s2 int64) PoolShares   { return PoolShares{s.Fraction.SubInt(s2)} }
-
-//nolint
-func (s DelegatorShares) Inv() DelegatorShares {
-	return DelegatorShares{s.Fraction.Inv()}
-}
-func (s DelegatorShares) Simplify() DelegatorShares {
-	return DelegatorShares{s.Fraction.Simplify()}
-}
-func (s DelegatorShares) Mul(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Mul(s2.Fraction)}
-}
-func (s DelegatorShares) Div(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Div(s2.Fraction)}
-}
-func (s DelegatorShares) Add(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Add(s2.Fraction)}
-}
-func (s DelegatorShares) Sub(s2 DelegatorShares) DelegatorShares {
-	return DelegatorShares{s.Fraction.Sub(s2.Fraction)}
-}
-func (s DelegatorShares) MulInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.MulInt(s2)}
-}
-func (s DelegatorShares) DivInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.DivInt(s2)}
-}
-func (s DelegatorShares) AddInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.AddInt(s2)}
-}
-func (s DelegatorShares) SubInt(s2 int64) DelegatorShares {
-	return DelegatorShares{s.Fraction.SubInt(s2)}
-}
+type PoolShares FractionI
+type DelegatorShares FractionI
 
 //_______________________________________________________________________________________________________
 
@@ -197,8 +153,8 @@ type Candidate struct {
 	PubKey      crypto.PubKey   `json:"pub_key"`      // Pubkey of candidate
 	Owner       sdk.Actor       `json:"owner"`        // Sender of BondTx - UnbondTx returns here
 	Assets      PoolShares      `json:"assets"`       // total shares of a global hold pools
-	Liablities  DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
-	VotingPower Fraction        `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Liabilities  DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
+	VotingPower FractionI       `json:"voting_power"` // Voting power if pubKey is a considered a validator
 	Description Description     `json:"description"`  // Description terms for the candidate
 }
 
@@ -216,19 +172,19 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 		Status:      Unbonded,
 		PubKey:      pubKey,
 		Owner:       owner,
-		Assets:      PoolShares{Zero},
-		Liablities:  DelegatorShares{Zero},
+		Assets:      Zero,
+		Liabilities:  Zero,
 		VotingPower: Zero,
 		Description: description,
 	}
 }
 
 // get the exchange rate of global pool shares over delegator shares
-func (c *Candidate) delegatorShareExRate() Fraction {
-	if c.Liablities.Equal(Zero) {
+func (c *Candidate) delegatorShareExRate() FractionI {
+	if c.Liabilities.Equal(Zero) {
 		return One
 	}
-	return c.Assets.Fraction.Div(c.Liablities.Fraction)
+	return c.Assets.Div(c.Liabilities)
 }
 
 // add tokens to a candidate
@@ -242,15 +198,15 @@ func (c *Candidate) addTokens(amount int64, gs *GlobalState) (issuedDelegatorSha
 	}
 	c.Assets = c.Assets.Add(receivedGlobalShares)
 
-	issuedDelegatorShares = DelegatorShares{c.delegatorShareExRate().Mul(receivedGlobalShares.Fraction)}
-	c.Liablities = c.Liablities.Add(issuedDelegatorShares)
+	issuedDelegatorShares = c.delegatorShareExRate().Mul(receivedGlobalShares)
+	c.Liabilities = c.Liabilities.Add(issuedDelegatorShares)
 	return
 }
 
 // remove shares from a candidate
 func (c *Candidate) removeShares(shares DelegatorShares, gs *GlobalState) (removedTokens int64) {
 
-	globalPoolSharesToRemove := PoolShares{c.delegatorShareExRate().Mul(shares.Fraction)}
+	globalPoolSharesToRemove := c.delegatorShareExRate().Mul(shares)
 
 	if c.Status == Bonded {
 		removedTokens = gs.removeSharesBonded(globalPoolSharesToRemove)
@@ -259,7 +215,7 @@ func (c *Candidate) removeShares(shares DelegatorShares, gs *GlobalState) (remov
 	}
 	c.Assets = c.Assets.Sub(globalPoolSharesToRemove)
 
-	c.Liablities = c.Liablities.Sub(shares)
+	c.Liabilities = c.Liabilities.Sub(shares)
 	return
 }
 
@@ -313,8 +269,8 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB, params Params) Cand
 
 	// update voting power
 	for _, c := range cs {
-		if !c.VotingPower.Equal(c.Assets.Fraction) {
-			c.VotingPower = c.Assets.Fraction
+		if !c.VotingPower.Equal(c.Assets) {
+			c.VotingPower = c.Assets
 		}
 	}
 	cs.Sort()

@@ -37,8 +37,8 @@ func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidat
 		c := &Candidate{
 			PubKey:      pks[i],
 			Owner:       actors[i],
-			Shares:      amts[i],
-			VotingPower: amts[i],
+			Liabilities: NewFraction(amts[i]),
+			VotingPower: NewFraction(amts[i]),
 		}
 		candidates = append(candidates, c)
 	}
@@ -67,7 +67,7 @@ func TestCandidatesSort(t *testing.T) {
 
 	N := 5
 	actors := newActors(N)
-	candidates := candidatesFromActors(actors, []int{10, 300, 123, 4, 200})
+	candidates := candidatesFromActors(actors, []int64{10, 300, 123, 4, 200})
 	expectedOrder := []int{1, 4, 2, 0, 3}
 
 	// test basic sort
@@ -85,11 +85,11 @@ func TestCandidatesSort(t *testing.T) {
 func TestValidatorsSort(t *testing.T) {
 	assert := assert.New(t)
 
-	v1 := (&Candidate{PubKey: pks[0], VotingPower: 25}).validator()
-	v2 := (&Candidate{PubKey: pks[1], VotingPower: 1234}).validator()
-	v3 := (&Candidate{PubKey: pks[2], VotingPower: 122}).validator()
-	v4 := (&Candidate{PubKey: pks[3], VotingPower: 13}).validator()
-	v5 := (&Candidate{PubKey: pks[4], VotingPower: 1111}).validator()
+	v1 := (&Candidate{PubKey: pks[0], VotingPower: NewFraction(25)}).validator()
+	v2 := (&Candidate{PubKey: pks[1], VotingPower: NewFraction(1234)}).validator()
+	v3 := (&Candidate{PubKey: pks[2], VotingPower: NewFraction(122)}).validator()
+	v4 := (&Candidate{PubKey: pks[3], VotingPower: NewFraction(13)}).validator()
+	v5 := (&Candidate{PubKey: pks[4], VotingPower: NewFraction(1111)}).validator()
 
 	// test from nothing to something
 	vs := Validators{v4, v2, v5, v1, v3}
@@ -108,15 +108,15 @@ func TestUpdateVotingPower(t *testing.T) {
 
 	N := 5
 	actors := newActors(N)
-	candidates := candidatesFromActors(actors, []int{400, 200, 100, 10, 1})
+	candidates := candidatesFromActors(actors, []int64{400, 200, 100, 10, 1})
 
 	// test a basic change in voting power
-	candidates[0].Shares = 500
+	candidates[0].Liabilities = NewFraction(500)
 	candidates.updateVotingPower(store)
 	assert.Equal(int64(500), candidates[0].VotingPower, "%v", candidates[0])
 
 	// test a swap in voting power
-	candidates[1].Shares = 600
+	candidates[1].Liabilities = NewFraction(600)
 	candidates.updateVotingPower(store)
 	assert.Equal(int64(600), candidates[0].VotingPower, "%v", candidates[0])
 	assert.Equal(int64(500), candidates[1].VotingPower, "%v", candidates[1])
@@ -134,7 +134,7 @@ func TestGetValidators(t *testing.T) {
 
 	N := 5
 	actors := newActors(N)
-	candidates := candidatesFromActors(actors, []int{400, 200, 0, 0, 0})
+	candidates := candidatesFromActors(actors, []int64{400, 200, 0, 0, 0})
 
 	validators := candidates.Validators()
 	require.Equal(2, len(validators))
@@ -145,11 +145,11 @@ func TestGetValidators(t *testing.T) {
 func TestValidatorsChanged(t *testing.T) {
 	require := require.New(t)
 
-	v1 := (&Candidate{PubKey: pks[0], VotingPower: 10}).validator()
-	v2 := (&Candidate{PubKey: pks[1], VotingPower: 10}).validator()
-	v3 := (&Candidate{PubKey: pks[2], VotingPower: 10}).validator()
-	v4 := (&Candidate{PubKey: pks[3], VotingPower: 10}).validator()
-	v5 := (&Candidate{PubKey: pks[4], VotingPower: 10}).validator()
+	v1 := (&Candidate{PubKey: pks[0], VotingPower: NewFraction(10)}).validator()
+	v2 := (&Candidate{PubKey: pks[1], VotingPower: NewFraction(10)}).validator()
+	v3 := (&Candidate{PubKey: pks[2], VotingPower: NewFraction(10)}).validator()
+	v4 := (&Candidate{PubKey: pks[3], VotingPower: NewFraction(10)}).validator()
+	v5 := (&Candidate{PubKey: pks[4], VotingPower: NewFraction(10)}).validator()
 
 	// test from nothing to something
 	vs1 := Validators{}
@@ -279,11 +279,11 @@ func TestUpdateValidatorSet(t *testing.T) {
 	assert.Equal(int64(0), candidates[4].VotingPower)
 
 	//mess with the power's of the candidates and test
-	candidates[0].Shares = 10
-	candidates[1].Shares = 600
-	candidates[2].Shares = 1000
-	candidates[3].Shares = 1
-	candidates[4].Shares = 10
+	candidates[0].Liabilities = NewFraction(10)
+	candidates[1].Liabilities = NewFraction(600)
+	candidates[2].Liabilities = NewFraction(1000)
+	candidates[3].Liabilities = NewFraction(1)
+	candidates[4].Liabilities = NewFraction(10)
 	for _, c := range candidates {
 		saveCandidate(store, c)
 	}

@@ -124,7 +124,7 @@ func (tx TxDelegate) Wrap() sdk.Tx { return sdk.Tx{tx} }
 // TxUnbond - struct for unbonding transactions
 type TxUnbond struct {
 	PubKey crypto.PubKey `json:"pub_key"`
-	Shares int64        `json:"amount"`
+	Shares int64         `json:"amount"`
 }
 
 // NewTxUnbond - new TxUnbond

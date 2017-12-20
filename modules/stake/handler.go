@@ -370,7 +370,7 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	if bond == nil {
 		bond = &DelegatorBond{
 			PubKey: tx.PubKey,
-			Shares: DelegatorShares{Zero},
+			Shares: Zero,
 		}
 	}
 
@@ -428,7 +428,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	//XXX make shares able to be received as a decimal place and converted to fraction?
-	sharesFrac := DelegatorShares{NewFraction(tx.Shares, 1)}
+	sharesFrac := NewFraction(tx.Shares, 1)
 
 	returnCoins := candidate.removeShares(sharesFrac, d.gs)
 	err := d.transfer(PoolAccount, d.sender,
@@ -459,7 +459,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// deduct shares from the candidate and save
-	if candidate.Liablities.Equal(Zero) {
+	if candidate.Liabilities.Equal(Zero) {
 		removeCandidate(d.store, tx.PubKey)
 	} else {
 		saveCandidate(d.store, candidate)

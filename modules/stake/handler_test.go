@@ -127,7 +127,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 	expectedBond := bondAmount // 1 since we send 1 at the start of loop,
 
 	// just send the same txbond multiple times
-	holder := deliverer.params.HoldAccount
+	holder := deliverer.params.HoldBonded
 	txDelegate := newTxDelegate(bondAmount, pk1)
 	for i := 0; i < 5; i++ {
 		got := deliverer.delegate(txDelegate)
@@ -137,7 +137,7 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond += bondAmount
 		expectedSender := initSender - expectedBond
-		gotBonded := candidates[0].Shares
+		gotBonded := candidates[0].Liabilities
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
 		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
@@ -159,7 +159,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	assert.NoError(got, "expected initial bond tx to be ok, got %v", got)
 
 	// just send the same txunbond multiple times
-	holder := deliverer.params.HoldAccount
+	holder := deliverer.params.HoldBonded
 	unbondAmount := int64(10)
 	txUndelegate := newTxUnbond(unbondAmount, pk1)
 	nUnbonds := 5
@@ -171,7 +171,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
-		gotBonded := candidates[0].Shares
+		gotBonded := candidates[0].Liabilities
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
 
@@ -195,7 +195,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		assert.Error(got, "expected unbond tx to fail")
 	}
 
-	leftBonded := initBond - unbondAmount*nUnbonds
+	leftBonded := initBond - unbondAmount*int64(nUnbonds)
 
 	// should be unable to unbond one more than we have
 	txUndelegate = newTxUnbond(leftBonded+1, pk1)
@@ -227,7 +227,7 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 		val := candidates[i]
 		balanceGot, balanceExpd := accStore[string(val.Owner.Address)], initSender-10
 		assert.Equal(i+1, len(candidates), "expected %d candidates got %d, candidates: %v", i+1, len(candidates), candidates)
-		assert.Equal(10, int(val.Shares), "expected %d shares, got %d", 10, val.Shares)
+		assert.Equal(10, int(val.Liabilities.Evaluate()), "expected %d shares, got %d", 10, val.Liabilities)
 		assert.Equal(balanceExpd, balanceGot, "expected account to have %d, got %d", balanceExpd, balanceGot)
 	}
 

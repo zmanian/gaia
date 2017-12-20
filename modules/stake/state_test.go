@@ -26,8 +26,8 @@ func TestState(t *testing.T) {
 	candidate := &Candidate{
 		Owner:       validator,
 		PubKey:      pk,
-		Shares:      9,
-		VotingPower: 0,
+		Liabilities: NewFraction(9, 0),
+		VotingPower: Zero,
 	}
 
 	// check the empty store first
@@ -42,7 +42,7 @@ func TestState(t *testing.T) {
 	assert.Equal(candidate, resCand)
 
 	// modify a records, save, and retrieve
-	candidate.Shares = 99
+	candidate.Liabilities = NewFraction(99)
 	saveCandidate(store, candidate)
 	resCand = loadCandidate(store, pk)
 	assert.Equal(candidate, resCand)
@@ -57,7 +57,7 @@ func TestState(t *testing.T) {
 
 	bond := &DelegatorBond{
 		PubKey: pk,
-		Shares: 9,
+		Shares: NewFraction(9),
 	}
 
 	//check the empty store first
@@ -70,7 +70,7 @@ func TestState(t *testing.T) {
 	assert.Equal(bond, resBond)
 
 	//modify a records, save, and retrieve
-	bond.Shares = 99
+	bond.Shares = NewFraction(99)
 	saveDelegatorBond(store, delegator, bond)
 	resBond = loadDelegatorBond(store, delegator, pk)
 	assert.Equal(bond, resBond)
