@@ -69,6 +69,7 @@ func newDeliver(sender sdk.Actor, accStore map[string]int64) deliver {
 		store:    store,
 		sender:   sender,
 		params:   loadParams(store),
+		gs:       loadGlobalState(store),
 		transfer: testCoinSender{accStore}.transferFn,
 	}
 }

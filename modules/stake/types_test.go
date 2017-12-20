@@ -37,6 +37,7 @@ func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidat
 		c := &Candidate{
 			PubKey:      pks[i],
 			Owner:       actors[i],
+			Assets:      NewFraction(amts[i]),
 			Liabilities: NewFraction(amts[i]),
 			VotingPower: NewFraction(amts[i]),
 		}

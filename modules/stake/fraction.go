@@ -1,5 +1,7 @@
 package stake
 
+import wire "github.com/tendermint/go-wire"
+
 // XXX test fractions!
 
 // FractionI -  basic fraction functionality
@@ -8,8 +10,8 @@ type FractionI interface {
 	Inv() FractionI
 	SetNumerator(int64) FractionI
 	SetDenominator(int64) FractionI
-	Numerator() int64
-	Denominator() int64
+	GetNumerator() int64
+	GetDenominator() int64
 	Simplify() FractionI
 	Negative() bool
 	Positive() bool
@@ -31,38 +33,39 @@ type FractionI interface {
 
 // Fraction - basic fraction
 type Fraction struct {
-	numerator, denominator int64
+	Numerator, Denominator int64
 }
 
 var _ FractionI = Fraction{} // enforce at compile time
+var _ = wire.RegisterInterface(struct{ FractionI }{}, wire.ConcreteType{Fraction{}, 0x01})
 
 // NewFraction - create a new fraction object
-func NewFraction(numerator int64, denominator ...int64) Fraction {
+func NewFraction(Numerator int64, Denominator ...int64) Fraction {
 	var denom int64 = 1
-	if len(denominator) > 0 {
-		denom = denominator[0]
+	if len(Denominator) > 0 {
+		denom = Denominator[0]
 	}
-	return Fraction{numerator, denom}
+	return Fraction{Numerator, denom}
 }
 
-// SetNumerator - return a fraction with a new numerator
-func (f Fraction) SetNumerator(numerator int64) FractionI {
-	return Fraction{numerator, f.denominator}
+// SetNumerator - return a fraction with a new Numerator
+func (f Fraction) SetNumerator(Numerator int64) FractionI {
+	return Fraction{Numerator, f.Denominator}
 }
 
-// SetDenominator - return a fraction with a new denominator
-func (f Fraction) SetDenominator(denominator int64) FractionI {
-	return Fraction{f.numerator, denominator}
+// SetDenominator - return a fraction with a new Denominator
+func (f Fraction) SetDenominator(Denominator int64) FractionI {
+	return Fraction{f.Numerator, Denominator}
 }
 
-// Numerator - return the numerator
-func (f Fraction) Numerator() int64 {
-	return f.numerator
+// GetNumerator - return the Numerator
+func (f Fraction) GetNumerator() int64 {
+	return f.Numerator
 }
 
-// Denominator - return the denominator
-func (f Fraction) Denominator() int64 {
-	return f.denominator
+// GetDenominator - return the Denominator
+func (f Fraction) GetDenominator() int64 {
+	return f.Denominator
 }
 
 // TODO define faster operations (mul, add, etc) on One and Zero
@@ -72,31 +75,31 @@ var Zero = Fraction{0, 1}
 
 // Inv - Inverse
 func (f Fraction) Inv() FractionI {
-	return Fraction{f.denominator, f.numerator}
+	return Fraction{f.Denominator, f.Numerator}
 }
 
-// Simplify - find the greatest common denominator, divide
+// Simplify - find the greatest common Denominator, divide
 func (f Fraction) Simplify() FractionI {
 
-	gcd := f.numerator
+	gcd := f.Numerator
 
-	for d := f.denominator; d != 0; {
+	for d := f.Denominator; d != 0; {
 		gcd, d = d, gcd%d
 	}
 
-	return Fraction{f.numerator / gcd, f.denominator / gcd}
+	return Fraction{f.Numerator / gcd, f.Denominator / gcd}
 }
 
 // Negative - is the fractior negative
 func (f Fraction) Negative() bool {
 	switch {
-	case f.numerator > 0:
-		if f.denominator > 0 {
+	case f.Numerator > 0:
+		if f.Denominator > 0 {
 			return false
 		}
 		return true
-	case f.numerator < 0:
-		if f.denominator < 0 {
+	case f.Numerator < 0:
+		if f.Denominator < 0 {
 			return false
 		}
 		return true
@@ -107,13 +110,13 @@ func (f Fraction) Negative() bool {
 // Positive - is the fraction positive
 func (f Fraction) Positive() bool {
 	switch {
-	case f.numerator > 0:
-		if f.denominator > 0 {
+	case f.Numerator > 0:
+		if f.Denominator > 0 {
 			return true
 		}
 		return false
-	case f.numerator < 0:
-		if f.denominator < 0 {
+	case f.Numerator < 0:
+		if f.Denominator < 0 {
 			return true
 		}
 		return false
@@ -143,99 +146,99 @@ func (f Fraction) LTint(i int64) bool {
 
 // Equal - test if two Fractions are equal, does not simplify
 func (f Fraction) Equal(f2 FractionI) bool {
-	if f.numerator == 0 {
-		return f2.Numerator() == 0
+	if f.Numerator == 0 {
+		return f2.GetNumerator() == 0
 	}
-	return ((f.numerator == f2.Numerator()) && (f.denominator == f2.Denominator()))
+	return ((f.Numerator == f2.GetNumerator()) && (f.Denominator == f2.GetDenominator()))
 }
 
 // Mul - multiply
 func (f Fraction) Mul(f2 FractionI) FractionI {
 	return Fraction{
-		f.numerator * f2.Numerator(),
-		f.denominator * f2.Denominator(),
+		f.Numerator * f2.GetNumerator(),
+		f.Denominator * f2.GetDenominator(),
 	}
 }
 
 // MulInt - multiply fraction by integer
 func (f Fraction) MulInt(i int64) FractionI {
 	return Fraction{
-		f.numerator * i,
-		f.denominator,
+		f.Numerator * i,
+		f.Denominator,
 	}
 }
 
 // Div - divide
 func (f Fraction) Div(f2 FractionI) FractionI {
 	return Fraction{
-		f.numerator * f2.Denominator(),
-		f.denominator * f2.Numerator(),
+		f.Numerator * f2.GetDenominator(),
+		f.Denominator * f2.GetNumerator(),
 	}
 }
 
 // DivInt - divide fraction by and integer
 func (f Fraction) DivInt(i int64) FractionI {
 	return Fraction{
-		f.numerator,
-		f.denominator * i,
+		f.Numerator,
+		f.Denominator * i,
 	}
 }
 
 // Add - add without simplication
 func (f Fraction) Add(f2 FractionI) FractionI {
-	if f.denominator == f2.Denominator() {
+	if f.Denominator == f2.GetDenominator() {
 		return Fraction{
-			f.numerator + f2.Numerator(),
-			f.denominator,
+			f.Numerator + f2.GetNumerator(),
+			f.Denominator,
 		}
 	}
 	return Fraction{
-		f.numerator*f2.Denominator() + f2.Numerator()*f.denominator,
-		f.denominator * f2.Denominator(),
+		f.Numerator*f2.GetDenominator() + f2.GetNumerator()*f.Denominator,
+		f.Denominator * f2.GetDenominator(),
 	}
 }
 
 // AddInt - add fraction with integer, no simplication
 func (f Fraction) AddInt(i int64) FractionI {
 	return Fraction{
-		f.numerator + i*f.denominator,
-		f.denominator,
+		f.Numerator + i*f.Denominator,
+		f.Denominator,
 	}
 }
 
 // Sub - subtract without simplication
 func (f Fraction) Sub(f2 FractionI) FractionI {
-	if f.denominator == f2.Denominator() {
+	if f.Denominator == f2.GetDenominator() {
 		return Fraction{
-			f.numerator - f2.Numerator(),
-			f.denominator,
+			f.Numerator - f2.GetNumerator(),
+			f.Denominator,
 		}
 	}
 	return Fraction{
-		f.numerator*f2.Denominator() - f2.Numerator()*f.denominator,
-		f.denominator * f2.Denominator(),
+		f.Numerator*f2.GetDenominator() - f2.GetNumerator()*f.Denominator,
+		f.Denominator * f2.GetDenominator(),
 	}
 }
 
 // SubInt - subtract fraction with integer, no simplication
 func (f Fraction) SubInt(i int64) FractionI {
 	return Fraction{
-		f.numerator - i*f.denominator,
-		f.denominator,
+		f.Numerator - i*f.Denominator,
+		f.Denominator,
 	}
 }
 
 // Evaluate - evaluate the fraction using bankers rounding
 func (f Fraction) Evaluate() int64 {
 
-	d := f.numerator / f.denominator // always drops the decimal
-	if f.numerator%f.denominator == 0 {
+	d := f.Numerator / f.Denominator // always drops the decimal
+	if f.Numerator%f.Denominator == 0 {
 		return d
 	}
 
 	// evaluate the remainder using bankers rounding
-	remainderDigit := (f.numerator * 10 / f.denominator) - (d * 10) // get the first remainder digit
-	isFinalDigit := (f.numerator*10%f.denominator == 0)             // is this the final digit in the remainder?
+	remainderDigit := (f.Numerator * 10 / f.Denominator) - (d * 10) // get the first remainder digit
+	isFinalDigit := (f.Numerator*10%f.Denominator == 0)             // is this the final digit in the remainder?
 	if isFinalDigit && remainderDigit == 5 {
 		return d + (d % 2) // always rounds to the even number
 	}

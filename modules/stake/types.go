@@ -129,6 +129,9 @@ func (gs *GlobalState) removeSharesUnbonded(shares PoolShares) (removedTokens in
 type PoolShares FractionI
 type DelegatorShares FractionI
 
+var _ = wire.RegisterInterface(struct{ PoolShares }{}, wire.ConcreteType{Fraction{}, 0x01})
+var _ = wire.RegisterInterface(struct{ DelegatorShares }{}, wire.ConcreteType{Fraction{}, 0x01})
+
 //_______________________________________________________________________________________________________
 
 // CandidateStatus - status of a validator-candidate
@@ -153,7 +156,7 @@ type Candidate struct {
 	PubKey      crypto.PubKey   `json:"pub_key"`      // Pubkey of candidate
 	Owner       sdk.Actor       `json:"owner"`        // Sender of BondTx - UnbondTx returns here
 	Assets      PoolShares      `json:"assets"`       // total shares of a global hold pools
-	Liabilities  DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
+	Liabilities DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
 	VotingPower FractionI       `json:"voting_power"` // Voting power if pubKey is a considered a validator
 	Description Description     `json:"description"`  // Description terms for the candidate
 }
@@ -173,7 +176,7 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 		PubKey:      pubKey,
 		Owner:       owner,
 		Assets:      Zero,
-		Liabilities:  Zero,
+		Liabilities: Zero,
 		VotingPower: Zero,
 		Description: description,
 	}
