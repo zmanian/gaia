@@ -354,7 +354,7 @@ func (d deliver) delegate(tx TxDelegate) error {
 
 func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) error {
 
-	if candidate.Status == Unbonded { //candidate has been withdrawn
+	if candidate.Status == Revoked { //candidate has been withdrawn
 		return ErrBondNotNominated()
 	}
 
@@ -375,11 +375,10 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	}
 
 	// Account new shares, save
-	gs := loadGlobalState(d.store)
-	bond.Shares = bond.Shares.Add(candidate.addTokens(tx.Bond.Amount, gs))
+	bond.Shares = bond.Shares.Add(candidate.addTokens(tx.Bond.Amount, d.gs))
 	saveCandidate(d.store, candidate)
 	saveDelegatorBond(d.store, d.sender, bond)
-	saveGlobalState(d.store, gs)
+	saveGlobalState(d.store, d.gs)
 	return nil
 }
 

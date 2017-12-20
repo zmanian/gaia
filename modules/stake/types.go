@@ -193,6 +193,8 @@ func (c *Candidate) delegatorShareExRate() FractionI {
 // add tokens to a candidate
 func (c *Candidate) addTokens(amount int64, gs *GlobalState) (issuedDelegatorShares DelegatorShares) {
 
+	exRate := c.delegatorShareExRate()
+
 	var receivedGlobalShares PoolShares
 	if c.Status == Bonded {
 		receivedGlobalShares = gs.addTokensBonded(amount)
@@ -201,7 +203,7 @@ func (c *Candidate) addTokens(amount int64, gs *GlobalState) (issuedDelegatorSha
 	}
 	c.Assets = c.Assets.Add(receivedGlobalShares)
 
-	issuedDelegatorShares = c.delegatorShareExRate().Mul(receivedGlobalShares)
+	issuedDelegatorShares = exRate.Mul(receivedGlobalShares)
 	c.Liabilities = c.Liabilities.Add(issuedDelegatorShares)
 	return
 }

@@ -63,12 +63,31 @@ func newTxUnbond(shares int64, pubKey crypto.PubKey) TxUnbond {
 	}
 }
 
+func paramsNoInflation() Params {
+	return Params{
+		HoldBonded:          sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
+		HoldUnbonded:        sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
+		InflationRateChange: Zero,
+		InflationMax:        Zero,
+		InflationMin:        Zero,
+		GoalBonded:          NewFraction(67, 100),
+		MaxVals:             100,
+		AllowedBondDenom:    "fermion",
+		GasDeclareCandidacy: 20,
+		GasEditCandidacy:    20,
+		GasDelegate:         20,
+		GasUnbond:           20,
+	}
+}
+
 func newDeliver(sender sdk.Actor, accStore map[string]int64) deliver {
 	store := state.NewMemKVStore()
+	params := paramsNoInflation()
+	saveParams(store, params)
 	return deliver{
 		store:    store,
 		sender:   sender,
-		params:   loadParams(store),
+		params:   params,
 		gs:       loadGlobalState(store),
 		transfer: testCoinSender{accStore}.transferFn,
 	}
@@ -138,12 +157,12 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond += bondAmount
 		expectedSender := initSender - expectedBond
-		gotBonded := candidates[0].Liabilities
+		gotBonded := candidates[0].Liabilities.Evaluate()
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
-		assert.Equal(expectedBond, gotBonded, "%v, %v", expectedBond, gotBonded)
-		assert.Equal(expectedBond, gotHolder, "%v, %v", expectedBond, gotHolder)
-		assert.Equal(expectedSender, gotSender, "%v, %v", expectedSender, gotSender)
+		assert.Equal(expectedBond, gotBonded, "i: %v, %v, %v", i, expectedBond, gotBonded)
+		assert.Equal(expectedBond, gotHolder, "i: %v, %v, %v", i, expectedBond, gotHolder)
+		assert.Equal(expectedSender, gotSender, "i: %v, %v, %v", i, expectedSender, gotSender)
 	}
 }
 
@@ -172,7 +191,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
-		gotBonded := candidates[0].Liabilities
+		gotBonded := candidates[0].Liabilities.Evaluate()
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
 

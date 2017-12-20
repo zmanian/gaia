@@ -242,7 +242,7 @@ func saveParams(store state.SimpleDB, params Params) {
 
 // load/save the global staking state
 func loadGlobalState(store state.SimpleDB) (gs *GlobalState) {
-	b := store.Get(ParamKey)
+	b := store.Get(GlobalStateKey)
 	if b == nil {
 		return initialGlobalState()
 	}
