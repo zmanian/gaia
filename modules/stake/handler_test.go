@@ -182,8 +182,8 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 	// these are more than we have bonded now
 	errorCases := []int64{
-		1<<64 - 1, // more than int64
-		1<<63 + 1, // more than int64
+		//1<<64 - 1, // more than int64
+		//1<<63 + 1, // more than int64
 		1<<63 - 1,
 		1 << 31,
 		initBond,
