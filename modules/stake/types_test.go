@@ -51,7 +51,7 @@ func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidat
 func testChange(t *testing.T, val Validator, chg *abci.Validator) {
 	assert := assert.New(t)
 	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(val.VotingPower, chg.Power)
+	assert.Equal(val.VotingPower.Evaluate(), chg.Power)
 }
 
 // helper function test if Candidate is removed as abci.Validator
@@ -113,12 +113,12 @@ func TestUpdateVotingPower(t *testing.T) {
 	candidates := candidatesFromActors(actors, []int64{400, 200, 100, 10, 1})
 
 	// test a basic change in voting power
-	candidates[0].Liabilities = NewFraction(500)
+	candidates[0].Assets = NewFraction(500)
 	candidates.updateVotingPower(store, params)
 	assert.Equal(int64(500), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 
 	// test a swap in voting power
-	candidates[1].Liabilities = NewFraction(600)
+	candidates[1].Assets = NewFraction(600)
 	candidates.updateVotingPower(store, params)
 	assert.Equal(int64(600), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 	assert.Equal(int64(500), candidates[1].VotingPower.Evaluate(), "%v", candidates[1])
@@ -277,14 +277,14 @@ func TestUpdateValidatorSet(t *testing.T) {
 	require.Equal(1, len(change), "%v", change)
 	testRemove(t, candidates[4].validator(), change[0])
 	candidates = loadCandidates(store)
-	assert.Equal(int64(0), candidates[4].VotingPower)
+	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate())
 
 	//mess with the power's of the candidates and test
-	candidates[0].Liabilities = NewFraction(10)
-	candidates[1].Liabilities = NewFraction(600)
-	candidates[2].Liabilities = NewFraction(1000)
-	candidates[3].Liabilities = NewFraction(1)
-	candidates[4].Liabilities = NewFraction(10)
+	candidates[0].Assets = NewFraction(10)
+	candidates[1].Assets = NewFraction(600)
+	candidates[2].Assets = NewFraction(1000)
+	candidates[3].Assets = NewFraction(1)
+	candidates[4].Assets = NewFraction(10)
 	for _, c := range candidates {
 		saveCandidate(store, c)
 	}
