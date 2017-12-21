@@ -1,67 +1,13 @@
 package stake
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	abci "github.com/tendermint/abci/types"
-	crypto "github.com/tendermint/go-crypto"
 
-	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
 )
-
-func newActors(n int) (actors []sdk.Actor) {
-	for i := 0; i < n; i++ {
-		actors = append(actors, sdk.Actor{
-			"testChain", "testapp", []byte(fmt.Sprintf("addr%d", i))})
-	}
-
-	return
-}
-
-var pks = []crypto.PubKey{
-	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB51"),
-	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB52"),
-	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB53"),
-	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB54"),
-	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB55"),
-}
-
-// NOTE: PubKey is supposed to be the binaryBytes of the crypto.PubKey
-// instead this is just being set the address here for testing purposes
-func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidates) {
-	for i := 0; i < len(actors); i++ {
-		c := &Candidate{
-			PubKey:      pks[i],
-			Owner:       actors[i],
-			Assets:      NewFraction(amts[i]),
-			Liabilities: NewFraction(amts[i]),
-			VotingPower: NewFraction(amts[i]),
-		}
-		candidates = append(candidates, c)
-	}
-
-	return
-}
-
-// helper function test if Candidate is changed asabci.Validator
-func testChange(t *testing.T, val Validator, chg *abci.Validator) {
-	assert := assert.New(t)
-	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(val.VotingPower.Evaluate(), chg.Power)
-}
-
-// helper function test if Candidate is removed as abci.Validator
-func testRemove(t *testing.T, val Validator, chg *abci.Validator) {
-	assert := assert.New(t)
-	assert.Equal(val.PubKey.Bytes(), chg.PubKey)
-	assert.Equal(int64(0), chg.Power)
-}
-
-//___________________________________________________________________________________
 
 func TestCandidatesSort(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
@@ -107,6 +53,7 @@ func TestUpdateVotingPower(t *testing.T) {
 	assert := assert.New(t)
 	store := state.NewMemKVStore()
 	params := loadParams(store)
+	gs := loadGlobalState(store)
 
 	N := 5
 	actors := newActors(N)
@@ -114,19 +61,19 @@ func TestUpdateVotingPower(t *testing.T) {
 
 	// test a basic change in voting power
 	candidates[0].Assets = NewFraction(500)
-	candidates.updateVotingPower(store, params)
+	candidates.updateVotingPower(store, gs, params)
 	assert.Equal(int64(500), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 
 	// test a swap in voting power
 	candidates[1].Assets = NewFraction(600)
-	candidates.updateVotingPower(store, params)
+	candidates.updateVotingPower(store, gs, params)
 	assert.Equal(int64(600), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 	assert.Equal(int64(500), candidates[1].VotingPower.Evaluate(), "%v", candidates[1])
 
 	// test the max validators term
 	params.MaxVals = 4
 	saveParams(store, params)
-	candidates.updateVotingPower(store, params)
+	candidates.updateVotingPower(store, gs, params)
 	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate(), "%v", candidates[4])
 }
 
@@ -256,6 +203,7 @@ func TestUpdateValidatorSet(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	store := state.NewMemKVStore()
 	params := loadParams(store)
+	gs := loadGlobalState(store)
 
 	N := 5
 	actors := newActors(N)
@@ -264,22 +212,22 @@ func TestUpdateValidatorSet(t *testing.T) {
 		saveCandidate(store, c)
 	}
 
-	// They should all already be validators
-	change, err := UpdateValidatorSet(store, params)
+	// they should all already be validators
+	change, err := UpdateValidatorSet(store, gs, params)
 	require.Nil(err)
 	require.Equal(0, len(change), "%v", change) // change 1, remove 1, add 2
 
 	// test the max value and test again
 	params.MaxVals = 4
 	saveParams(store, params)
-	change, err = UpdateValidatorSet(store, params)
+	change, err = UpdateValidatorSet(store, gs, params)
 	require.Nil(err)
 	require.Equal(1, len(change), "%v", change)
 	testRemove(t, candidates[4].validator(), change[0])
 	candidates = loadCandidates(store)
 	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate())
 
-	//mess with the power's of the candidates and test
+	// mess with the power's of the candidates and test
 	candidates[0].Assets = NewFraction(10)
 	candidates[1].Assets = NewFraction(600)
 	candidates[2].Assets = NewFraction(1000)
@@ -288,9 +236,9 @@ func TestUpdateValidatorSet(t *testing.T) {
 	for _, c := range candidates {
 		saveCandidate(store, c)
 	}
-	change, err = UpdateValidatorSet(store, params)
+	change, err = UpdateValidatorSet(store, gs, params)
 	require.Nil(err)
-	require.Equal(5, len(change), "%v", change) //3 changed, 1 added, 1 removed
+	require.Equal(5, len(change), "%v", change) // 3 changed, 1 added, 1 removed
 	candidates = loadCandidates(store)
 	testChange(t, candidates[0].validator(), change[0])
 	testChange(t, candidates[1].validator(), change[1])

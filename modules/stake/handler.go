@@ -296,6 +296,37 @@ type transferFn func(sender, receiver sdk.Actor, coins coin.Coins) error
 
 var _ delegatedProofOfStake = deliver{} // enforce interface at compile time
 
+//_____________________________________________________________________
+// deliver helper functions
+
+// TODO move from deliver with new SDK should only be dependant on store to send coins in NEW SDK
+
+// move a candidates asset pool from bonded to unbonded pool
+func (d deliver) bondedToUnbondedPool(candidate *Candidate) error {
+
+	// replace bonded shares with unbonded shares
+	tokens := d.gs.removeSharesBonded(candidate.Assets)
+	candidate.Assets = d.gs.addTokensUnbonded(tokens)
+	candidate.Status = Unbonded
+
+	return d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
+		coin.Coins{{d.params.AllowedBondDenom, tokens}})
+}
+
+// move a candidates asset pool from unbonded to bonded pool
+func (d deliver) unbondedToBondedPool(candidate *Candidate) error {
+
+	// replace bonded shares with unbonded shares
+	tokens := d.gs.removeSharesUnbonded(candidate.Assets)
+	candidate.Assets = d.gs.addTokensBonded(tokens)
+	candidate.Status = Bonded
+
+	return d.transfer(d.params.HoldUnbonded, d.params.HoldBonded,
+		coin.Coins{{d.params.AllowedBondDenom, tokens}})
+}
+
+//_____________________________________________________________________
+
 // These functions assume everything has been authenticated,
 // now we just perform action and save
 func (d deliver) declareCandidacy(tx TxDeclareCandidacy) error {
@@ -448,13 +479,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 
 		// change the share types to unbonded if they were not already
 		if candidate.Status == Bonded {
-
-			// replace bonded shares with unbonded shares
-			tokens := d.gs.removeSharesBonded(candidate.Assets)
-			candidate.Assets = d.gs.addTokensUnbonded(tokens)
-
-			err = d.transfer(d.params.HoldBonded, d.params.HoldUnbonded,
-				coin.Coins{{d.params.AllowedBondDenom, tokens}})
+			err = d.bondedToUnbondedPool(candidate)
 			if err != nil {
 				return err
 			}

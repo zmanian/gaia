@@ -16,23 +16,45 @@ func Tick(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, err 
 	height := ctx.BlockHeight()
 
 	// Process Validator Provisions
-	// TODO right now just process every 5 blocks, in new SDK make hourly
+	// XXX right now just process every 5 blocks, in new SDK make hourly
 	if gs.InflationLastTime+5 <= height {
 		gs.InflationLastTime = height
 		processProvisions(store, params, gs)
 	}
 
-	return UpdateValidatorSet(store, params)
+	return UpdateValidatorSet(store, gs, params)
 }
 
 // XXX test processProvisions
-func processProvisions(store state.SimpleDB, params Params, gs *GlobalState) {
+func processProvisions(store state.SimpleDB, gs *GlobalState, params Params) {
 
-	//The target annual inflation rate is recalculated for each previsions cycle. The
-	//inflation is also subject to a rate change (positive of negative) depending or
-	//the distance from the desired ratio (67%). The maximum rate change possible is
-	//defined to be 13% per year, however the annual inflation is capped as between
-	//7% and 20%.
+	// get hourly, and save annual inflation
+	hourly, annual := getInflation(gs, params)
+	gs.Inflation = annual
+
+	// Because the validators hold a relative bonded share (`GlobalStakeShare`), when
+	// more bonded tokens are added proportionally to all validators the only term
+	// which needs to be updated is the `BondedPool`. So for each previsions cycle:
+
+	hourlyProvisions := hourly.MulInt(gs.TotalSupply).Evaluate()
+	gs.BondedPool += hourlyProvisions
+	gs.TotalSupply += hourlyProvisions
+
+	// XXX XXX XXX XXX XXX XXX XXX XXX XXX
+	// XXX Mint them to the hold account
+	// XXX XXX XXX XXX XXX XXX XXX XXX XXX
+
+	// save the params
+	saveGlobalState(store, gs)
+}
+
+func getInflation(gs *GlobalState, params Params) (hourly, annual FractionI) {
+
+	// The target annual inflation rate is recalculated for each previsions cycle. The
+	// inflation is also subject to a rate change (positive of negative) depending or
+	// the distance from the desired ratio (67%). The maximum rate change possible is
+	// defined to be 13% per year, however the annual inflation is capped as between
+	// 7% and 20%.
 
 	bondedRatio := NewFraction(gs.BondedPool, gs.TotalSupply)
 	annualInflationRateChange := One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
@@ -43,24 +65,9 @@ func processProvisions(store state.SimpleDB, params Params, gs *GlobalState) {
 	if annualInflation.LT(params.InflationMin) {
 		annualInflation = params.InflationMin
 	}
+
 	hoursPerYear := NewFraction(876582, 100)
-	provisionTokensHourly := annualInflation.Div(hoursPerYear).MulInt(gs.TotalSupply)
+	hourlyInflation := annualInflation.Div(hoursPerYear)
 
-	// save the new inflation for the next tick
-	gs.Inflation = annualInflation
-
-	//Because the validators hold a relative bonded share (`GlobalStakeShare`), when
-	//more bonded tokens are added proportionally to all validators the only term
-	//which needs to be updated is the `BondedPool`. So for each previsions cycle:
-
-	newProvisions := provisionTokensHourly.Evaluate()
-	gs.BondedPool += newProvisions
-	gs.TotalSupply += newProvisions
-
-	//XXX XXX XXX XXX XXX XXX XXX XXX XXX
-	//XXX Mint them to the hold account
-	//XXX XXX XXX XXX XXX XXX XXX XXX XXX
-
-	// save the params
-	saveGlobalState(store, gs)
+	return hourlyInflation, annualInflation
 }

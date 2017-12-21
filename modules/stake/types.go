@@ -270,7 +270,7 @@ func (cs Candidates) Sort() {
 }
 
 // update the voting power and save
-func (cs Candidates) updateVotingPower(store state.SimpleDB, params Params) Candidates {
+func (cs Candidates) updateVotingPower(store state.SimpleDB, gs *GlobalState, params Params) Candidates {
 
 	// update voting power
 	for _, c := range cs {
@@ -283,6 +283,15 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB, params Params) Cand
 		// truncate the power
 		if i >= int(params.MaxVals) {
 			c.VotingPower = Zero
+			if c.Status == Bonded {
+				// XXX to replace this with handler.bondedToUnbondePool function
+				// XXX waiting for logic with new SDK to update account balance here
+				tokens := gs.removeSharesBonded(c.Assets)
+				c.Assets = gs.addTokensUnbonded(tokens)
+				c.Status = Unbonded
+			}
+		} else {
+			c.Status = Bonded
 		}
 		saveCandidate(store, c)
 	}
@@ -383,13 +392,13 @@ func (vs Validators) validatorsUpdated(vs2 Validators) (updated []*abci.Validato
 
 // UpdateValidatorSet - Updates the voting power for the candidate set and
 // returns the subset of validators which have been updated for Tendermint
-func UpdateValidatorSet(store state.SimpleDB, params Params) (change []*abci.Validator, err error) {
+func UpdateValidatorSet(store state.SimpleDB, gs *GlobalState, params Params) (change []*abci.Validator, err error) {
 
 	// get the validators before update
 	candidates := loadCandidates(store)
 
 	v1 := candidates.Validators()
-	v2 := candidates.updateVotingPower(store, params).Validators()
+	v2 := candidates.updateVotingPower(store, gs, params).Validators()
 
 	change = v1.validatorsUpdated(v2)
 	return
