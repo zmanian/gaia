@@ -5,13 +5,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-func TestGetInflation(t *testing.T) {
-	assert, require := assert.New(t), require.New(t)
-}
+// XXX complete test
+//func TestGetInflation(t *testing.T) {
+//assert, require := assert.New(t), require.New(t)
+//}
 
 func TestProcessProvisions(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
@@ -42,11 +44,11 @@ func TestProcessProvisions(t *testing.T) {
 	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate())
 
 	// mess with the power's of the candidates and test
-	candidates[0].Assets = NewFraction(10)
-	candidates[1].Assets = NewFraction(600)
-	candidates[2].Assets = NewFraction(1000)
-	candidates[3].Assets = NewFraction(1)
-	candidates[4].Assets = NewFraction(10)
+	candidates[0].Assets = rational.New(10)
+	candidates[1].Assets = rational.New(600)
+	candidates[2].Assets = rational.New(1000)
+	candidates[3].Assets = rational.New(1)
+	candidates[4].Assets = rational.New(10)
 	for _, c := range candidates {
 		saveCandidate(store, c)
 	}

@@ -207,7 +207,7 @@ although in later phases shares are used along with other terms to calculate
 the coins.
 
 When unbonding is initiated, delegator shares are immediately removed from the
-candidate. In the unbonding queue - the fraction of all historical slashings on
+candidate. In the unbonding queue - the rational of all historical slashings on
 that validator are recorded (StartSlashRatio). When this queue reaches maturity
 if that total slashing applied is greater on the validator then the
 difference (amount that should have been slashed from the first validator) is

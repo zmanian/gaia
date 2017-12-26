@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/tendermint/tmlibs/log"
+	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/errors"
@@ -268,7 +269,7 @@ func (c check) unbond(tx TxUnbond) error {
 
 	// check if have enough shares to unbond
 	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
-	if bond.Shares.LTint(tx.Shares) { // bond shares < tx shares
+	if bond.Shares.LT(rational.New(tx.Shares)) { // bond shares < tx shares
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
 			bond.Shares, tx.Shares)
 	}
@@ -408,7 +409,7 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	if bond == nil {
 		bond = &DelegatorBond{
 			PubKey: tx.PubKey,
-			Shares: Zero,
+			Shares: rational.New(0),
 		}
 	}
 
@@ -429,10 +430,10 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// subtract bond tokens from delegator bond
-	if bond.Shares.LTint(tx.Shares) { // bond shares < tx shares
+	if bond.Shares.LT(rational.New(tx.Shares)) { // bond shares < tx shares
 		return ErrInsufficientFunds()
 	}
-	bond.Shares = bond.Shares.SubInt(tx.Shares)
+	bond.Shares = bond.Shares.Sub(rational.New(tx.Shares))
 
 	// get pubKey candidate
 	candidate := loadCandidate(d.store, tx.PubKey)
@@ -441,7 +442,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	revokeCandidacy := false
-	if bond.Shares.Equal(Zero) {
+	if bond.Shares.IsZero() {
 
 		// if the bond is the owner of the candidate then
 		// trigger a revoke candidacy
@@ -464,8 +465,8 @@ func (d deliver) unbond(tx TxUnbond) error {
 		poolAccount = d.params.HoldUnbonded
 	}
 
-	//XXX make shares able to be received as a decimal place and converted to fraction?
-	sharesFrac := NewFraction(tx.Shares, 1)
+	//XXX make shares able to be received as a decimal place and converted to rational?
+	sharesFrac := rational.New(tx.Shares)
 
 	returnCoins := candidate.removeShares(sharesFrac, d.gs)
 	err := d.transfer(poolAccount, d.sender,
@@ -490,7 +491,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 	}
 
 	// deduct shares from the candidate and save
-	if candidate.Liabilities.Equal(Zero) {
+	if candidate.Liabilities.IsZero() {
 		removeCandidate(d.store, tx.PubKey)
 	} else {
 		saveCandidate(d.store, candidate)

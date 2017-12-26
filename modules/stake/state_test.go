@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/state"
@@ -23,11 +24,12 @@ func TestState(t *testing.T) {
 	//----------------------------------------------------------------------
 	// Candidate checks
 
+	// XXX expand to include both liabilities and assets use/test all candidate fields
 	candidate := &Candidate{
 		Owner:       validator,
 		PubKey:      pk,
-		Liabilities: NewFraction(9, 0),
-		VotingPower: Zero,
+		Liabilities: rational.New(9),
+		VotingPower: rational.New(0),
 	}
 
 	// check the empty store first
@@ -42,7 +44,7 @@ func TestState(t *testing.T) {
 	assert.Equal(candidate, resCand)
 
 	// modify a records, save, and retrieve
-	candidate.Liabilities = NewFraction(99)
+	candidate.Liabilities = rational.New(99)
 	saveCandidate(store, candidate)
 	resCand = loadCandidate(store, pk)
 	assert.Equal(candidate, resCand)
@@ -57,7 +59,7 @@ func TestState(t *testing.T) {
 
 	bond := &DelegatorBond{
 		PubKey: pk,
-		Shares: NewFraction(9),
+		Shares: rational.New(9),
 	}
 
 	//check the empty store first
@@ -70,7 +72,7 @@ func TestState(t *testing.T) {
 	assert.Equal(bond, resBond)
 
 	//modify a records, save, and retrieve
-	bond.Shares = NewFraction(99)
+	bond.Shares = rational.New(99)
 	saveDelegatorBond(store, delegator, bond)
 	resBond = loadDelegatorBond(store, delegator, pk)
 	assert.Equal(bond, resBond)

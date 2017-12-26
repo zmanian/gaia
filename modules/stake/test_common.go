@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	abci "github.com/tendermint/abci/types"
 	crypto "github.com/tendermint/go-crypto"
+	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk"
 )
@@ -44,9 +45,9 @@ func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidat
 		c := &Candidate{
 			PubKey:      pks[i],
 			Owner:       actors[i],
-			Assets:      NewFraction(amts[i]),
-			Liabilities: NewFraction(amts[i]),
-			VotingPower: NewFraction(amts[i]),
+			Assets:      rational.New(amts[i]),
+			Liabilities: rational.New(amts[i]),
+			VotingPower: rational.New(amts[i]),
 		}
 		candidates = append(candidates, c)
 	}

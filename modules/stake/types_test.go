@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk/state"
 )
@@ -32,11 +33,11 @@ func TestCandidatesSort(t *testing.T) {
 func TestValidatorsSort(t *testing.T) {
 	assert := assert.New(t)
 
-	v1 := (&Candidate{PubKey: pks[0], VotingPower: NewFraction(25)}).validator()
-	v2 := (&Candidate{PubKey: pks[1], VotingPower: NewFraction(1234)}).validator()
-	v3 := (&Candidate{PubKey: pks[2], VotingPower: NewFraction(122)}).validator()
-	v4 := (&Candidate{PubKey: pks[3], VotingPower: NewFraction(13)}).validator()
-	v5 := (&Candidate{PubKey: pks[4], VotingPower: NewFraction(1111)}).validator()
+	v1 := (&Candidate{PubKey: pks[0], VotingPower: rational.New(25)}).validator()
+	v2 := (&Candidate{PubKey: pks[1], VotingPower: rational.New(1234)}).validator()
+	v3 := (&Candidate{PubKey: pks[2], VotingPower: rational.New(122)}).validator()
+	v4 := (&Candidate{PubKey: pks[3], VotingPower: rational.New(13)}).validator()
+	v5 := (&Candidate{PubKey: pks[4], VotingPower: rational.New(1111)}).validator()
 
 	// test from nothing to something
 	vs := Validators{v4, v2, v5, v1, v3}
@@ -60,12 +61,12 @@ func TestUpdateVotingPower(t *testing.T) {
 	candidates := candidatesFromActors(actors, []int64{400, 200, 100, 10, 1})
 
 	// test a basic change in voting power
-	candidates[0].Assets = NewFraction(500)
+	candidates[0].Assets = rational.New(500)
 	candidates.updateVotingPower(store, gs, params)
 	assert.Equal(int64(500), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 
 	// test a swap in voting power
-	candidates[1].Assets = NewFraction(600)
+	candidates[1].Assets = rational.New(600)
 	candidates.updateVotingPower(store, gs, params)
 	assert.Equal(int64(600), candidates[0].VotingPower.Evaluate(), "%v", candidates[0])
 	assert.Equal(int64(500), candidates[1].VotingPower.Evaluate(), "%v", candidates[1])
@@ -93,11 +94,11 @@ func TestGetValidators(t *testing.T) {
 func TestValidatorsChanged(t *testing.T) {
 	require := require.New(t)
 
-	v1 := (&Candidate{PubKey: pks[0], VotingPower: NewFraction(10)}).validator()
-	v2 := (&Candidate{PubKey: pks[1], VotingPower: NewFraction(10)}).validator()
-	v3 := (&Candidate{PubKey: pks[2], VotingPower: NewFraction(10)}).validator()
-	v4 := (&Candidate{PubKey: pks[3], VotingPower: NewFraction(10)}).validator()
-	v5 := (&Candidate{PubKey: pks[4], VotingPower: NewFraction(10)}).validator()
+	v1 := (&Candidate{PubKey: pks[0], VotingPower: rational.New(10)}).validator()
+	v2 := (&Candidate{PubKey: pks[1], VotingPower: rational.New(10)}).validator()
+	v3 := (&Candidate{PubKey: pks[2], VotingPower: rational.New(10)}).validator()
+	v4 := (&Candidate{PubKey: pks[3], VotingPower: rational.New(10)}).validator()
+	v5 := (&Candidate{PubKey: pks[4], VotingPower: rational.New(10)}).validator()
 
 	// test from nothing to something
 	vs1 := Validators{}
@@ -122,14 +123,14 @@ func TestValidatorsChanged(t *testing.T) {
 	require.Zero(len(changed))
 
 	// test single value change
-	vs2[2].VotingPower = One
+	vs2[2].VotingPower = rational.New(1)
 	changed = vs1.validatorsUpdated(vs2)
 	require.Equal(1, len(changed))
 	testChange(t, vs2[2], changed[0])
 
 	// test multiple value change
-	vs2[0].VotingPower = NewFraction(11)
-	vs2[2].VotingPower = NewFraction(5)
+	vs2[0].VotingPower = rational.New(11)
+	vs2[2].VotingPower = rational.New(5)
 	changed = vs1.validatorsUpdated(vs2)
 	require.Equal(2, len(changed))
 	testChange(t, vs2[0], changed[0])
@@ -189,7 +190,7 @@ func TestValidatorsChanged(t *testing.T) {
 
 	// test many types of changes
 	vs2 = Validators{v1, v3, v4, v5}
-	vs2[2].VotingPower = NewFraction(11)
+	vs2[2].VotingPower = rational.New(11)
 	changed = vs1.validatorsUpdated(vs2)
 	require.Equal(4, len(changed), "%v", changed) // change 1, remove 1, add 2
 	testRemove(t, vs1[1], changed[0])
@@ -228,11 +229,11 @@ func TestUpdateValidatorSet(t *testing.T) {
 	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate())
 
 	// mess with the power's of the candidates and test
-	candidates[0].Assets = NewFraction(10)
-	candidates[1].Assets = NewFraction(600)
-	candidates[2].Assets = NewFraction(1000)
-	candidates[3].Assets = NewFraction(1)
-	candidates[4].Assets = NewFraction(10)
+	candidates[0].Assets = rational.New(10)
+	candidates[1].Assets = rational.New(600)
+	candidates[2].Assets = rational.New(1000)
+	candidates[3].Assets = rational.New(1)
+	candidates[4].Assets = rational.New(10)
 	for _, c := range candidates {
 		saveCandidate(store, c)
 	}

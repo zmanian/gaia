@@ -35,10 +35,10 @@ func TestBondUpdateValidateBasic(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
-		{"basic good", fields{pk1, coinPos}, false},
+		{"basic good", fields{pks[0], coinPos}, false},
 		{"empty delegator", fields{crypto.PubKey{}, coinPos}, true},
-		{"zero coin", fields{pk1, coinZero}, true},
-		{"neg coin", fields{pk1, coinNeg}, true},
+		{"zero coin", fields{pks[0], coinZero}, true},
+		{"neg coin", fields{pks[0], coinNeg}, true},
 	}
 
 	for _, tt := range tests {

@@ -220,7 +220,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: b49bce2bc3fb8fa25f676b9b49cce5e10f89b0c6
+  version: 9efa8a03783016aa00952e6b451739b048c1f8cd
   subpackages:
   - autofile
   - cli
@@ -235,6 +235,7 @@ imports:
   - merkle
   - pubsub
   - pubsub/query
+  - rational
 - name: golang.org/x/crypto
   version: c7af5bf2638a1164f2eb5467c39c6cffbd13a02e
   subpackages:

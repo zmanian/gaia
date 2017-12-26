@@ -10,6 +10,7 @@ import (
 	abci "github.com/tendermint/abci/types"
 	crypto "github.com/tendermint/go-crypto"
 	wire "github.com/tendermint/go-wire"
+	"github.com/tendermint/tmlibs/rational"
 )
 
 // Params defines the high level settings for staking
@@ -17,10 +18,10 @@ type Params struct {
 	HoldBonded   sdk.Actor `json:"hold_bonded"`   // account  where all bonded coins are held
 	HoldUnbonded sdk.Actor `json:"hold_unbonded"` // account where all delegated but unbonded coins are held
 
-	InflationRateChange FractionI `json:"inflation_rate_change"` // maximum annual change in inflation rate
-	InflationMax        FractionI `json:"inflation_max"`         // maximum inflation rate
-	InflationMin        FractionI `json:"inflation_min"`         // minimum inflation rate
-	GoalBonded          FractionI `json:"goal_bonded"`           // Goal of percent bonded atoms
+	InflationRateChange rational.Rational `json:"inflation_rate_change"` // maximum annual change in inflation rate
+	InflationMax        rational.Rational `json:"inflation_max"`         // maximum inflation rate
+	InflationMin        rational.Rational `json:"inflation_min"`         // minimum inflation rate
+	GoalBonded          rational.Rational `json:"goal_bonded"`           // Goal of percent bonded atoms
 
 	MaxVals          uint16 `json:"max_vals"`           // maximum number of validators
 	AllowedBondDenom string `json:"allowed_bond_denom"` // bondable coin denomination
@@ -36,10 +37,10 @@ func defaultParams() Params {
 	return Params{
 		HoldBonded:          sdk.NewActor(stakingModuleName, []byte("77777777777777777777777777777777")),
 		HoldUnbonded:        sdk.NewActor(stakingModuleName, []byte("88888888888888888888888888888888")),
-		InflationRateChange: NewFraction(13, 100),
-		InflationMax:        NewFraction(20, 100),
-		InflationMin:        NewFraction(7, 100),
-		GoalBonded:          NewFraction(67, 100),
+		InflationRateChange: rational.New(13, 100),
+		InflationMax:        rational.New(20, 100),
+		InflationMin:        rational.New(7, 100),
+		GoalBonded:          rational.New(67, 100),
 		MaxVals:             100,
 		AllowedBondDenom:    "fermion",
 		GasDeclareCandidacy: 20,
@@ -53,45 +54,45 @@ func defaultParams() Params {
 
 // GlobalState - dynamic parameters of the current state
 type GlobalState struct {
-	TotalSupply       int64      `json:"total_supply"`        // total supply of all tokens
-	BondedShares      PoolShares `json:"bonded_shares"`       // sum of all shares distributed for the Bonded Pool
-	UnbondedShares    PoolShares `json:"unbonded_shares"`     // sum of all shares distributed for the Unbonded Pool
-	BondedPool        int64      `json:"bonded_pool"`         // reserve of bonded tokens
-	UnbondedPool      int64      `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
-	InflationLastTime int64      `json:"inflation_last_time"` // block which the last inflation was processed // TODO make time
-	Inflation         FractionI  `json:"inflation"`           // current annual inflation rate
+	TotalSupply       int64             `json:"total_supply"`        // total supply of all tokens
+	BondedShares      PoolShares        `json:"bonded_shares"`       // sum of all shares distributed for the Bonded Pool
+	UnbondedShares    PoolShares        `json:"unbonded_shares"`     // sum of all shares distributed for the Unbonded Pool
+	BondedPool        int64             `json:"bonded_pool"`         // reserve of bonded tokens
+	UnbondedPool      int64             `json:"unbonded_pool"`       // reserve of unbonded tokens held with candidates
+	InflationLastTime int64             `json:"inflation_last_time"` // block which the last inflation was processed // TODO make time
+	Inflation         rational.Rational `json:"inflation"`           // current annual inflation rate
 }
 
 func initialGlobalState() *GlobalState {
 	return &GlobalState{
 		TotalSupply:       0,
-		BondedShares:      Zero,
-		UnbondedShares:    Zero,
+		BondedShares:      rational.New(0),
+		UnbondedShares:    rational.New(0),
 		BondedPool:        0,
 		UnbondedPool:      0,
 		InflationLastTime: 0,
-		Inflation:         NewFraction(7, 100),
+		Inflation:         rational.New(7, 100),
 	}
 }
 
 // get the exchange rate of bonded token per issued share
 func (gs *GlobalState) bondedShareExRate() PoolShares {
-	if gs.BondedShares.Equal(Zero) {
-		return One
+	if gs.BondedShares.IsZero() {
+		return rational.New(1)
 	}
-	return gs.BondedShares.Inv().MulInt(gs.BondedPool)
+	return gs.BondedShares.Inv().Mul(rational.New(gs.BondedPool))
 }
 
 // get the exchange rate of unbonded tokens held in candidates per issued share
 func (gs *GlobalState) unbondedShareExRate() PoolShares {
-	if gs.UnbondedShares.Equal(Zero) {
-		return One
+	if gs.UnbondedShares.IsZero() {
+		return rational.New(1)
 	}
-	return gs.UnbondedShares.Inv().MulInt(gs.UnbondedPool)
+	return gs.UnbondedShares.Inv().Mul(rational.New(gs.UnbondedPool))
 }
 
 func (gs *GlobalState) addTokensBonded(amount int64) (issuedShares PoolShares) {
-	issuedShares = gs.bondedShareExRate().Inv().MulInt(amount) // (tokens/shares)^-1 * tokens
+	issuedShares = gs.bondedShareExRate().Inv().Mul(rational.New(amount)) // (tokens/shares)^-1 * tokens
 	gs.BondedPool += amount
 	gs.BondedShares = gs.BondedShares.Add(issuedShares)
 	return
@@ -105,7 +106,7 @@ func (gs *GlobalState) removeSharesBonded(shares PoolShares) (removedTokens int6
 }
 
 func (gs *GlobalState) addTokensUnbonded(amount int64) (issuedShares PoolShares) {
-	issuedShares = gs.unbondedShareExRate().Inv().MulInt(amount) // (tokens/shares)^-1 * tokens
+	issuedShares = gs.unbondedShareExRate().Inv().Mul(rational.New(amount)) // (tokens/shares)^-1 * tokens
 	gs.UnbondedShares = gs.UnbondedShares.Add(issuedShares)
 	gs.UnbondedPool += amount
 	return
@@ -126,11 +127,12 @@ func (gs *GlobalState) removeSharesUnbonded(shares PoolShares) (removedTokens in
 // to there delegators.
 
 // nolint
-type PoolShares FractionI
-type DelegatorShares FractionI
+type PoolShares rational.Rational
+type DelegatorShares rational.Rational
 
-var _ = wire.RegisterInterface(struct{ PoolShares }{}, wire.ConcreteType{Fraction{}, 0x01})
-var _ = wire.RegisterInterface(struct{ DelegatorShares }{}, wire.ConcreteType{Fraction{}, 0x01})
+// XXX fix wire encoding
+//var _ = wire.RegisterInterface(struct{ PoolShares }{}, wire.ConcreteType{rational.Rational, 0x01})
+//var _ = wire.RegisterInterface(struct{ DelegatorShares }{}, wire.ConcreteType{rational.Rational, 0x01})
 
 //_______________________________________________________________________________________________________
 
@@ -152,13 +154,13 @@ const (
 // exchange rate. Voting power can be calculated as total bonds multiplied by
 // exchange rate.
 type Candidate struct {
-	Status      CandidateStatus `json:"status"`       // Bonded status of validator
-	PubKey      crypto.PubKey   `json:"pub_key"`      // Pubkey of candidate
-	Owner       sdk.Actor       `json:"owner"`        // Sender of BondTx - UnbondTx returns here
-	Assets      PoolShares      `json:"assets"`       // total shares of a global hold pools
-	Liabilities DelegatorShares `json:"liabilities"`  // total shares issued to a candidate's delegators
-	VotingPower FractionI       `json:"voting_power"` // Voting power if pubKey is a considered a validator
-	Description Description     `json:"description"`  // Description terms for the candidate
+	Status      CandidateStatus   `json:"status"`       // Bonded status of validator
+	PubKey      crypto.PubKey     `json:"pub_key"`      // Pubkey of candidate
+	Owner       sdk.Actor         `json:"owner"`        // Sender of BondTx - UnbondTx returns here
+	Assets      PoolShares        `json:"assets"`       // total shares of a global hold pools
+	Liabilities DelegatorShares   `json:"liabilities"`  // total shares issued to a candidate's delegators
+	VotingPower rational.Rational `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Description Description       `json:"description"`  // Description terms for the candidate
 }
 
 // Description - description fields for a candidate
@@ -175,19 +177,19 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 		Status:      Unbonded,
 		PubKey:      pubKey,
 		Owner:       owner,
-		Assets:      Zero,
-		Liabilities: Zero,
-		VotingPower: Zero,
+		Assets:      rational.New(0),
+		Liabilities: rational.New(0),
+		VotingPower: rational.New(0),
 		Description: description,
 	}
 }
 
 // get the exchange rate of global pool shares over delegator shares
-func (c *Candidate) delegatorShareExRate() FractionI {
-	if c.Liabilities.Equal(Zero) {
-		return One
+func (c *Candidate) delegatorShareExRate() rational.Rational {
+	if c.Liabilities.IsZero() {
+		return rational.New(1)
 	}
-	return c.Assets.Div(c.Liabilities)
+	return c.Assets.Quo(c.Liabilities)
 }
 
 // add tokens to a candidate
@@ -282,7 +284,7 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB, gs *GlobalState, pa
 	for i, c := range cs {
 		// truncate the power
 		if i >= int(params.MaxVals) {
-			c.VotingPower = Zero
+			c.VotingPower = rational.New(0)
 			if c.Status == Bonded {
 				// XXX to replace this with handler.bondedToUnbondePool function
 				// XXX waiting for logic with new SDK to update account balance here
@@ -306,14 +308,14 @@ func (cs Candidates) Validators() Validators {
 
 	//test if empty
 	if len(cs) == 1 {
-		if cs[0].VotingPower.Equal(Zero) {
+		if cs[0].VotingPower.IsZero() {
 			return nil
 		}
 	}
 
 	validators := make(Validators, len(cs))
 	for i, c := range cs {
-		if c.VotingPower.Equal(Zero) { //exit as soon as the first Voting power set to zero is found
+		if c.VotingPower.IsZero() { //exit as soon as the first Voting power set to zero is found
 			return validators[:i]
 		}
 		validators[i] = c.validator()

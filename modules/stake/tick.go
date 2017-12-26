@@ -5,6 +5,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/state"
 
 	abci "github.com/tendermint/abci/types"
+	"github.com/tendermint/tmlibs/rational"
 )
 
 // Tick - called at the end of every block
@@ -19,7 +20,7 @@ func Tick(ctx sdk.Context, store state.SimpleDB) (change []*abci.Validator, err 
 	// XXX right now just process every 5 blocks, in new SDK make hourly
 	if gs.InflationLastTime+5 <= height {
 		gs.InflationLastTime = height
-		processProvisions(store, params, gs)
+		processProvisions(store, gs, params)
 	}
 
 	return UpdateValidatorSet(store, gs, params)
@@ -36,7 +37,7 @@ func processProvisions(store state.SimpleDB, gs *GlobalState, params Params) {
 	// more bonded tokens are added proportionally to all validators the only term
 	// which needs to be updated is the `BondedPool`. So for each previsions cycle:
 
-	hourlyProvisions := hourly.MulInt(gs.TotalSupply).Evaluate()
+	hourlyProvisions := hourly.Mul(rational.New(gs.TotalSupply)).Evaluate()
 	gs.BondedPool += hourlyProvisions
 	gs.TotalSupply += hourlyProvisions
 
@@ -48,7 +49,7 @@ func processProvisions(store state.SimpleDB, gs *GlobalState, params Params) {
 	saveGlobalState(store, gs)
 }
 
-func getInflation(gs *GlobalState, params Params) (hourly, annual FractionI) {
+func getInflation(gs *GlobalState, params Params) (hourly, annual rational.Rational) {
 
 	// The target annual inflation rate is recalculated for each previsions cycle. The
 	// inflation is also subject to a rate change (positive of negative) depending or
@@ -56,8 +57,8 @@ func getInflation(gs *GlobalState, params Params) (hourly, annual FractionI) {
 	// defined to be 13% per year, however the annual inflation is capped as between
 	// 7% and 20%.
 
-	bondedRatio := NewFraction(gs.BondedPool, gs.TotalSupply)
-	annualInflationRateChange := One.Sub(bondedRatio.Div(params.GoalBonded)).Mul(params.InflationRateChange)
+	bondedRatio := rational.New(gs.BondedPool, gs.TotalSupply)
+	annualInflationRateChange := rational.New(1).Sub(bondedRatio.Quo(params.GoalBonded)).Mul(params.InflationRateChange)
 	annualInflation := gs.Inflation.Add(annualInflationRateChange)
 	if annualInflation.GT(params.InflationMax) {
 		annualInflation = params.InflationMax
@@ -66,8 +67,8 @@ func getInflation(gs *GlobalState, params Params) (hourly, annual FractionI) {
 		annualInflation = params.InflationMin
 	}
 
-	hoursPerYear := NewFraction(876582, 100)
-	hourlyInflation := annualInflation.Div(hoursPerYear)
+	hoursPerYear := rational.New(876582, 100)
+	hourlyInflation := annualInflation.Quo(hoursPerYear)
 
 	return hourlyInflation, annualInflation
 }
