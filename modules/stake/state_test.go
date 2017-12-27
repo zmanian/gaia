@@ -28,8 +28,19 @@ func TestState(t *testing.T) {
 	candidate := &Candidate{
 		Owner:       validator,
 		PubKey:      pk,
+		Assets:      rational.New(9),
 		Liabilities: rational.New(9),
 		VotingPower: rational.New(0),
+	}
+
+	candidatesEqual := func(c1, c2 *Candidate) bool {
+		return c1.Status == c2.Status &&
+			c1.PubKey.Equals(c2.PubKey) &&
+			c1.Owner.Equals(c2.Owner) &&
+			c1.Assets.Equal(c2.Assets) &&
+			c1.Liabilities.Equal(c2.Liabilities) &&
+			c1.VotingPower.Equal(c2.VotingPower) &&
+			c1.Description == c2.Description
 	}
 
 	// check the empty store first
@@ -41,13 +52,13 @@ func TestState(t *testing.T) {
 	// set and retrieve a record
 	saveCandidate(store, candidate)
 	resCand = loadCandidate(store, pk)
-	assert.Equal(candidate, resCand)
+	assert.True(candidatesEqual(candidate, resCand))
 
 	// modify a records, save, and retrieve
 	candidate.Liabilities = rational.New(99)
 	saveCandidate(store, candidate)
 	resCand = loadCandidate(store, pk)
-	assert.Equal(candidate, resCand)
+	assert.True(candidatesEqual(candidate, resCand))
 
 	// also test that the pubkey has been added to pubkey list
 	resPks = loadCandidatesPubKeys(store)
@@ -62,6 +73,11 @@ func TestState(t *testing.T) {
 		Shares: rational.New(9),
 	}
 
+	bondsEqual := func(b1, b2 *DelegatorBond) bool {
+		return b1.PubKey.Equals(b2.PubKey) &&
+			b1.Shares.Equal(b2.Shares)
+	}
+
 	//check the empty store first
 	resBond := loadDelegatorBond(store, delegator, pk)
 	assert.Nil(resBond)
@@ -69,13 +85,13 @@ func TestState(t *testing.T) {
 	//Set and retrieve a record
 	saveDelegatorBond(store, delegator, bond)
 	resBond = loadDelegatorBond(store, delegator, pk)
-	assert.Equal(bond, resBond)
+	assert.True(bondsEqual(bond, resBond))
 
 	//modify a records, save, and retrieve
 	bond.Shares = rational.New(99)
 	saveDelegatorBond(store, delegator, bond)
 	resBond = loadDelegatorBond(store, delegator, pk)
-	assert.Equal(bond, resBond)
+	assert.True(bondsEqual(bond, resBond))
 
 	//----------------------------------------------------------------------
 	// Param checks

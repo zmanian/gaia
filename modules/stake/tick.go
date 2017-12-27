@@ -49,7 +49,7 @@ func processProvisions(store state.SimpleDB, gs *GlobalState, params Params) {
 	saveGlobalState(store, gs)
 }
 
-func getInflation(gs *GlobalState, params Params) (hourly, annual rational.Rational) {
+func getInflation(gs *GlobalState, params Params) (hourly, annual rational.Rat) {
 
 	// The target annual inflation rate is recalculated for each previsions cycle. The
 	// inflation is also subject to a rate change (positive of negative) depending or

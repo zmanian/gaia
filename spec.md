@@ -272,7 +272,7 @@ type QueueElemUnbondCandidate struct {
 
 A new parameter (`Status`) is now introduced into the Candidate struct to
 signal that the candidate is either active, unbonding, or unbonded. Also
-`UnbondingDelegatorShares` is introduced to account for delegators unbonding.  
+`Unbondingrational.Rat` is introduced to account for delegators unbonding.  
 
 ``` golang
 type CandidateStatus byte
@@ -334,8 +334,8 @@ type Candidate struct {
 	Status                    byte       
 	PubKey                    crypto.PubKey
 	Owner                     auth.Account
-	IssuedDelegatorShares     int64    
-	UnbondingDelegatorShares  int64    
+	Issuedrational.Rat     int64    
+	Unbondingrational.Rat  int64    
 	GlobalStakeShares         int64  
 	VotingPower               int64   
     Description               Description
@@ -365,9 +365,9 @@ accounting of distributed shares to delegators must also increased at every
 deposit.
  
 ```
-delegatorExRate = validatorCoins / candidate.IssuedDelegatorShares 
+delegatorExRate = validatorCoins / candidate.Issuedrational.Rat 
 createShares = coinsDeposited / delegatorExRate 
-candidate.IssuedDelegatorShares += createShares
+candidate.Issuedrational.Rat += createShares
 ```
 
 Whenever a validator has new tokens added to it, the `BondedPool` is
@@ -446,7 +446,7 @@ type Candidate struct {
 	Status                 byte       
 	PubKey                 crypto.PubKey
 	Owner                  auth.Account
-	IssuedDelegatorShares  int64    
+	Issuedrational.Rat  int64    
 	GlobalStakeShares      int64  
 	VotingPower            int64   
     Commission             int64
@@ -510,7 +510,7 @@ type Param struct {
 	IssuedFeeShares          int64       // sum of all fee pool shares issued 
 	BondedPool          int64       // reserve of all bonded tokens  
 	FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
-	FeePoolShares            int64       // total accumulated shares created for the fee pool
+	Feerational.Rat            int64       // total accumulated shares created for the fee pool
 	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
 	FeeHoldingsShares        int64       // total accumulated shares created for the fee holdings
 	FeeHoldingsBondedTokens  int64       // total bonded tokens of validators considered when adding shares to FeeHoldings
@@ -569,7 +569,7 @@ issuedShares = FeesForProposer * candidate.proposerFeeCalcShares
                + FeeHoldingWithdraw * candidate.LastFeesStakedShares
 
 params.FeePool += ProposerBlockFees + FeeHoldingWithdrawn
-params.FeePoolShares += issuedShares 
+params.Feerational.Rat += issuedShares 
 
 candidate.FeeShares += issuedShares * (1 - candidate.Commission)
 candidate.FeeCommissionShares += issuedShares * candidate.Commission
@@ -606,7 +606,7 @@ pool to be withdrawn during a delegator fee withdrawal:
 
 ```
 feeSharesToWithdraw = (currentHeight - delegator.FeeWithdrawalHeight) 
-                      * delegator.Shares / candidate.IssueDelegatorShares
+                      * delegator.Shares / candidate.Issuerational.Rat
 withdrawalEntitlement := feeSharesToWithdraw / params.IssuedFeeShares
 
 coinsWithdrawn = param.FeePool * withdrawalEntitlement

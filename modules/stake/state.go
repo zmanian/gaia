@@ -1,6 +1,8 @@
 package stake
 
 import (
+	"encoding/json"
+
 	crypto "github.com/tendermint/go-crypto"
 	"github.com/tendermint/go-wire"
 
@@ -81,7 +83,7 @@ func loadCandidate(store state.SimpleDB, pubKey crypto.PubKey) *Candidate {
 		return nil
 	}
 	candidate := new(Candidate)
-	err := wire.ReadBinaryBytes(b, candidate)
+	err := json.Unmarshal(b, candidate)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
@@ -96,7 +98,10 @@ func saveCandidate(store state.SimpleDB, candidate *Candidate) {
 		saveCandidatesPubKeys(store, append(pks, candidate.PubKey))
 	}
 
-	b := wire.BinaryBytes(*candidate)
+	b, err := json.Marshal(*candidate)
+	if err != nil {
+		panic(err)
+	}
 	store.Set(GetCandidateKey(candidate.PubKey), b)
 }
 
@@ -143,7 +148,7 @@ func loadDelegatorBond(store state.SimpleDB,
 	}
 
 	bond := new(DelegatorBond)
-	err := wire.ReadBinaryBytes(delegatorBytes, bond)
+	err := json.Unmarshal(delegatorBytes, bond)
 	if err != nil {
 		panic(err)
 	}
@@ -161,7 +166,10 @@ func saveDelegatorBond(store state.SimpleDB, delegator sdk.Actor, bond *Delegato
 	}
 
 	// now actually save the bond
-	b := wire.BinaryBytes(*bond)
+	b, err := json.Marshal(*bond)
+	if err != nil {
+		panic(err)
+	}
 	store.Set(GetDelegatorBondKey(delegator, bond.PubKey), b)
 	//updateDelegatorBonds(store, delegator)
 }
@@ -226,7 +234,7 @@ func loadParams(store state.SimpleDB) (params Params) {
 		return defaultParams()
 	}
 
-	err := wire.ReadBinaryBytes(b, &params)
+	err := json.Unmarshal(b, &params)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
@@ -234,7 +242,10 @@ func loadParams(store state.SimpleDB) (params Params) {
 	return
 }
 func saveParams(store state.SimpleDB, params Params) {
-	b := wire.BinaryBytes(params)
+	b, err := json.Marshal(params)
+	if err != nil {
+		panic(err)
+	}
 	store.Set(ParamKey, b)
 }
 
@@ -247,13 +258,16 @@ func loadGlobalState(store state.SimpleDB) (gs *GlobalState) {
 		return initialGlobalState()
 	}
 	gs = new(GlobalState)
-	err := wire.ReadBinaryBytes(b, gs)
+	err := json.Unmarshal(b, gs)
 	if err != nil {
 		panic(err) // This error should never occure big problem if does
 	}
 	return
 }
 func saveGlobalState(store state.SimpleDB, gs *GlobalState) {
-	b := wire.BinaryBytes(*gs)
+	b, err := json.Marshal(*gs)
+	if err != nil {
+		panic(err)
+	}
 	store.Set(GlobalStateKey, b)
 }
