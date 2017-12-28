@@ -36,6 +36,11 @@ var pks = []crypto.PubKey{
 	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB53"),
 	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB54"),
 	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB55"),
+	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB56"),
+	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB57"),
+	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB58"),
+	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB59"),
+	newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB60"),
 }
 
 // NOTE: PubKey is supposed to be the binaryBytes of the crypto.PubKey
@@ -43,6 +48,7 @@ var pks = []crypto.PubKey{
 func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidates) {
 	for i := 0; i < len(actors); i++ {
 		c := &Candidate{
+			Status:      Unbonded,
 			PubKey:      pks[i],
 			Owner:       actors[i],
 			Assets:      rational.New(amts[i]),
@@ -52,6 +58,21 @@ func candidatesFromActors(actors []sdk.Actor, amts []int64) (candidates Candidat
 		candidates = append(candidates, c)
 	}
 
+	return
+}
+
+func candidatesFromActorsEmpty(actors []sdk.Actor) (candidates Candidates) {
+	for i := 0; i < len(actors); i++ {
+		c := &Candidate{
+			Status:      Unbonded,
+			PubKey:      pks[i],
+			Owner:       actors[i],
+			Assets:      rational.Zero,
+			Liabilities: rational.Zero,
+			VotingPower: rational.Zero,
+		}
+		candidates = append(candidates, c)
+	}
 	return
 }
 

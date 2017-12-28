@@ -1,64 +1,105 @@
 package stake
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tmlibs/rational"
 
 	"github.com/cosmos/cosmos-sdk/state"
 )
 
-// XXX complete test
-//func TestGetInflation(t *testing.T) {
-//assert, require := assert.New(t), require.New(t)
-//}
-
-func TestProcessProvisions(t *testing.T) {
-	assert, require := assert.New(t), require.New(t)
+func TestGetInflation(t *testing.T) {
+	assert := assert.New(t)
 	store := state.NewMemKVStore()
 	params := loadParams(store)
 	gs := loadGlobalState(store)
 
-	N := 5
-	actors := newActors(N)
-	candidates := candidatesFromActors(actors, []int64{400, 200, 100, 10, 1})
-	for _, c := range candidates {
-		saveCandidate(store, c)
+	// Governing Mechanism:
+	//    bondedRatio = BondedPool / TotalSupply
+	//    inflationRateChangePerYear = (1- bondedRatio/ GoalBonded) * MaxInflationRateChange
+
+	tests := []struct {
+		setBondedPool, setTotalSupply int64
+		setInflation, expectedChange  rational.Rat
+	}{
+		// with 0% bonded atom supply the inflation should increase by InflationRateChange
+		{0, 0, rational.New(7, 100), params.InflationRateChange.Quo(hrsPerYr)},
+
+		// 100% bonded, starting at 20% inflation and being reduced
+		{1, 1, rational.New(20, 100), rational.One.Sub(rational.One.Quo(params.GoalBonded)).Mul(params.InflationRateChange).Quo(hrsPerYr)},
+
+		// 50% bonded, starting at 10% inflation and being increased
+		{1, 2, rational.New(10, 100), rational.One.Sub(rational.New(1, 2).Quo(params.GoalBonded)).Mul(params.InflationRateChange).Quo(hrsPerYr)},
+
+		// test 7% minimum stop (testing with 100% bonded)
+		{1, 1, rational.New(7, 100), rational.Zero},
+		{1, 1, rational.New(70001, 1000000), rational.New(-1, 1000000)},
+
+		// test 20% maximum stop (testing with 0% bonded)
+		{0, 0, rational.New(20, 100), rational.Zero},
+		{0, 0, rational.New(199999, 1000000), rational.New(1, 1000000)},
+
+		// perfect balance shouldn't change inflation
+		{67, 100, rational.New(15, 100), rational.Zero},
+	}
+	for _, tc := range tests {
+		gs.BondedPool, gs.TotalSupply = tc.setBondedPool, tc.setTotalSupply
+		gs.Inflation = tc.setInflation
+
+		inflation := nextInflation(gs, params)
+		diffInflation := inflation.Sub(tc.setInflation)
+
+		assert.True(diffInflation.Equal(tc.expectedChange),
+			"%v, %v", diffInflation, tc.expectedChange)
+	}
+}
+
+func TestProcessProvisions(t *testing.T) {
+	assert := assert.New(t)
+	store := state.NewMemKVStore()
+	params := loadParams(store)
+	gs := loadGlobalState(store)
+
+	// create some candidates some bonded, some unbonded
+	n := 10
+	actors := newActors(n)
+	candidates := candidatesFromActorsEmpty(actors)
+	for i, candidate := range candidates {
+		if i < 5 {
+			candidate.Status = Bonded
+		}
+		mintedTokens := int64((i + 1) * 10000000)
+		gs.TotalSupply += mintedTokens
+		candidate.addTokens(mintedTokens, gs)
+		saveCandidate(store, candidate)
 	}
 
-	// they should all already be validators
-	change, err := UpdateValidatorSet(store, gs, params)
-	require.Nil(err)
-	require.Equal(0, len(change), "%v", change) // change 1, remove 1, add 2
+	// initial bonded ratio ~ 27%
+	assert.True(gs.bondedRatio().Equal(rational.New(15, 55)), "%v", gs.bondedRatio())
 
-	// test the max value and test again
-	params.MaxVals = 4
-	saveParams(store, params)
-	change, err = UpdateValidatorSet(store, gs, params)
-	require.Nil(err)
-	require.Equal(1, len(change), "%v", change)
-	testRemove(t, candidates[4].validator(), change[0])
-	candidates = loadCandidates(store)
-	assert.Equal(int64(0), candidates[4].VotingPower.Evaluate())
+	initialSupply := gs.TotalSupply
+	initialUnbonded := gs.TotalSupply - gs.BondedPool
 
-	// mess with the power's of the candidates and test
-	candidates[0].Assets = rational.New(10)
-	candidates[1].Assets = rational.New(600)
-	candidates[2].Assets = rational.New(1000)
-	candidates[3].Assets = rational.New(1)
-	candidates[4].Assets = rational.New(10)
-	for _, c := range candidates {
-		saveCandidate(store, c)
+	// process the provisions a year
+	for hr := 0; hr < 8766; hr++ {
+		expInflation := nextInflation(gs, params)
+		expProvisions := (expInflation.Mul(rational.New(gs.TotalSupply)).Quo(hrsPerYr)).Evaluate()
+		if hr == 1 {
+			panic(fmt.Sprintf("debug expInflation: %v\n", expInflation))
+			panic(fmt.Sprintf("debug expProvisions: %v\n", expProvisions))
+		}
+		startBondedPool := gs.BondedPool
+		startTotalSupply := gs.TotalSupply
+		processProvisions(store, gs, params)
+		assert.Equal(startBondedPool+expProvisions, gs.BondedPool)
+		assert.Equal(startTotalSupply+expProvisions, gs.TotalSupply)
 	}
-	change, err = UpdateValidatorSet(store, gs, params)
-	require.Nil(err)
-	require.Equal(5, len(change), "%v", change) //3 changed, 1 added, 1 removed
-	candidates = loadCandidates(store)
-	testChange(t, candidates[0].validator(), change[0])
-	testChange(t, candidates[1].validator(), change[1])
-	testChange(t, candidates[2].validator(), change[2])
-	testRemove(t, candidates[3].validator(), change[3])
-	testChange(t, candidates[4].validator(), change[4])
+	assert.NotEqual(initialSupply, gs.TotalSupply)
+	assert.Equal(initialUnbonded, gs.TotalSupply-gs.BondedPool)
+	panic(fmt.Sprintf("debug total %v, bonded  %v, diff %v\n", gs.TotalSupply, gs.BondedPool, gs.TotalSupply-gs.BondedPool))
+
+	// initial bonded ratio ~ 27%
+	assert.True(gs.bondedRatio().Equal(rational.New(15, 55)), "%v", gs.bondedRatio())
 }

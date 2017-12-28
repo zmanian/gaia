@@ -25,31 +25,25 @@ var (
 )
 
 func TestBondUpdateValidateBasic(t *testing.T) {
-	type fields struct {
-		PubKey crypto.PubKey
-		Bond   coin.Coin
-	}
-
 	tests := []struct {
 		name    string
-		fields  fields
+		PubKey  crypto.PubKey
+		Bond    coin.Coin
 		wantErr bool
 	}{
-		{"basic good", fields{pks[0], coinPos}, false},
-		{"empty delegator", fields{crypto.PubKey{}, coinPos}, true},
-		{"zero coin", fields{pks[0], coinZero}, true},
-		{"neg coin", fields{pks[0], coinNeg}, true},
+		{"basic good", pks[0], coinPos, false},
+		{"empty delegator", crypto.PubKey{}, coinPos, true},
+		{"zero coin", pks[0], coinZero, true},
+		{"neg coin", pks[0], coinNeg, true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx := TxDelegate{BondUpdate{
-				PubKey: tt.fields.PubKey,
-				Bond:   tt.fields.Bond,
-			}}
-			assert.Equal(t, tt.wantErr, tx.ValidateBasic() != nil,
-				"test: %v, tx.ValidateBasic: %v", tt.name, tx.ValidateBasic())
-		})
+	for _, tc := range tests {
+		tx := TxDelegate{BondUpdate{
+			PubKey: tc.PubKey,
+			Bond:   tc.Bond,
+		}}
+		assert.Equal(t, tc.wantErr, tx.ValidateBasic() != nil,
+			"test: %v, tx.ValidateBasic: %v", tc.name, tx.ValidateBasic())
 	}
 }
 
@@ -89,7 +83,7 @@ func TestSerializeTx(t *testing.T) {
 	bondAmt := int64(1234321)
 	bond := coin.Coin{Denom: "ATOM", Amount: bondAmt}
 
-	cases := []struct {
+	tests := []struct {
 		tx sdk.Tx
 	}{
 		{NewTxUnbond(bondAmt, pubKey)},
@@ -98,7 +92,7 @@ func TestSerializeTx(t *testing.T) {
 		// {NewTxRevokeCandidacy(pubKey)},
 	}
 
-	for i, tc := range cases {
+	for i, tc := range tests {
 		var tx sdk.Tx
 		bs := wire.BinaryBytes(tc.tx)
 		err := wire.ReadBinaryBytes(bs, &tx)

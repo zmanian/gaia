@@ -123,7 +123,7 @@ func TestValidatorsChanged(t *testing.T) {
 	require.Zero(len(changed))
 
 	// test single value change
-	vs2[2].VotingPower = rational.New(1)
+	vs2[2].VotingPower = rational.One
 	changed = vs1.validatorsUpdated(vs2)
 	require.Equal(1, len(changed))
 	testChange(t, vs2[2], changed[0])
@@ -232,7 +232,7 @@ func TestUpdateValidatorSet(t *testing.T) {
 	candidates[0].Assets = rational.New(10)
 	candidates[1].Assets = rational.New(600)
 	candidates[2].Assets = rational.New(1000)
-	candidates[3].Assets = rational.New(1)
+	candidates[3].Assets = rational.One
 	candidates[4].Assets = rational.New(10)
 	for _, c := range candidates {
 		saveCandidate(store, c)

@@ -220,7 +220,7 @@ imports:
   - types
   - version
 - name: github.com/tendermint/tmlibs
-  version: 399e69d505ee50ac2bba59b7dcecfc04bce8a365
+  version: 383a8902cde5805fde07a812556eabc27325fbe3
   subpackages:
   - autofile
   - cli

@@ -66,8 +66,8 @@ type GlobalState struct {
 func initialGlobalState() *GlobalState {
 	return &GlobalState{
 		TotalSupply:       0,
-		BondedShares:      rational.New(0),
-		UnbondedShares:    rational.New(0),
+		BondedShares:      rational.Zero,
+		UnbondedShares:    rational.Zero,
 		BondedPool:        0,
 		UnbondedPool:      0,
 		InflationLastTime: 0,
@@ -75,10 +75,18 @@ func initialGlobalState() *GlobalState {
 	}
 }
 
+// get the bond ratio of the global state
+func (gs *GlobalState) bondedRatio() rational.Rat {
+	if gs.TotalSupply > 0 {
+		return rational.New(gs.BondedPool, gs.TotalSupply)
+	}
+	return rational.Zero
+}
+
 // get the exchange rate of bonded token per issued share
 func (gs *GlobalState) bondedShareExRate() rational.Rat {
 	if gs.BondedShares.IsZero() {
-		return rational.New(1)
+		return rational.One
 	}
 	return gs.BondedShares.Inv().Mul(rational.New(gs.BondedPool))
 }
@@ -86,7 +94,7 @@ func (gs *GlobalState) bondedShareExRate() rational.Rat {
 // get the exchange rate of unbonded tokens held in candidates per issued share
 func (gs *GlobalState) unbondedShareExRate() rational.Rat {
 	if gs.UnbondedShares.IsZero() {
-		return rational.New(1)
+		return rational.One
 	}
 	return gs.UnbondedShares.Inv().Mul(rational.New(gs.UnbondedPool))
 }
@@ -139,12 +147,12 @@ const (
 // exchange rate. Voting power can be calculated as total bonds multiplied by
 // exchange rate.
 type Candidate struct {
-	Status      CandidateStatus `json:"status"`       // Bonded status of validator
+	Status      CandidateStatus `json:"status"`       // Bonded status
 	PubKey      crypto.PubKey   `json:"pub_key"`      // Pubkey of candidate
 	Owner       sdk.Actor       `json:"owner"`        // Sender of BondTx - UnbondTx returns here
-	Assets      rational.Rat    `json:"assets"`       // total shares of a global hold pools
-	Liabilities rational.Rat    `json:"liabilities"`  // total shares issued to a candidate's delegators
-	VotingPower rational.Rat    `json:"voting_power"` // Voting power if pubKey is a considered a validator
+	Assets      rational.Rat    `json:"assets"`       // total shares of a global hold pools TODO custom type PoolShares
+	Liabilities rational.Rat    `json:"liabilities"`  // total shares issued to a candidate's delegators TODO custom type DelegatorShares
+	VotingPower rational.Rat    `json:"voting_power"` // Voting power if considered a validator
 	Description Description     `json:"description"`  // Description terms for the candidate
 }
 
@@ -162,9 +170,9 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 		Status:      Unbonded,
 		PubKey:      pubKey,
 		Owner:       owner,
-		Assets:      rational.New(0),
-		Liabilities: rational.New(0),
-		VotingPower: rational.New(0),
+		Assets:      rational.Zero,
+		Liabilities: rational.Zero,
+		VotingPower: rational.Zero,
 		Description: description,
 	}
 }
@@ -172,7 +180,7 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 // get the exchange rate of global pool shares over delegator shares
 func (c *Candidate) delegatorShareExRate() rational.Rat {
 	if c.Liabilities.IsZero() {
-		return rational.New(1)
+		return rational.One
 	}
 	return c.Assets.Quo(c.Liabilities)
 }
@@ -269,7 +277,7 @@ func (cs Candidates) updateVotingPower(store state.SimpleDB, gs *GlobalState, pa
 	for i, c := range cs {
 		// truncate the power
 		if i >= int(params.MaxVals) {
-			c.VotingPower = rational.New(0)
+			c.VotingPower = rational.Zero
 			if c.Status == Bonded {
 				// XXX to replace this with handler.bondedToUnbondePool function
 				// XXX waiting for logic with new SDK to update account balance here

@@ -409,7 +409,7 @@ func (d deliver) delegateWithCandidate(tx TxDelegate, candidate *Candidate) erro
 	if bond == nil {
 		bond = &DelegatorBond{
 			PubKey: tx.PubKey,
-			Shares: rational.New(0),
+			Shares: rational.Zero,
 		}
 	}
 

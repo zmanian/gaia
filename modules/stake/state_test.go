@@ -30,7 +30,7 @@ func TestState(t *testing.T) {
 		PubKey:      pk,
 		Assets:      rational.New(9),
 		Liabilities: rational.New(9),
-		VotingPower: rational.New(0),
+		VotingPower: rational.Zero,
 	}
 
 	candidatesEqual := func(c1, c2 *Candidate) bool {
