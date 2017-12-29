@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	crypto "github.com/tendermint/go-crypto"
+	"github.com/tendermint/tmlibs/rational"
 
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
@@ -62,7 +63,7 @@ func init() {
 	fsAmount.String(FlagAmount, "1fermion", "Amount of coins to bond")
 
 	fsShares := flag.NewFlagSet("", flag.ContinueOnError)
-	fsShares.Int64(FlagShares, 0, "Amount of shares to unbond")
+	fsShares.String(FlagShares, "", "Amount of shares to unbond, either in decimal or keyword MAX (ex. 1.23456789, 99, MAX)")
 
 	fsCandidate := flag.NewFlagSet("", flag.ContinueOnError)
 	fsCandidate.String(FlagMoniker, "", "validator-candidate name")
@@ -146,9 +147,20 @@ func cmdDelegate(cmd *cobra.Command, args []string) error {
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
 
-	shares := viper.GetInt64(FlagShares)
-	if shares <= 0 {
-		return fmt.Errorf("shares must be positive interger")
+	// TODO once go-wire refactored the shares can be broadcast as a Rat instead of a string
+
+	// check the shares before broadcasting
+	sharesStr := viper.GetString(FlagShares)
+	var shares rational.Rat
+	if sharesStr != "MAX" {
+		var err error
+		shares, err = rational.NewFromDecimal(sharesStr)
+		if err != nil {
+			return err
+		}
+		if !shares.GT(rational.Zero) {
+			return fmt.Errorf("shares must be positive integer or decimal (ex. 123, 1.23456789)")
+		}
 	}
 
 	pk, err := GetPubKey(viper.GetString(FlagPubKey))
@@ -156,7 +168,7 @@ func cmdUnbond(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tx := stake.NewTxUnbond(shares, pk)
+	tx := stake.NewTxUnbond(sharesStr, pk)
 	return txcmd.DoTx(tx)
 }
 

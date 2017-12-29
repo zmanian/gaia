@@ -45,7 +45,7 @@ type unbondInput struct {
 
 	Pubkey crypto.PubKey `json:"pub_key"`
 	From   *sdk.Actor    `json:"from"`
-	Amount int64        `json:"amount"`
+	Shares string        `json:"amount"`
 }
 
 // RegisterDelegate is a mux.Router handler that exposes
@@ -112,7 +112,7 @@ func delegate(w http.ResponseWriter, r *http.Request) {
 }
 
 func prepareUnbondTx(ui *unbondInput) sdk.Tx {
-	tx := stake.NewTxUnbond(ui.Amount, ui.Pubkey)
+	tx := stake.NewTxUnbond(ui.Shares, ui.Pubkey)
 	// fees are optional
 	if ui.Fees != nil && !ui.Fees.IsZero() {
 		tx = fee.NewFee(tx, *ui.Fees, *ui.From)

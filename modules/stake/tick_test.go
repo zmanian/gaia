@@ -98,3 +98,5 @@ func TestProcessProvisions(t *testing.T) {
 	// initial bonded ratio ~ 35% ~ 30% increase for bonded holders
 	assert.True(gs.bondedRatio().Equal(rational.New(105906511, 305906511)), "%v", gs.bondedRatio())
 }
+
+// XXX test delegation with provisions

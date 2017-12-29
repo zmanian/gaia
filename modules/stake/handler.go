@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/spf13/viper"
 	"github.com/tendermint/tmlibs/log"
 	"github.com/tendermint/tmlibs/rational"
 
@@ -267,9 +268,26 @@ func (c check) delegate(tx TxDelegate) error {
 
 func (c check) unbond(tx TxUnbond) error {
 
-	// check if have enough shares to unbond
+	// check if bond has any shares in it unbond
 	bond := loadDelegatorBond(c.store, c.sender, tx.PubKey)
-	if bond.Shares.LT(rational.New(tx.Shares)) { // bond shares < tx shares
+	sharesStr := viper.GetString(tx.Shares)
+	if bond.Shares.LT(rational.Zero) { // bond shares < tx shares
+		return fmt.Errorf("no shares in account to unbond")
+	}
+
+	// if shares set to maximum shares then we're good
+	if sharesStr == "MAX" {
+		return nil
+	}
+
+	// test getting rational number from decimal provided
+	shares, err := rational.NewFromDecimal(sharesStr)
+	if err != nil {
+		return err
+	}
+
+	// test that there are enough shares to unbond
+	if bond.Shares.LT(shares) {
 		return fmt.Errorf("not enough bond shares to unbond, have %v, trying to unbond %v",
 			bond.Shares, tx.Shares)
 	}
@@ -429,11 +447,23 @@ func (d deliver) unbond(tx TxUnbond) error {
 		return ErrNoDelegatorForAddress()
 	}
 
+	// retrieve the amount of bonds to remove (TODO remove redundancy already serialized)
+	var shares rational.Rat
+	if tx.Shares == "MAX" {
+		shares = bond.Shares
+	} else {
+		var err error
+		shares, err = rational.NewFromDecimal(tx.Shares)
+		if err != nil {
+			return err
+		}
+	}
+
 	// subtract bond tokens from delegator bond
-	if bond.Shares.LT(rational.New(tx.Shares)) { // bond shares < tx shares
+	if bond.Shares.LT(shares) { // bond shares < tx shares
 		return ErrInsufficientFunds()
 	}
-	bond.Shares = bond.Shares.Sub(rational.New(tx.Shares))
+	bond.Shares = bond.Shares.Sub(shares)
 
 	// get pubKey candidate
 	candidate := loadCandidate(d.store, tx.PubKey)
@@ -465,10 +495,7 @@ func (d deliver) unbond(tx TxUnbond) error {
 		poolAccount = d.params.HoldUnbonded
 	}
 
-	//XXX make shares able to be received as a decimal place and converted to rational?
-	sharesFrac := rational.New(tx.Shares)
-
-	returnCoins := candidate.removeShares(sharesFrac, d.gs)
+	returnCoins := candidate.removeShares(shares, d.gs)
 	err := d.transfer(poolAccount, d.sender,
 		coin.Coins{{d.params.AllowedBondDenom, returnCoins}})
 	if err != nil {

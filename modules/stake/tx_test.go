@@ -1,6 +1,7 @@
 package stake
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,8 +53,8 @@ func TestAllAreTx(t *testing.T) {
 
 	// make sure all types construct properly
 	pubKey := newPubKey("1234567890")
-	bondAmt := int64(1234321)
-	bond := coin.Coin{Denom: "ATOM", Amount: bondAmt}
+	bondAmt := 1234321
+	bond := coin.Coin{Denom: "ATOM", Amount: int64(bondAmt)}
 
 	// Note that Wrap is only defined on BondUpdate, so when you call it,
 	// you lose all info on the embedding type. Please add Wrap()
@@ -62,7 +63,7 @@ func TestAllAreTx(t *testing.T) {
 	_, ok := txDelegate.Unwrap().(TxDelegate)
 	assert.True(ok, "%#v", txDelegate)
 
-	txUnbond := NewTxUnbond(bondAmt, pubKey)
+	txUnbond := NewTxUnbond(strconv.Itoa(bondAmt), pubKey)
 	_, ok = txUnbond.Unwrap().(TxUnbond)
 	assert.True(ok, "%#v", txUnbond)
 
@@ -80,13 +81,13 @@ func TestSerializeTx(t *testing.T) {
 
 	// make sure all types construct properly
 	pubKey := newPubKey("1234567890")
-	bondAmt := int64(1234321)
-	bond := coin.Coin{Denom: "ATOM", Amount: bondAmt}
+	bondAmt := 1234321
+	bond := coin.Coin{Denom: "ATOM", Amount: int64(bondAmt)}
 
 	tests := []struct {
 		tx sdk.Tx
 	}{
-		{NewTxUnbond(bondAmt, pubKey)},
+		{NewTxUnbond(strconv.Itoa(bondAmt), pubKey)},
 		{NewTxDeclareCandidacy(bond, pubKey, Description{})},
 		{NewTxDeclareCandidacy(bond, pubKey, Description{})},
 		// {NewTxRevokeCandidacy(pubKey)},

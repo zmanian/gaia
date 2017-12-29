@@ -124,11 +124,11 @@ func (tx TxDelegate) Wrap() sdk.Tx { return sdk.Tx{tx} }
 // TxUnbond - struct for unbonding transactions
 type TxUnbond struct {
 	PubKey crypto.PubKey `json:"pub_key"`
-	Shares int64         `json:"amount"`
+	Shares string        `json:"amount"`
 }
 
 // NewTxUnbond - new TxUnbond
-func NewTxUnbond(shares int64, pubKey crypto.PubKey) sdk.Tx {
+func NewTxUnbond(shares string, pubKey crypto.PubKey) sdk.Tx {
 	return TxUnbond{
 		PubKey: pubKey,
 		Shares: shares,
@@ -142,10 +142,6 @@ func (tx TxUnbond) Wrap() sdk.Tx { return sdk.Tx{tx} }
 func (tx TxUnbond) ValidateBasic() error {
 	if tx.PubKey.Empty() {
 		return errCandidateEmpty
-	}
-
-	if tx.Shares == 0 {
-		return fmt.Errorf("Shares must be > 0")
 	}
 	return nil
 }

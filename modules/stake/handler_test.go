@@ -1,6 +1,7 @@
 package stake
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,7 @@ func newTxDelegate(amt int64, pubKey crypto.PubKey) TxDelegate {
 	}}
 }
 
-func newTxUnbond(shares int64, pubKey crypto.PubKey) TxUnbond {
+func newTxUnbond(shares string, pubKey crypto.PubKey) TxUnbond {
 	return TxUnbond{
 		PubKey: pubKey,
 		Shares: shares,
@@ -171,8 +172,8 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 	// just send the same txunbond multiple times
 	holder := deliverer.params.HoldUnbonded // XXX this should be HoldBonded, new SDK updates
-	unbondAmount := int64(10)
-	txUndelegate := newTxUnbond(unbondAmount, pks[0])
+	unbondShares, unbondSharesStr := int64(10), "10"
+	txUndelegate := newTxUnbond(unbondSharesStr, pks[0])
 	nUnbonds := 5
 	for i := 0; i < nUnbonds; i++ {
 		got := deliverer.unbond(txUndelegate)
@@ -180,7 +181,7 @@ func TestIncrementsTxUnbond(t *testing.T) {
 
 		//Check that the accounts and the bond account have the appropriate values
 		candidates := loadCandidates(deliverer.store)
-		expectedBond := initBond - int64(i+1)*unbondAmount // +1 since we send 1 at the start of loop
+		expectedBond := initBond - int64(i+1)*unbondShares // +1 since we send 1 at the start of loop
 		expectedSender := initSender + (initBond - expectedBond)
 		gotBonded := candidates[0].Liabilities.Evaluate()
 		gotHolder := accStore[string(holder.Address)]
@@ -200,21 +201,21 @@ func TestIncrementsTxUnbond(t *testing.T) {
 		initBond,
 	}
 	for _, c := range errorCases {
-		unbondAmount := c
-		txUndelegate := newTxUnbond(unbondAmount, pks[0])
+		unbondShares := strconv.Itoa(int(c))
+		txUndelegate := newTxUnbond(unbondShares, pks[0])
 		got = deliverer.unbond(txUndelegate)
 		assert.Error(got, "expected unbond tx to fail")
 	}
 
-	leftBonded := initBond - unbondAmount*int64(nUnbonds)
+	leftBonded := initBond - unbondShares*int64(nUnbonds)
 
 	// should be unable to unbond one more than we have
-	txUndelegate = newTxUnbond(leftBonded+1, pks[0])
+	txUndelegate = newTxUnbond(strconv.Itoa(int(leftBonded)+1), pks[0])
 	got = deliverer.unbond(txUndelegate)
 	assert.Error(got, "expected unbond tx to fail")
 
 	// should be able to unbond just what we have
-	txUndelegate = newTxUnbond(leftBonded, pks[0])
+	txUndelegate = newTxUnbond(strconv.Itoa(int(leftBonded)), pks[0])
 	got = deliverer.unbond(txUndelegate)
 	assert.NoError(got, "expected unbond tx to pass")
 }
@@ -245,7 +246,7 @@ func TestMultipleTxDeclareCandidacy(t *testing.T) {
 	// unbond them all
 	for i, sender := range senders {
 		candidatePre := loadCandidate(deliverer.store, pubKeys[i])
-		txUndelegate := newTxUnbond(10, pubKeys[i])
+		txUndelegate := newTxUnbond("10", pubKeys[i])
 		deliverer.sender = sender
 		got := deliverer.unbond(txUndelegate)
 		assert.NoError(got, "expected tx %d to be ok, got %v", i, got)
@@ -286,7 +287,7 @@ func TestMultipleTxDelegate(t *testing.T) {
 
 	// unbond them all
 	for i, delegator := range delegators {
-		txUndelegate := newTxUnbond(10, pks[0])
+		txUndelegate := newTxUnbond("10", pks[0])
 		deliverer.sender = delegator
 		got := deliverer.unbond(txUndelegate)
 		require.NoError(got, "expected tx %d to be ok, got %v", i, got)
@@ -315,7 +316,7 @@ func TestVoidCandidacy(t *testing.T) {
 	require.NoError(got, "expected ok, got %v", got)
 
 	// unbond the candidates bond portion
-	txUndelegate := newTxUnbond(10, pks[0])
+	txUndelegate := newTxUnbond("10", pks[0])
 	deliverer.sender = sender
 	got = deliverer.unbond(txUndelegate)
 	require.NoError(got, "expected no error on runTxDeclareCandidacy")
