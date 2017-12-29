@@ -1,9 +1,5 @@
 package: github.com/cosmos/gaia
 import:
-- package: github.com/ethanfrey/hid
-  version: f76da0b80567e8b6f676e1757b549a93494fe4b5
-- package: github.com/ethanfrey/ledger
-  version: f7f2f056357db77db845a79aa1abdadc3ae66369
 - package: github.com/gorilla/websocket
 - package: github.com/pkg/errors
   version: ^0.8.0
@@ -20,7 +16,7 @@ import:
 - package: github.com/tendermint/iavl
   version: develop
 - package: github.com/tendermint/go-crypto
-  version: develop
+  version: remove_ledger
   subpackages:
   - cmd
   - keys
@@ -29,7 +25,7 @@ import:
   subpackages:
   - data
 - package: github.com/tendermint/tendermint
-  version: develop
+  version: release-v0.15.0
   subpackages:
   - config
   - node
