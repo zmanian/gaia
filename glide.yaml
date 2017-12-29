@@ -25,7 +25,7 @@ import:
   subpackages:
   - data
 - package: github.com/tendermint/tendermint
-  version: release-v0.15.0
+  version: v0.15.0
   subpackages:
   - config
   - node

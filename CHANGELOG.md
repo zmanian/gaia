@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (December 29, 2017)
+
+BREAKING CHANGES:
+
+* Update to Tendermint v0.15.0
+
 ## 0.4.0 (December 6, 2017)
 
 Added delegation to existing validators
