@@ -31,7 +31,7 @@ var hrsPerYr = rational.New(8766) // as defined by a julian year of 365.25 days
 // process provisions for an hour period
 func processProvisions(store state.SimpleDB, gs *GlobalState, params Params) {
 
-	gs.Inflation = nextInflation(gs, params)
+	gs.Inflation = nextInflation(gs, params).Round(1000000000)
 
 	// Because the validators hold a relative bonded share (`GlobalStakeShare`), when
 	// more bonded tokens are added proportionally to all validators the only term

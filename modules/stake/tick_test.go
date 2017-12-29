@@ -1,7 +1,6 @@
 package stake
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,12 +83,8 @@ func TestProcessProvisions(t *testing.T) {
 
 	// process the provisions a year
 	for hr := 0; hr < 8766; hr++ {
-		expInflation := nextInflation(gs, params)
+		expInflation := nextInflation(gs, params).Round(1000000000)
 		expProvisions := (expInflation.Mul(rational.New(gs.TotalSupply)).Quo(hrsPerYr)).Evaluate()
-		if hr == 1 {
-			panic(fmt.Sprintf("debug expInflation: %v\n", expInflation))
-			panic(fmt.Sprintf("debug expProvisions: %v\n", expProvisions))
-		}
 		startBondedPool := gs.BondedPool
 		startTotalSupply := gs.TotalSupply
 		processProvisions(store, gs, params)
@@ -98,8 +93,8 @@ func TestProcessProvisions(t *testing.T) {
 	}
 	assert.NotEqual(initialSupply, gs.TotalSupply)
 	assert.Equal(initialUnbonded, gs.TotalSupply-gs.BondedPool)
-	panic(fmt.Sprintf("debug total %v, bonded  %v, diff %v\n", gs.TotalSupply, gs.BondedPool, gs.TotalSupply-gs.BondedPool))
+	//panic(fmt.Sprintf("debug total %v, bonded  %v, diff %v\n", gs.TotalSupply, gs.BondedPool, gs.TotalSupply-gs.BondedPool))
 
-	// initial bonded ratio ~ 27%
-	assert.True(gs.bondedRatio().Equal(rational.New(15, 55)), "%v", gs.bondedRatio())
+	// initial bonded ratio ~ 35% ~ 30% increase for bonded holders
+	assert.True(gs.bondedRatio().Equal(rational.New(105906511, 305906511)), "%v", gs.bondedRatio())
 }
