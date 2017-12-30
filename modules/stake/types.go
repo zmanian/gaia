@@ -63,6 +63,8 @@ type GlobalState struct {
 	Inflation         rational.Rat `json:"inflation"`           // current annual inflation rate
 }
 
+// XXX define globalstate interface?
+
 func initialGlobalState() *GlobalState {
 	return &GlobalState{
 		TotalSupply:       0,
@@ -176,6 +178,8 @@ func NewCandidate(pubKey crypto.PubKey, owner sdk.Actor, description Description
 		Description: description,
 	}
 }
+
+// XXX define candidate interface?
 
 // get the exchange rate of global pool shares over delegator shares
 func (c *Candidate) delegatorShareExRate() rational.Rat {

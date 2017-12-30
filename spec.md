@@ -2,16 +2,15 @@
 
 The staking module is tasked with various core staking functionality.
 Ultimately it is responsible for: 
+ - Declaration of candidacy for becoming a validator
+ - Updating tendermint validating power to reflect slashible stake
+ - Delegation and unbonding transactions 
+ - Implementing unbonding period
+ - Provisioning Atoms
+ - Managing and distributing transaction fees
+ - Providing the framework for validator commission on delegators
 
-1. Declaration of candidacy for becoming a validator
-2. Updating tendermint validating power to reflect slashible stake
-3. Delegation and unbonding transactions 
-4. Implementing unbonding period
-5. Provisioning Atoms
-6. Managing and distributing transaction fees
-7. Providing the framework for validator commission on delegators
-
-## Types
+## Global State
 
 `Params` and `GlobalState` represent the global persistent state of the gaia.
 `Params` is intended to remain static whereas `GlobalState` is anticipated to
@@ -56,8 +55,18 @@ type GlobalState struct {
 }
 ```
 
+
+## Candidacy
+
 XXX insert Candidate introduction
 
+type TxDeclareCandidacy struct {
+	BondUpdate
+    Description         Description
+	Commission          int64  
+	CommissionMax       int64 
+	CommissionMaxChange int64 
+}
 ``` golang
 type CandidateStatus byte
 
@@ -118,7 +127,8 @@ Candidate parameters are described:
  - VotingPower: Proportional to the amount of bonded tokens which the validator
    has if the validator is within the top 100 validators.
 
- 
+
+### Notes on store indexing
 
 Within the store, each `Candidate` is stored by validator-pubkey.
 
@@ -137,15 +147,46 @@ from this sorting without the need to retrieve the entire group of candidates.
 
 
 
-DelegatorBond represents some bond shares held by an account. It is owned by
-one delegator, and is associated with the voting power of one validator. The
-sender of the transaction is considered to be the owner of the bond being sent. 
+### The Queue
 
-Each `DelegatorBond` is individually stored by candidate pubkey and sender
-actor.  
+In order to process the unbonding period a queue is defined which creates
 
- - key: Delegator/Candidate-Pubkey
- - value: DelegatorBond 
+``` golang
+type Queue interface {
+    Push(bytes []byte) // add a new entry to the end of the queue
+    Pop()              // remove the leading queue entry
+    Peek() []byte      // get the leading queue entry
+}
+
+type MerkleQueue struct {
+	slot  byte           // queue slot in the store
+	store state.SimpleDB // queue store
+	tail  int64          // start position of the queue
+	head  int64          // end position of the queue
+}
+```
+
+All queue elements used for unbonding share a common struct:
+
+``` golang
+type QueueElem struct {
+	Candidate   crypto.PubKey
+	InitHeight  int64    // when the queue was initiated
+}
+```
+
+## Delegator Bonding
+
+``` golang 
+type BondUpdate struct {
+	PubKey crypto.PubKey
+	Amount coin.Coin       
+}
+
+type TxDelegate struct { 
+    BondUpdate 
+}
+```
 
 For all subsequent bonding, whether self-bonding or delegation the `TxDelegate`
 function should be used. In this context `TxUnbond` is used to unbond either
@@ -165,82 +206,129 @@ type DelegatorBond struct {
 
 Description: 
  - Candidate: bond candidate pub-key
- - Shares: the number of shares associated with the pubkey, 
-The shares will not be equal to the number of coins bonded to the candidate. 
- - FeeWithdrawalHeight: last height fees were withdrawn from Candidate.FeeShares
+ - Shares: the number of shares associated with the pubkey, The shares will not
+   be equal to the number of coins bonded to the candidate. 
+ - FeeWithdrawalHeight: last height fees were withdrawn from
+   `Candidate.FeeShares`
 
-## Transaction Structs
+Each `DelegatorBond` is individually stored by candidate pubkey and sender
+actor.  
+
+ - key: Delegator/Candidate-Pubkey
+ - value: DelegatorBond 
+
+
+DelegatorBond represents some bond shares held by an account. It is owned by
+one delegator, and is associated with the voting power of one validator. The
+sender of the transaction is considered to be the owner of the bond being sent. 
+
+### Delegator Unbonding
+
+Delegator unbonding is defined by the following trasaction type:
 
 ``` golang
-type BondUpdate struct {
-	PubKey crypto.PubKey
-	Amount coin.Coin       
-}
-
-type TxDelegate struct { 
-    BondUpdate 
-}
-
-type TxDeclareCandidacy struct {
-	BondUpdate
-    Description         Description
-	Commission          int64  
-	CommissionMax       int64 
-	CommissionMaxChange int64 
-}
-
 type TxUnbond struct { 
 	PubKey crypto.PubKey
-	Shares int64       
-}
-
-type TxWithdrawFees struct {
-	PubKey crypto.PubKey
+	Shares rational.Rat 
 }
 ```
 
-## Queue Structs
-
-
-``` golang
-type MerkleQueue struct {
-	slot  byte           //Queue name in the store
-	store state.SimpleDB //Queue store
-	tail  int64         //Start position of the queue
-	head  int64         //End position of the queue
-}
-
-type Queue interface {
-    Push(bytes []byte) 
-    Pop() 
-    Peek() []byte 
-}
-```
-
-### Serialized Queue Elements
+When unbonding is initiated, delegator shares are immediately removed from the
+candidate and added to a queue object.
 
 ``` golang
-type QueueElem struct {
-	Candidate   crypto.PubKey
-	InitHeight  int64    // when the queue was initiated
-}
-
 type QueueElemUnbondDelegation struct {
 	QueueElem
-	Payout           auth.Account // account to pay out to
-    Amount           int64    // amount of shares which are unbonding
-    StartSlashRatio  int64    // old candidate slash ratio at start of re-delegation
+	Payout           auth.Account  // account to pay out to
+    Shares           rational.Rat  // amount of shares which are unbonding
+    StartSlashRatio  rational.Rat  // candidate slash ratio at start of re-delegation
 }
+```
 
+In the unbonding queue - the fraction of all historical slashings on
+that validator are recorded (StartSlashRatio). When this queue reaches maturity
+if that total slashing applied is greater on the validator then the
+difference (amount that should have been slashed from the first validator) is
+assigned to the amount being paid out. 
+
+The queue is ordered so the next to unbond is at the head. Every tick the head
+of the queue is checked and if the unbonding period has passed since
+`InitHeight` commence with final settlment of the unbonding and pop the queue.
+
+### Re-Delegation
+
+``` golang
 type QueueElemReDelegate struct {
 	QueueElem
 	Payout       auth.Account  // account to pay out to
-    Shares       int64        // amount of shares which are unbonding
+    Shares       rational.Rat  // amount of shares which are unbonding
     NewCandidate crypto.PubKey // validator to bond to after unbond
 }
+```
 
+The redelegtion command allows delegators to switch validators while still 
+receiving equal reward to as if you had never unbonded. Transactions structs of the
+re-delegation command may looks like this:
+
+``` golang
+type TxRedelegate struct { 
+	PubKeyFrom crypto.PubKey
+	PubKeyTo   crypto.PubKey
+	Shares     rational.Rat 
+}
+```
+
+Re-delegation is defined as an unbond followed by an immediate bond at the 
+maturity of the unbonding. 
+
+When re-delegation is initiated, delegator shares remain accounted for within
+the `Candidate.Shares` and the term `ReDelegatingShares` is incremented.
+This must be done in anticipation for the next phase of implementation where we
+must properly calculate payouts to unbonding token holders.  During the
+unbonding period all unbonding shares do not count towards the voting power of
+a validator. Once the `QueueElemReDelegation` has reached maturity, the
+appropriate unbonding shares are removed from the `Shares` and
+`ReDelegatingShares` term.   
+
+As a unique case, any delegator who is in the process of unbonding from a
+validator can use this transaction type to re-delegate back to the original
+validator they're currently unbonding from (and only that validator).  This can
+be thought of as a _cancel unbonding_ option.
+
+### Candidate Unbonding
+
+``` golang
 type QueueElemUnbondCandidate struct {
 	QueueElem
+}
+```
+
+Unbonding of entire candidates to temporary liquid accounts occurs under the
+scenarios: 
+ - a candidate unbonds all of their tokens
+ - is kicked from the validator set for liveliness issues
+ - crosses a self-imposed safety threshold
+   - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxXxXX
+
+Delegators do not unbond to their personal wallets but begin the unbonding
+process to a pool where they must then transact in order to withdraw to their
+respective wallets.  If a delegator chooses to initiate an unbond or
+re-delegation of their shares while a candidate full unbond is commencing, then
+that unbond/re-delegation is subject to a reduced unbonding period based on how
+much time that bond has already spent in the unbonding queue.
+
+If the validator was kicked for liviliness issues and is able to regain
+livliness then all tokens in the unbonding pool which have not transacted to
+move will be bonded back to the now-live validator. 
+
+
+
+## Fee Calculations
+
+``` golang
+type TxWithdrawFees struct {
+	PubKey crypto.PubKey
 }
 ```
 
@@ -364,78 +452,7 @@ accumulate until the unbond queue reaches maturity. At the block which the
 queue reaches maturity and shares are unbonded all available fees are
 simultaneously withdrawn. 
 
-
-### Unbonding
-
-A staking-module state parameter will be introduced which defines the number of
-blocks to unbond from a validator. Once complete unbonding as a validator or a
-Candidate will put your coins in a queue before being returned.
-
-
-The queue is ordered so the next to unbond is at the head.  Every tick the head
-of the queue is checked and if the unbonding period has passed since
-`InitHeight` commence with final settlment of the unbonding and pop the queue.
-Currently the each share to unbond is equivelent to a single unbonding token,
-although in later phases shares are used along with other terms to calculate
-the coins.
-
-When unbonding is initiated, delegator shares are immediately removed from the
-candidate. In the unbonding queue - the fraction of all historical slashings on
-that validator are recorded (StartSlashRatio). When this queue reaches maturity
-if that total slashing applied is greater on the validator then the
-difference (amount that should have been slashed from the first validator) is
-assigned to the amount being paid out. 
-
-### Re-Delegation
-
-If a delegator is attempting to switch validators, using an unbonding command
-followed by a bond command will reduce the amount of validation reward than
-having just stayed with the same validator. Because we do not want to
-disincentive delegators from switching validators, the re-delegate command is
-introduced. This command provides a delegator who wishes to switch validators
-equal reward to as if you had never unbonded. Transactions structs of the
-re-delegation command may looks like this:
-
-Re-delegation is defined as an unbond followed by an immediate bond at the 
-maturity of the unbonding. 
-
-When re-delegation is initiated, delegator shares remain accounted for within
-the `Candidate.Shares` and the term `ReDelegatingShares` is incremented.
-This must be done in anticipation for the next phase of implementation where we
-must properly calculate payouts to unbonding token holders.  During the
-unbonding period all unbonding shares do not count towards the voting power of
-a validator. Once the `QueueElemReDelegation` has reached maturity, the
-appropriate unbonding shares are removed from the `Shares` and
-`ReDelegatingShares` term.   
-
-As a unique case, any delegator who is in the process of unbonding from a
-validator can use this transaction type to re-delegate back to the original
-validator they're currently unbonding from (and only that validator).  This can
-be thought of as a _cancel unbonding_ option.
-
-### Candidate Unbonding
-
-Unbonding of entire candidates to temporary liquid accounts occurs under the
-scenarios: 
- - a candidate unbonds all of their tokens
- - is kicked from the validator set for liveliness issues
- - crosses a self-imposed safety threshold
-   - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-   - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxXxXX
-
-Delegators do not unbond to their personal wallets but begin the unbonding
-process to a pool where they must then transact in order to withdraw to their
-respective wallets.  If a delegator chooses to initiate an unbond or
-re-delegation of their shares while a candidate full unbond is commencing, then
-that unbond/re-delegation is subject to a reduced unbonding period based on how
-much time that bond has already spent in the unbonding queue.
-
-If the validator was kicked for liviliness issues and is able to regain
-livliness then all tokens in the unbonding pool which have not transacted to
-move will be bonded back to the now-live validator. 
-
-
-## Validation Provision Atoms Calculations
+## Provision Calculations
 
 Every hour atom provisions are assigned proportionally to the each slashable
 bonded token, not including unbonding tokens.
