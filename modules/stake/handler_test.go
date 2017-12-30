@@ -146,9 +146,6 @@ func TestIncrementsTxDelegate(t *testing.T) {
 		candidates := loadCandidates(deliverer.store)
 		expectedBond += bondAmount
 		expectedSender := initSender - expectedBond
-		//if i == 1 {
-		//panic(fmt.Sprintf("debug Liabilities: %v\n", candidates[0].Liabilities))
-		//}
 		gotBonded := candidates[0].Liabilities.Evaluate()
 		gotHolder := accStore[string(holder.Address)]
 		gotSender := accStore[string(deliverer.sender.Address)]
@@ -171,7 +168,9 @@ func TestIncrementsTxUnbond(t *testing.T) {
 	assert.NoError(got, "expected initial bond tx to be ok, got %v", got)
 
 	// just send the same txunbond multiple times
-	holder := deliverer.params.HoldUnbonded // XXX this should be HoldBonded, new SDK updates
+	holder := deliverer.params.HoldUnbonded // XXX new SDK, this should be HoldBonded
+
+	// XXX use decimals here
 	unbondShares, unbondSharesStr := int64(10), "10"
 	txUndelegate := newTxUnbond(unbondSharesStr, pks[0])
 	nUnbonds := 5

@@ -247,3 +247,5 @@ func TestUpdateValidatorSet(t *testing.T) {
 	testRemove(t, candidates[3].validator(), change[3])
 	testChange(t, candidates[4].validator(), change[4])
 }
+
+// XXX test global state functions, candidate exchange rate functions etc.

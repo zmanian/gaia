@@ -74,9 +74,20 @@ func TestProcessProvisions(t *testing.T) {
 		candidate.addTokens(mintedTokens, gs)
 		saveCandidate(store, candidate)
 	}
+	var totalSupply int64 = 550000000
+	var bondedShares int64 = 150000000
+	var unbondedShares int64 = 400000000
 
 	// initial bonded ratio ~ 27%
-	assert.True(gs.bondedRatio().Equal(rational.New(15, 55)), "%v", gs.bondedRatio())
+	assert.True(gs.bondedRatio().Equal(rational.New(bondedShares, totalSupply)), "%v", gs.bondedRatio())
+
+	// Supplies
+	assert.Equal(totalSupply, gs.TotalSupply)
+	assert.Equal(bondedShares, gs.BondedPool)
+	assert.Equal(unbondedShares, gs.UnbondedPool)
+
+	// test the value of candidate shares
+	assert.True(gs.bondedShareExRate().Equal(rational.One), "%v", gs.bondedShareExRate())
 
 	initialSupply := gs.TotalSupply
 	initialUnbonded := gs.TotalSupply - gs.BondedPool
@@ -92,11 +103,18 @@ func TestProcessProvisions(t *testing.T) {
 		assert.Equal(startTotalSupply+expProvisions, gs.TotalSupply)
 	}
 	assert.NotEqual(initialSupply, gs.TotalSupply)
-	assert.Equal(initialUnbonded, gs.TotalSupply-gs.BondedPool)
+	assert.Equal(initialUnbonded, gs.UnbondedPool)
 	//panic(fmt.Sprintf("debug total %v, bonded  %v, diff %v\n", gs.TotalSupply, gs.BondedPool, gs.TotalSupply-gs.BondedPool))
 
 	// initial bonded ratio ~ 35% ~ 30% increase for bonded holders
 	assert.True(gs.bondedRatio().Equal(rational.New(105906511, 305906511)), "%v", gs.bondedRatio())
-}
 
-// XXX test delegation with provisions
+	// global supply
+	assert.Equal(int64(611813022), gs.TotalSupply)
+	assert.Equal(int64(211813022), gs.BondedPool)
+	assert.Equal(unbondedShares, gs.UnbondedPool)
+
+	// test the value of candidate shares
+	assert.True(gs.bondedShareExRate().Mul(rational.New(bondedShares)).Equal(rational.New(211813022)), "%v", gs.bondedShareExRate())
+
+}
