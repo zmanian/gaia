@@ -25,6 +25,7 @@ type Params struct {
 	InflationMax        rational.Rational // maximum inflation rate
 	InflationMin        rational.Rational // minimum inflation rate
 	GoalBonded          rational.Rational // Goal of percent bonded atoms
+	ReserveTax          rational.Rational // Tax collected on all fees
 
 	MaxVals          uint16  // maximum number of validators
 	AllowedBondDenom string  // bondable coin denomination
@@ -49,6 +50,7 @@ type GlobalState struct {
 	Inflation                rational.Rat // current annual inflation rate
     DateLastCommissionReset  int64        // unix timestamp for last commission accounting reset
     FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
+    ReservePool              coin.Coins   // pool of reserve taxes collected on all fees for governance use
     AccumAdjustment          rational.Rat // Adjustment factor for calculating global fee accum
 }
 ```
@@ -447,19 +449,23 @@ Fees are paid directly into a global fee pool. With regards to fee withdrawal:
    change).
 
 When the validator is the proposer of the round, that validator (and their
-delegators) receives between 1% and 5% of fee rewards, the remainder is
-distributed socially by voting power to all validators including the proposer
-validator.  The amount of provision reward is calculated from pre-commits
-Tendermint messages. All provision rewards are added to a provision reward pool 
-which validator holds individually. Here note that `BondedShares` represents
-the sum of all voting power saved in the `GlobalState` (denoted `gs`).
+delegators) receives between 1% and 5% of fee rewards, the reserve tax is then
+charged, then the remainder is distributed socially by voting power to all
+validators including the proposer validator.  The amount of provision reward is
+calculated from pre-commits Tendermint messages. All provision rewards are
+added to a provision reward pool which validator holds individually. Here note
+that `BondedShares` represents the sum of all voting power saved in the
+`GlobalState` (denoted `gs`).
 
 ```
 proposerReward = feesCollected * (0.01 + 0.04 
                   * sumOfVotingPowerOfPrecommitValidators / gs.BondedShares)
 candidate.ProposerRewardPool += proposerReward
 
-distributedReward = feesCollected - proposerReward
+reserveTaxed = feesCollected * params.ReserveTax
+gs.ReservePool += reserveTaxed
+
+distributedReward = feesCollected - proposerReward - reserveTaxed
 gs.FeePool += distributedReward
 ```
 
