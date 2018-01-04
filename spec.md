@@ -40,19 +40,16 @@ type Params struct {
 
 ``` golang
 type GlobalState struct {
-	TotalSupply       int64               // total supply of atom tokens
-	BondedShares      PoolShares          // sum of all shares distributed for the Bonded Pool
-	UnbondedShares    PoolShares          // sum of all shares distributed for the Unbonded Pool
-	BondedPool        int64               // reserve of bonded tokens
-	UnbondedPool      int64               // reserve of unbonded tokens held with candidates
-	InflationLastTime int64               // timestamp of last processing of inflation
-	Inflation         rational.Rat        // current annual inflation rate
+	TotalSupply              int64        // total supply of atom tokens
+	BondedShares             rational.Rat // sum of all shares distributed for the BondedPool
+	UnbondedShares           rational.Rat // sum of all shares distributed for the UnbondedPool
+	BondedPool               int64        // reserve of bonded tokens
+	UnbondedPool             int64        // reserve of unbonded tokens held with candidates
+	InflationLastTime        int64        // timestamp of last processing of inflation
+	Inflation                rational.Rat // current annual inflation rate
     DateLastCommissionReset  int64        // unix timestamp for last commission accounting reset
-	
     FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
-	FeePoolShares            rational.Rat // total accumulated shares created for the fee pool
-	FeeHoldings              coin.Coins   // collected fees waiting be added to the pool when assigned
-	FeeHoldingsShares        rational.Rat // total accumulated shares created for the fee holdings
+    AccumAdjustment          rational.Rat // Adjustment factor for calculating global fee accum
 }
 ```
 
@@ -105,10 +102,8 @@ type Candidate struct {
     CommissionMax          rational.Rat
     CommissionChangeRate   rational.Rat
     CommissionChangeToday  rational.Rat
-    FeeShares              rational.Rat
-    FeeCommissionShares    rational.Rat
-    LastFeesHeight         int64
-    LastFeesStakedShares   rational.Rat
+    ProposerRewardPool     coin.Coins
+    AccumAdjustment        rational.Rat
     Description            Description 
 }
 
@@ -144,18 +139,15 @@ Candidate parameters are described:
  - VotingPower: Proportional to the amount of bonded tokens which the validator
    has if the validator is within the top 100 validators.
  - Commission:  The commission rate of fees charged to any delegators
- - CommissionMax:  The maximum commission rate which this candidate can charge
+ - CommissionMax:  The maximum commission rate which this candidate can charge 
+   each day from the date `GlobalState.DateLastCommissionReset` 
  - CommissionChangeRate: The maximum daily increase of the candidate commission
  - CommissionChangeToday: Counter for the amount of change to commission rate 
    which has occurred today, reset on the first block of each day (UTC time)
- - FeeShares: Cumulative counter for the amount of fees the candidate and its
-   delegators are entitled too
- - FeeCommissionShares: Fee shares reserved for the candidate charged as
-   commission to the delegators
- - LastFeesHeight: The last height fees moved from the `FeeHolding` to
-   `FeePool` for this candidate
- - LastFeesStakedShares: The candidates staked shares at the time that the last
-   fees were processed (at `LastFeesHeight`) 
+ - ProposerRewardPool: reward pool for extra fees collected when this candidate
+   is the proposer of a block
+ - AccumAdjustment: Adjustment factor for calculating fee accum for the
+   candidate
  - Description
    - Name: moniker
    - DateBonded: date determined which the validator was bonded
@@ -454,116 +446,162 @@ Fees are paid directly into a global fee pool. With regards to fee withdrawal:
    full withdrawal of the fees must occur (as the rules for lazy accounting
    change).
 
-A separate fee pool exists per candidate containing all fee asset held by a
-validator. The candidate `FeeShares` are passively calculated for each block as
-fees are collected.  When the validator is the proposer of a block the
-accounting of passively collected fees pool shares takes place.  In addition,
-when the validator is the proposer of the round, the amount of fee rewards
-collected by that particular block is increased by a skew. The skew factor is
-calculated from pre-commits Tendermint messages and will be 1 for non-proposer
-nodes and between 1.01 and 1.05 for proposer nodes.  
+When the validator is the proposer of the round, that validator (and their
+delegators) receives between 1% and 5% of fee rewards, the remainder is
+distributed socially by voting power to all validators including the proposer
+validator.  The amount of provision reward is calculated from pre-commits
+Tendermint messages. All provision rewards are added to a provision reward pool 
+which validator holds individually. Here note that `BondedShares` represents
+the sum of all voting power saved in the `GlobalState` (denoted `gs`).
 
 ```
-skew = 1.01 + 0.04 * number_precommits/number_validators
+proposerReward = feesCollected * (0.01 + 0.04 
+                  * sumOfVotingPowerOfPrecommitValidators / gs.BondedShares)
+candidate.ProposerRewardPool += proposerReward
+
+distributedReward = feesCollected - proposerReward
+gs.FeePool += distributedReward
 ```
 
-Fees are passively calculated using a second temporary pool dubbed as the fees
-holding pool. For each proposer block, the fees are withdrawn for the proposer
-validator, and the fee holding pool is increased to contain the fees for the
-non-proposer validators to be withdrawn at a later block. 
+The entitlement to the fee pool held by the each validator is accounted for
+lazily.  First we must account for a candidate's `count` and `adjustment`. The
+`count` represents a lazy accounting of what that candidates entitlement to the
+fee pool would be if there `VotingPower` was to never change and they were to
+never withdraw fees. 
+
+``` 
+candidate.count = candidate.VotingPower * BlockHeight
+``` 
+
+Similarly the GlobalState count can be passively calculated whenever needed,
+where `BondedShares` is the updated sum of voting powers from all validators.
+
+``` 
+gs.count = gs.BondedShares * BlockHeight
+``` 
+
+The `adjustment` term accounts for changes in voting power and withdrawals of
+fees. The adjustment factor must be persisted with the candidate and modified
+whenever fees are withdrawn from the candidate or the voting power of the
+candidate changes. When the voting power of the candidate changes the
+`AccumAdjustment` factor is increased/decreased by the cumulative difference in the
+voting power if the voting power has been the new voting power as opposed to
+the old voting power for the entire duration of the blockchain up the previous
+block. Each time there is an adjustment change the GlobalState (denoted `gs`)
+`AccumAdjustment` must also be updated.
 
 ```
-proposerFeeCalcShares = skew * candidate.GlobalStakeShares
-totalCalcShares = params.IssuedGlobalStakeShares + (skew - 1) 
-                  * candidate.GlobalStakeShares 
-ProposerBlockFees = FeesJustCollected * proposerFeeCalcShares / totalCalcShares
-
-heights = (CurrentHeight - 1) - candidate.LastFeesHeight 
-FeeHoldingSharesWithdrawn = heights * candidate.LastFeesStakedShares 
-FeeHoldingWithdrawn = params.FeeHoldings 
-                      * FeeHoldingSharesWithdrawn / params.FeeHoldingsShares
-
-params.FeeHoldingsShares += totalCalcShares - proposerFeeCalcShares 
-                            - FeeHoldingSharesWithdrawn
-params.FeeHoldings -= FeesJustCollected - ProposerBlockFees 
-                      - FeeHoldingWithdrawn
-```
-Add the fees to the pool and increase proposer pool shares. Note that shares
-are divided into shares for delegators and shares collected as commission by
-the validator
-```
-issuedShares = FeesForProposer * candidate.proposerFeeCalcShares
-               + FeeHoldingWithdraw * candidate.LastFeesStakedShares
-
-params.FeePool += ProposerBlockFees + FeeHoldingWithdrawn
-params.FeePoolShares += issuedShares 
-
-candidate.FeeShares += issuedShares * (1 - candidate.Commission)
-candidate.FeeCommissionShares += issuedShares * candidate.Commission
-params.IssuedFeeShares += issuedShares
-```
-lastly, reset the candidates `LastFeesStakedShares` and `LastFeesHeight`
-```
-candidate.LastFeesHeight = currentHeight
-candidate.LastFeesStakedShares = candidate.GlobalStakeShares
+AdjustmentChange = candidate.VotingPower * (height - 1) 
+                   - candidate.PreviousBlockVotingPower * (height - 1)
+candidate.AccumAdjustment += AdjustmentChange
+gs.AccumAdjustment += AdjustmentChange
 ```
 
-For a delegator to withdraw fees a transaction must be sent to the candidate.
-The upon withdrawal the liquid tokens are sent to the delegators liquid
-account.  If the delegator account is the candidate.Owner (aka the candidate
-owner is with withdrawing fees) then both the entitled fees as well as the
-commission fees will be withdrawn.
+Note that this means that the adjustment factor can be negative if the voting
+power of a candidate is decreasing. When fees are withdrawn the adjustment
+factor is reduced to account for those missing fees, by the `accum`
+(calculation to determine `accum` for  transaction described later) 
 
-``` golang
-type TxWithdrawFees struct {
-	PubKey crypto.PubKey
-}
-```
+``` 
+candidate.AccumAdjustment += accum
+gs.AccumAdjustment += accum
+``` 
 
-The fee pool entitlement of each share (whether `FeeShares` or
-`FeeCommissionShares`)  can be calculated as: 
+With each candidates and the global state  `count` and `AccumAdjustment` known the
+entitlement to the global fee pool can be calculated for any candidate.
 
 ```
-entitlement = shares / params.IssuedFeeShares
+candidate.accum = candidate.count - candidate.AccumAdjustment
+gs.accum = gs.count - gs.AccumAdjustment
+candidate.entitlement = candidate.accum / gs.accum
+candidate.feeRewards = candidate.entitlement * gs.FeePool
 ```
 
-The entitlement is applied equally to all assets held in the fee pool.
-Similarly, the `withdrawalEntitlement` is the percent of all assets in the fee
-pool to be withdrawn during a delegator fee withdrawal: 
+So far we have covered two sources fees which can be withdrawn from: Fees from
+proposer rewards (`candidate.ProposerRewardPool`), and fees from the fee pool
+(`candidate.feeRewards`). However we should note that all fees from fee pool
+are subject to commission rate from the owner of the candidate. These next
+calculations outline the math behind withdrawing fee rewards as either a
+delegator to a candidate or as the owner of a candidate.
+
+### As a delegator
+
+As a delegator each time you withdraw fees you must draw all fees which you are
+entitled too.  This is achieved by calculating an accum based on your share of
+the candidate as well as the duration of time since your last withdrawal. Here
+`bond` refers to a `DelegatorBond` object. 
 
 ```
-feeSharesToWithdraw = (currentHeight - delegator.FeeWithdrawalHeight) 
-                      * delegator.Shares / candidate.IssueDelegatorShares
-withdrawalEntitlement := feeSharesToWithdraw / params.IssuedFeeShares
+accumRaw = candidate.VotingPower * bond.Shares / Candidate.IssuedDelegatorShares 
+         * (BlockHeight - bond.FeeWithdrawalHeight)
+``` 
 
-coinsWithdrawn = param.FeePool * withdrawalEntitlement
-param.FeePool -= coinsWithdrawn
-delegator.Owner.Balance += coinsWithdrawn
-```
-
-When a withdrawal of a delegator fees occurs the shares must also be balanced
-appropriately:
+Accum must be further reduced as there is a commission rate which is being
+charged by the candidate, therefor the actual accum which is being withdrawn
+from is reduced
 
 ```
-candidate.FeeShares -= feeSharesToWithdraw 
-params.IssuedFeeShares -= feeSharesToWithdraw
+accum = accumRaw * (1 - candidate.Commission)
 ```
 
-Similarly when a candidate chooses to withdraw fees from the
-FeeCommissionShares:
+With `accum` solved the amount of entitled fees from both the
+`ProposerRewardPool` and the `feeRewards` can be determined 
 
 ```
-withdrawalEntitlement := candidate.FeeCommissionShares / params.IssuedFeeShares
-candidate.FeeCommissionShares = 0  
-params.IssuedFeeShares -= FeeCommissionShares
-
-
-coinsWithdrawn = param.FeePool * withdrawalEntitlement
-param.FeePool -= coinsWithdrawn
-candidate.Owner.Balance. += coinsWithdrawn
+rewardProposer = candidate.ProposerRewardPool * accum / candidate.accum
+rewardPool = candidate.feeRewards * accum / candidate.accum
 ```
 
-Finally, note that when a delegator chooses to re-delegate shares, fees
-continue to accumulate until the re-delegation queue reaches maturity. At the
-block which the queue reaches maturity and shares are re-delegated all
-available fees are simultaneously withdrawn. 
+When fees are withdrawn, the `candidate.AccumAdjustment` must be increased, and
+account balances must be updated:
+
+```
+candidate.AccumAdjustment += accum
+candidate.ProposerRewardPool -= rewardProposer
+gs.FeePool -= rewardPool
+delegator.Owner.Balance += rewardProposer + rewardPool
+```
+
+As mentioned earlier, every time the voting power of a delegator bond is
+changing either by unbonding or further bonding, all fees must be first
+withdrawn. 
+
+### As the candidate owner
+
+As the candidate owner the same calculations apply as if you were a delegator
+however  you are also entitled to a commission on the fee rewards received by
+all delegators. The `accumComm` term is calculated similarly to the `accum`
+term however no ratio of bond shares to total shares must be multiplied as the
+commission applies to the entire stake of the candidate. 
+
+```
+accumComm = candidate.VotingPower * (BlockHeight - bond.FeeWithdrawalHeight) 
+            * candidate.Commission
+
+rewardProposerComm = candidate.ProposerRewardPool * accumComm / candidate.accum
+rewardPoolComm = candidate.feeRewards * accumComm / candidate.accum
+``` 
+
+Upon withdrawal as a candidate owner the final accounting is calculated as so:
+
+```
+candidate.AccumAdjustment += accum + accumComm
+candidate.ProposerRewardPool -= rewardProposer + rewardProposerComm
+gs.FeePool -= rewardPool + rewardPoolComm
+delegator.Owner.Balance += rewardProposer + rewardPool
+                           + rewardProposerComm + rewardPoolComm
+```
+
+### Other general notes on fees accounting
+
+- When a delegator chooses to re-delegate shares, fees continue to accumulate
+  until the re-delegation queue reaches maturity. At the block which the queue
+  reaches maturity and shares are re-delegated all available fees are
+  simultaneously withdrawn. 
+- Whenever a totally new validator is added to the validator set, the `accum`
+  of the entire candidate must be 0, meaning that the initial value for
+  `candidate.AccumAdjustment` must be set to the value of `canidate.Count` for the
+  height which the candidate is added on the validator set.
+- The accum of a new delegator bond will be 0 for the height at which the bond
+  was added. This is achieved by setting `DelegatorBond.FeeWithdrawalHeight` to
+  the height which the bond was added. 
