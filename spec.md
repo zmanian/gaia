@@ -3,7 +3,7 @@
 The staking module is tasked with various core staking functionality.
 Ultimately it is responsible for: 
  - Declaration of candidacy for becoming a validator
- - Updating tendermint validating power to reflect slashible stake
+ - Updating Tendermint validating power to reflect slashable stake
  - Delegation and unbonding transactions 
  - Implementing unbonding period
  - Provisioning Atoms
@@ -12,7 +12,7 @@ Ultimately it is responsible for:
 
 ## Global State
 
-`Params` and `GlobalState` represent the global persistent state of the gaia.
+`Params` and `GlobalState` represent the global persistent state of Gaia.
 `Params` is intended to remain static whereas `GlobalState` is anticipated to
 change each block. 
 
@@ -95,6 +95,7 @@ validators or candidate-validators.
 type Candidate struct {
 	Status                 CandidateStatus       
 	PubKey                 crypto.PubKey
+	GovernancePubKey       crypto.PubKey
 	Owner                  auth.Account
 	GlobalStakeShares      rational.Rat 
 	IssuedDelegatorShares  rational.Rat
@@ -170,16 +171,29 @@ type BondUpdate struct {
 
 type TxDeclareCandidacy struct {
 	BondUpdate
-    Description         Description
+    GovernancePubKey    crypto.PubKey
 	Commission          int64  
 	CommissionMax       int64 
 	CommissionMaxChange int64 
+    Description         Description
 }
 ``` 
 
 For all subsequent self-bonding, whether self-bonding or delegation the
 `TxDelegate` function should be used. In this context `TxUnbond` is used to
 unbond either delegation bonds or validator self-bonds. 
+
+If either the `Description` (excluding `DateBonded` which is constant),
+`Commission`, or the `GovernancePubKey` need to be updated, the
+`TxEditCandidacy` transaction should be sent from the owner account:
+
+``` golang
+type TxDeclareCandidacy struct {
+    GovernancePubKey    crypto.PubKey
+	Commission          int64  
+    Description         Description
+}
+```
 
 ### Store indexing
 
@@ -272,7 +286,7 @@ type TxDelegate struct {
 
 ### Unbonding
 
-Delegator unbonding is defined by the following trasaction type:
+Delegator unbonding is defined by the following transaction type:
 
 ``` golang
 type TxUnbond struct { 
