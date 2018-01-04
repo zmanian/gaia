@@ -209,20 +209,27 @@ sort though the group of all candidates:
  - value: `ValidatorBond.PubKey`
 
 When the set of all validators needs to be determined from the group of all
-candidates, the top 100 candidates, sorted by GlobalStakeShares can be retrieved
+candidates, the top candidates, sorted by GlobalStakeShares can be retrieved
 from this sorting without the need to retrieve the entire group of candidates.  
+
+### New Validators
+
+Any new validator who is to join the validator set must have enough stake to
+not exceed the previous smallest validator by at least 5% before replacing them
+in the validator set.
 
 ### Validators getting kicked
 
 Unbonding of an entire validator-candidate to a temporary liquid account occurs
 under the scenarios: 
+ - not enough stake to be within the validator set
  - the owner unbonds all of their staked tokens
  - validator liveliness issues
  - crosses a self-imposed safety threshold
    - minimum number of tokens staked by owner
    - minimum ratio of tokens staked by owner to delegator tokens 
 
-When this occurs delegator's tokesn do not unbond to their personal wallets but
+When this occurs delegator's tokens do not unbond to their personal wallets but
 begin the unbonding process to a pool where they must then transact in order to
 withdraw to their respective wallets. The following unbonding will use the
 following queue element
