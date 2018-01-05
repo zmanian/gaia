@@ -9,9 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	crypto "github.com/tendermint/go-crypto"
-	wire "github.com/tendermint/go-wire"
 
-	"github.com/cosmos/cosmos-sdk/client/commands/keys"
 	txcmd "github.com/cosmos/cosmos-sdk/client/commands/txs"
 	"github.com/cosmos/cosmos-sdk/modules/coin"
 
@@ -20,78 +18,167 @@ import (
 
 // nolint
 const (
-	FlagAmount = "amount"
 	FlagPubKey = "pubkey"
+	FlagAmount = "amount"
+	FlagShares = "shares"
+
+	FlagMoniker  = "moniker"
+	FlagIdentity = "keybase-sig"
+	FlagWebsite  = "website"
+	FlagDetails  = "details"
 )
 
 // nolint
 var (
-	CmdBond = &cobra.Command{
-		Use:   "bond",
-		Short: "bond coins to your validator bond account",
-		RunE:  cmdBond,
+	CmdDeclareCandidacy = &cobra.Command{
+		Use:   "declare-candidacy",
+		Short: "create new validator-candidate account and delegate some coins to it",
+		RunE:  cmdDeclareCandidacy,
+	}
+	CmdEditCandidacy = &cobra.Command{
+		Use:   "edit-candidacy",
+		Short: "edit and existing validator-candidate account",
+		RunE:  cmdEditCandidacy,
+	}
+	CmdDelegate = &cobra.Command{
+		Use:   "delegate",
+		Short: "delegate coins to an existing validator/candidate",
+		RunE:  cmdDelegate,
 	}
 	CmdUnbond = &cobra.Command{
 		Use:   "unbond",
-		Short: "unbond coins from your validator bond account",
+		Short: "unbond coins from a validator/candidate",
 		RunE:  cmdUnbond,
 	}
 )
 
 func init() {
-	// Add Flags
-	fsDelegation := flag.NewFlagSet("", flag.ContinueOnError)
-	fsDelegation.String(FlagAmount, "1atom", "Amount of Atoms")
-	fsDelegation.String(FlagPubKey, "", "PubKey of the Validator")
 
-	CmdBond.Flags().AddFlagSet(fsDelegation)
-	CmdUnbond.Flags().AddFlagSet(fsDelegation)
+	// define the flags
+	fsPk := flag.NewFlagSet("", flag.ContinueOnError)
+	fsPk.String(FlagPubKey, "", "PubKey of the validator-candidate")
+
+	fsAmount := flag.NewFlagSet("", flag.ContinueOnError)
+	fsAmount.String(FlagAmount, "1fermion", "Amount of coins to bond")
+
+	fsShares := flag.NewFlagSet("", flag.ContinueOnError)
+	fsShares.Int64(FlagShares, 0, "Amount of shares to unbond")
+
+	fsCandidate := flag.NewFlagSet("", flag.ContinueOnError)
+	fsCandidate.String(FlagMoniker, "", "validator-candidate name")
+	fsCandidate.String(FlagIdentity, "", "optional keybase signature")
+	fsCandidate.String(FlagWebsite, "", "optional website")
+	fsCandidate.String(FlagDetails, "", "optional detailed description space")
+
+	// add the flags
+	CmdDelegate.Flags().AddFlagSet(fsPk)
+	CmdDelegate.Flags().AddFlagSet(fsAmount)
+
+	CmdUnbond.Flags().AddFlagSet(fsPk)
+	CmdUnbond.Flags().AddFlagSet(fsShares)
+
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsPk)
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsAmount)
+	CmdDeclareCandidacy.Flags().AddFlagSet(fsCandidate)
+
+	CmdEditCandidacy.Flags().AddFlagSet(fsPk)
+	CmdEditCandidacy.Flags().AddFlagSet(fsCandidate)
 }
 
-func cmdBond(cmd *cobra.Command, args []string) error {
+func cmdDeclareCandidacy(cmd *cobra.Command, args []string) error {
 	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
 	if err != nil {
 		return err
 	}
 
-	var pubkey crypto.PubKey
-	pubkeyStr := viper.GetString(FlagPubKey)
-	if len(pubkeyStr) != 0 {
-		pkBytes, err := hex.DecodeString(pubkeyStr)
-		if err != nil {
-			return err
-		}
-
-		if len(pkBytes) != 32 { //if len(pubkeyStr) != 64 {
-			return fmt.Errorf("pubkey must be hex encoded string which is 64 characters long")
-		}
-		var pkEd crypto.PubKeyEd25519
-		copy(pkEd[:], pkBytes[:])
-		pubkey = pkEd.Wrap()
-
-	} else { // if pubkey flag is not used get the pubkey of the signer
-		name := viper.GetString(txcmd.FlagName)
-		if len(name) == 0 {
-			return fmt.Errorf("must use --name flag")
-		}
-
-		info, err := keys.GetKeyManager().Get(name)
-		if err != nil {
-			return err
-		}
-		pubkey = info.PubKey
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
 	}
 
-	tx := stake.NewTxBond(amount, wire.BinaryBytes(pubkey))
+	if viper.GetString(FlagMoniker) == "" {
+		return fmt.Errorf("please enter a moniker for the validator-candidate using --moniker")
+	}
+
+	description := stake.Description{
+		Moniker:  viper.GetString(FlagMoniker),
+		Identity: viper.GetString(FlagIdentity),
+		Website:  viper.GetString(FlagWebsite),
+		Details:  viper.GetString(FlagDetails),
+	}
+
+	tx := stake.NewTxDeclareCandidacy(amount, pk, description)
+	return txcmd.DoTx(tx)
+}
+
+func cmdEditCandidacy(cmd *cobra.Command, args []string) error {
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
+	}
+
+	description := stake.Description{
+		Moniker:  viper.GetString(FlagMoniker),
+		Identity: viper.GetString(FlagIdentity),
+		Website:  viper.GetString(FlagWebsite),
+		Details:  viper.GetString(FlagDetails),
+	}
+
+	tx := stake.NewTxEditCandidacy(pk, description)
+	return txcmd.DoTx(tx)
+}
+
+func cmdDelegate(cmd *cobra.Command, args []string) error {
+	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
+	if err != nil {
+		return err
+	}
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
+	if err != nil {
+		return err
+	}
+
+	tx := stake.NewTxDelegate(amount, pk)
 	return txcmd.DoTx(tx)
 }
 
 func cmdUnbond(cmd *cobra.Command, args []string) error {
-	amount, err := coin.ParseCoin(viper.GetString(FlagAmount))
+
+	sharesRaw := viper.GetInt64(FlagShares)
+	if sharesRaw <= 0 {
+		return fmt.Errorf("shares must be positive interger")
+	}
+	shares := uint64(sharesRaw)
+
+	pk, err := GetPubKey(viper.GetString(FlagPubKey))
 	if err != nil {
 		return err
 	}
 
-	tx := stake.NewTxUnbond(amount)
+	tx := stake.NewTxUnbond(shares, pk)
 	return txcmd.DoTx(tx)
+}
+
+// GetPubKey - create the pubkey from a pubkey string
+func GetPubKey(pubKeyStr string) (pk crypto.PubKey, err error) {
+
+	if len(pubKeyStr) == 0 {
+		err = fmt.Errorf("must use --pubkey flag")
+		return
+	}
+	if len(pubKeyStr) != 64 { //if len(pkBytes) != 32 {
+		err = fmt.Errorf("pubkey must be Ed25519 hex encoded string which is 64 characters long")
+		return
+	}
+	var pkBytes []byte
+	pkBytes, err = hex.DecodeString(pubKeyStr)
+	if err != nil {
+		return
+	}
+	var pkEd crypto.PubKeyEd25519
+	copy(pkEd[:], pkBytes[:])
+	pk = pkEd.Wrap()
+	return
 }

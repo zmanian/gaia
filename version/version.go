@@ -7,7 +7,7 @@ import (
 )
 
 // Version - Gaia Version
-const Version = "0.3.0"
+const Version = "0.5.0"
 
 // VersionCmd - The version of gaia
 var VersionCmd = &cobra.Command{
