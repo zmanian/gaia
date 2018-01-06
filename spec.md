@@ -51,7 +51,7 @@ type GlobalState struct {
     DateLastCommissionReset  int64        // unix timestamp for last commission accounting reset
     FeePool                  coin.Coins   // fee pool for all the fee shares which have already been distributed
     ReservePool              coin.Coins   // pool of reserve taxes collected on all fees for governance use
-    AccumAdjustment          rational.Rat // Adjustment factor for calculating global fee accum
+    Adjustment          rational.Rat // Adjustment factor for calculating global fee accum
 }
 ```
 
@@ -106,7 +106,7 @@ type Candidate struct {
     CommissionChangeRate   rational.Rat
     CommissionChangeToday  rational.Rat
     ProposerRewardPool     coin.Coins
-    AccumAdjustment        rational.Rat
+    Adjustment        rational.Rat
     Description            Description 
 }
 
@@ -149,7 +149,7 @@ Candidate parameters are described:
    which has occurred today, reset on the first block of each day (UTC time)
  - ProposerRewardPool: reward pool for extra fees collected when this candidate
    is the proposer of a block
- - AccumAdjustment: Adjustment factor for calculating fee accum for the
+ - Adjustment: Adjustment factor for calculating fee accum for the
    candidate
  - Description
    - Name: moniker
@@ -488,6 +488,8 @@ gs.ReservePool += reserveTaxed
 
 distributedReward = feesCollected - proposerReward - reserveTaxed
 gs.FeePool += distributedReward
+gs.SumFeesReceived += distributedReward
+gs.RecentFee = distributedReward
 ```
 
 The entitlement to the fee pool held by the each validator is accounted for
@@ -511,81 +513,84 @@ The `adjustment` term accounts for changes in voting power and withdrawals of
 fees. The adjustment factor must be persisted with the candidate and modified
 whenever fees are withdrawn from the candidate or the voting power of the
 candidate changes. When the voting power of the candidate changes the
-`AccumAdjustment` factor is increased/decreased by the cumulative difference in the
+`Adjustment` factor is increased/decreased by the cumulative difference in the
 voting power if the voting power has been the new voting power as opposed to
 the old voting power for the entire duration of the blockchain up the previous
 block. Each time there is an adjustment change the GlobalState (denoted `gs`)
-`AccumAdjustment` must also be updated.
+`Adjustment` must also be updated.
 
 ```
-AdjustmentChange = candidate.VotingPower * (height - 1) 
-                   - candidate.PreviousBlockVotingPower * (height - 1)
-candidate.AccumAdjustment += AdjustmentChange
-gs.AccumAdjustment += AdjustmentChange
+simplePool = candidate.count / gs.count * gs.SumFeesReceived
+projectedPool = candidate.PrevPower * (height-1) 
+                / (gs.PrevPower * (height-1)) * gs.PrevFeesReceived
+                + candidate.Power / gs.Power * gs.RecentFee
+
+AdjustmentChange = simplePool - projectedPool
+candidate.AdjustmentRewardPool += AdjustmentChange
+gs.Adjustment += AdjustmentChange
 ```
 
 Note that this means that the adjustment factor can be negative if the voting
 power of a candidate is decreasing. When fees are withdrawn the adjustment
-factor is reduced to account for those missing fees, by the `accum`
-(calculation to determine `accum` for  transaction described later) 
+factor is reduced to account for those missing fees.
 
 ``` 
-candidate.AccumAdjustment += accum
-gs.AccumAdjustment += accum
+candidate.AdjustmentRewardPool += withdrawn
+gs.Adjustment += withdrawn
 ``` 
 
-With each candidates and the global state  `count` and `AccumAdjustment` known the
-entitlement to the global fee pool can be calculated for any candidate.
+Now the entitled fee pool of each candidate can be lazily accounted for at 
+any given block:
 
 ```
-candidate.accum = candidate.count - candidate.AccumAdjustment
-gs.accum = gs.count - gs.AccumAdjustment
-candidate.entitlement = candidate.accum / gs.accum
-candidate.feeRewards = candidate.entitlement * gs.FeePool
+candidate.feePool = candidate.simplePool - candidate.Adjustment
 ```
 
 So far we have covered two sources fees which can be withdrawn from: Fees from
 proposer rewards (`candidate.ProposerRewardPool`), and fees from the fee pool
-(`candidate.feeRewards`). However we should note that all fees from fee pool
-are subject to commission rate from the owner of the candidate. These next
+(`candidate.feePool`). However we should note that all fees from fee pool are
+subject to commission rate from the owner of the candidate. These next
 calculations outline the math behind withdrawing fee rewards as either a
-delegator to a candidate or as the owner of a candidate.
+delegator to a candidate providing commission, or as the owner of a candidate
+who is receiving commission.
 
 ### As a delegator
 
 As a delegator each time you withdraw fees you must draw all fees which you are
 entitled too.  This is achieved by calculating an accum based on your share of
-the candidate as well as the duration of time since your last withdrawal. Here
-`bond` refers to a `DelegatorBond` object. 
+the candidate and later applying an adjustment amount to account for fees
+already withdrawn.
 
 ```
-accumRaw = candidate.VotingPower * bond.Shares / Candidate.IssuedDelegatorShares 
-         * (BlockHeight - bond.FeeWithdrawalHeight)
+accumRaw = candidate.VotingPower * delegatorBond.Shares / candidate.IssuedDelegatorShares 
+         * BlockHeight - delegatorBond.Adjustment
 ``` 
 
-Accum must be further reduced as there is a commission rate which is being
-charged by the candidate, therefor the actual accum which is being withdrawn
-from is reduced
+commission must also be reduced from accum:
 
 ```
 accum = accumRaw * (1 - candidate.Commission)
 ```
 
-With `accum` solved the amount of entitled fees from both the
-`ProposerRewardPool` and the `feeRewards` can be determined 
+With `accum` solved the amount of entitled fees can be determined for a
+delegator bond.
 
 ```
-rewardProposer = candidate.ProposerRewardPool * accum / candidate.accum
-rewardPool = candidate.feeRewards * accum / candidate.accum
+rewardProposer = candidate.ProposerRewardPool * accum 
+                 / candidate.accum  - delegatorBond.AdjustmentRewardProposer
+rewardPool = candidate.feePool * accum 
+             / candidate.accum - delegatorBond.AdjustmentRewardPool
 ```
 
-When fees are withdrawn, the `candidate.AccumAdjustment` must be increased, and
-account balances must be updated:
+When fees are withdrawn, the adjustments must be increased, and account
+balances must be updated:
 
 ```
-candidate.AccumAdjustment += accum
-candidate.ProposerRewardPool -= rewardProposer
-gs.FeePool -= rewardPool
+candidate.AdjustmentRewardPool += rewardPool
+candidate.AdjustmentRewardProposer += rewardProposer
+delegatorBond.AdjustmentRewardPool += rewardPool
+delegatorBond.AdjustmentRewardProposer += rewardProposer
+
 delegator.Owner.Balance += rewardProposer + rewardPool
 ```
 
@@ -602,19 +607,20 @@ term however no ratio of bond shares to total shares must be multiplied as the
 commission applies to the entire stake of the candidate. 
 
 ```
-accumComm = candidate.VotingPower * (BlockHeight - bond.FeeWithdrawalHeight) 
-            * candidate.Commission
+accumComm = candidate.VotingPower * BlockHeight * candidate.Commission
 
-rewardProposerComm = candidate.ProposerRewardPool * accumComm / candidate.accum
-rewardPoolComm = candidate.feeRewards * accumComm / candidate.accum
+rewardProposerComm = candidate.ProposerRewardPool * accumComm 
+                     / candidate.accum - AdjustmentRewardProposerComm
+rewardPoolComm = candidate.feePool * accumComm 
+                 / candidate.accum - AdjustmentRewardPoolComm
 ``` 
 
 Upon withdrawal as a candidate owner the final accounting is calculated as so:
 
 ```
-candidate.AccumAdjustment += accum + accumComm
-candidate.ProposerRewardPool -= rewardProposer + rewardProposerComm
-gs.FeePool -= rewardPool + rewardPoolComm
+candidate.AdjustmentRewardProposerComm += rewardProposerComm
+candidate.AdjustmentRewardPoolComm += rewardPoolComm
+
 delegator.Owner.Balance += rewardProposer + rewardPool
                            + rewardProposerComm + rewardPoolComm
 ```
@@ -627,8 +633,8 @@ delegator.Owner.Balance += rewardProposer + rewardPool
   simultaneously withdrawn. 
 - Whenever a totally new validator is added to the validator set, the `accum`
   of the entire candidate must be 0, meaning that the initial value for
-  `candidate.AccumAdjustment` must be set to the value of `canidate.Count` for the
+  `candidate.Adjustment` must be set to the value of `canidate.Count` for the
   height which the candidate is added on the validator set.
-- The accum of a new delegator bond will be 0 for the height at which the bond
+- The feePool of a new delegator bond will be 0 for the height at which the bond
   was added. This is achieved by setting `DelegatorBond.FeeWithdrawalHeight` to
   the height which the bond was added. 
