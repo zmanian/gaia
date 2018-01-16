@@ -1,7 +1,18 @@
-# Staking Module
+# Stake Module
 
-The staking module is tasked with various core staking functionality.
-Ultimately it is responsible for: 
+## Overview
+
+The stake module is tasked with various core staking functionality. Through the
+stake module atoms may be bonded, delegated, and provisions/rewards are
+distributed. Atom provisions are distributed to validators and their delegators
+through share distribution of a collective pool of all staked atoms. As atoms
+are created they are added to the common pool and each share become
+proportionally worth more atoms. Fees are distributed through a similar pooling
+mechanism but where each validator and delegator maintains an adjustment factor
+to determine the true proportion of fees they are entitled too. This adjustment
+factor is updated for each delegator and validator for each block where changes
+to the voting power occurs in the network. Broken down, the stake module at a
+high level is responsible for: 
  - Declaration of candidacy for becoming a validator
  - Updating Tendermint validating power to reflect slashable stake
  - Delegation and unbonding transactions 
@@ -9,6 +20,17 @@ Ultimately it is responsible for:
  - Provisioning Atoms
  - Managing and distributing transaction fees
  - Providing the framework for validator commission on delegators
+
+### Transaction Overview
+
+Available Transactions: 
+ - TxDeclareCandidacy
+ - TxEditCandidacy
+ - TxLivelinessCheck
+ - TxProveLive 
+ - TxDelegate
+ - TxUnbond 
+ - TxRedelegate
 
 ## Global State
 
@@ -18,8 +40,8 @@ change each block.
 
 ``` golang
 type Params struct {
-	HoldBonded   auth.Account // account  where all bonded coins are held
-	HoldUnbonded auth.Account // account where all delegated but unbonded coins are held
+	HoldBonded   Address // account  where all bonded coins are held
+	HoldUnbonded Address // account where all delegated but unbonded coins are held
 
 	InflationRateChange rational.Rational // maximum annual change in inflation rate
 	InflationMax        rational.Rational // maximum inflation rate
@@ -60,24 +82,7 @@ type GlobalState struct {
 The queue is ordered so the next to unbond/re-delegate is at the head. Every
 tick the head of the queue is checked and if the unbonding period has passed
 since `InitHeight` commence with final settlement of the unbonding and pop the
-queue.
-
-``` golang
-type Queue interface {
-    Push(bytes []byte) // add a new entry to the end of the queue
-    Pop()              // remove the leading queue entry
-    Peek() []byte      // get the leading queue entry
-}
-
-type MerkleQueue struct {
-	slot  byte           // queue slot in the store
-	store state.SimpleDB // queue store
-	tail  int64          // start position of the queue
-	head  int64          // end position of the queue
-}
-```
-
-All queue elements used for unbonding share a common struct:
+queue. All queue elements used for unbonding share a common struct:
 
 ``` golang
 type QueueElem struct {
@@ -85,6 +90,8 @@ type QueueElem struct {
 	InitHeight  int64    // when the queue was initiated
 }
 ```
+
+Each `QueueElem` is persisted in the store until it is popped from the queue. 
 
 ## Validator-Candidate
 
@@ -96,7 +103,7 @@ type Candidate struct {
 	Status                 CandidateStatus       
 	PubKey                 crypto.PubKey
 	GovernancePubKey       crypto.PubKey
-	Owner                  auth.Account
+	Owner                  Address
 	GlobalStakeShares      rational.Rat 
 	IssuedDelegatorShares  rational.Rat
 	RedelegatingShares     rational.Rat
@@ -112,9 +119,11 @@ type Candidate struct {
 
 type CandidateStatus byte
 const (
-    Bonded    CandidateStatus = 0x00
-    Unbonding CandidateStatus = 0x01
-    Unbonded  CandidateStatus = 0x02
+    VyingUnbonded  CandidateStatus = 0x00
+    VyingUnbonding CandidateStatus = 0x01
+    Bonded         CandidateStatus = 0x02
+    KickUnbonding  CandidateStatus = 0x03
+    KickUnbonded   CandidateStatus = 0x04
 )
 
 type Description struct {
@@ -127,7 +136,9 @@ type Description struct {
 ```
 
 Candidate parameters are described:
- - Status: signal that the candidate is either active, unbonding, or unbonded.
+ - Status: signal that the candidate is either vying for validator status
+   either unbonded or unbonding, an active validator, or a kicked validator
+   either unbonding or unbonded.
  - PubKey: separated key from the owner of the candidate as is used strictly
    for participating in consensus.
  - Owner: Address where coins are bonded from and unbonded to 
@@ -164,15 +175,11 @@ During this transaction a self-delegation transaction is executed to bond
 tokens which are sent in with the transaction.
 
 ``` golang
-type BondUpdate struct {
-	PubKey crypto.PubKey
-	Amount coin.Coin       
-}
-
 type TxDeclareCandidacy struct {
-	BondUpdate
+	PubKey              crypto.PubKey
+	Amount              coin.Coin       
     GovernancePubKey    crypto.PubKey
-	Commission          int64  
+	Commission          rational.Rat
 	CommissionMax       int64 
 	CommissionMaxChange int64 
     Description         Description
@@ -188,37 +195,41 @@ If either the `Description` (excluding `DateBonded` which is constant),
 `TxEditCandidacy` transaction should be sent from the owner account:
 
 ``` golang
-type TxDeclareCandidacy struct {
+type TxEditCandidacy struct {
     GovernancePubKey    crypto.PubKey
 	Commission          int64  
     Description         Description
 }
 ```
 
-### Store indexing
+### Persistent State
 
 Within the store, each `Candidate` is stored by validator-pubkey.
 
  - key: validator-pubkey
- - value: `ValidatorBond` object
+ - value: `Candidate` object
 
-A second key-value pair is also maintained by the store in order to quickly
-sort though the group of all candidates: 
+A second key-value pair is also persisted in order to quickly sort though the
+group of all candidates, this second index is however not persisted through the
+merkle store. 
 
  - key: `Candidate.GlobalStakeShares`
- - value: `ValidatorBond.PubKey`
+ - value: `Candidate.PubKey`
 
 When the set of all validators needs to be determined from the group of all
 candidates, the top candidates, sorted by GlobalStakeShares can be retrieved
-from this sorting without the need to retrieve the entire group of candidates.  
+from this sorting without the need to retrieve the entire group of candidates.
+When validators are kicked from the validator set they are removed from this
+list. 
 
 ### New Validators
 
-Any new validator who is to join the validator set must have enough stake to
-not exceed the previous smallest validator by at least 5% before replacing them
-in the validator set.
+The validator set is updated in the first block of every hour. Validators are
+taken as the first `GlobalState.MaxValidators` number of candidates with the
+greatest amount of staked atoms who have not been kicked from the validator
+set.
 
-### Validators getting kicked
+### Kicked Validators
 
 Unbonding of an entire validator-candidate to a temporary liquid account occurs
 under the scenarios: 
@@ -245,10 +256,43 @@ while a candidate-unbond is commencing, then that unbond/re-delegation is
 subject to a reduced unbonding period based on how much time those funds have
 already spent in the unbonding queue.
 
+#### Liveliness issues
+
+Liveliness issues are calculated by keeping track of the block precommits in
+the block header. A queue is persisted which contains the block headers from
+all recent blocks for the duration of the unbonding period. A validator is
+defined as having livliness issues if they have not been included in more than
+33% of the blocks over: 
+ - The most recent 24 Hours if they have >= 20% of global stake
+ - The most recent week if they have = 0% of global stake
+ - Linear interpolation of the above two scenarios
+
+Liveliness kicks are only checked when a `TxLivelinessCheck` transaction is
+submitted. 
+
+``` golang
+type TxLivelinessCheck struct {
+    PubKey        crypto.PubKey
+    RewardAccount Addresss
+}
+```
+
+If the `TxLivelinessCheck is successful in kicking a validator, 5% of the
+liveliness punishment is provided as a reward to `RewardAccount`.
+
+#### Validator Liveliness Proof
+
 If the validator was kicked for liveliness issues and is able to regain
 liveliness then all delegators in the temporary unbonding pool which have not
 transacted to move will be bonded back to the now-live validator and begin to
-once again collect provisions and rewards. 
+once again collect provisions and rewards. Regaining livliness is demonstrated
+by sending in a `TxProveLive` transaction:
+
+``` golang
+type TxProveLive struct {
+    PubKey crypto.PubKey
+}
+```
 
 ## Delegator bond
 
@@ -290,7 +334,8 @@ candidate will return shares which are assigned in `DelegatorBond.Shares`.
 
 ``` golang 
 type TxDelegate struct { 
-    BondUpdate 
+	PubKey crypto.PubKey
+	Amount coin.Coin       
 }
 ```
 
@@ -311,7 +356,7 @@ candidate and added to a queue object.
 ``` golang
 type QueueElemUnbondDelegation struct {
 	QueueElem
-	Payout           auth.Account  // account to pay out to
+	Payout           Address  // account to pay out to
     Shares           rational.Rat  // amount of shares which are unbonding
     StartSlashRatio  rational.Rat  // candidate slash ratio at start of re-delegation
 }
@@ -326,18 +371,8 @@ assigned to the amount being paid out.
 
 ### Re-Delegation
 
-``` golang
-type QueueElemReDelegate struct {
-	QueueElem
-	Payout       auth.Account  // account to pay out to
-    Shares       rational.Rat  // amount of shares which are unbonding
-    NewCandidate crypto.PubKey // validator to bond to after unbond
-}
-```
-
 The re-delegation command allows delegators to switch validators while still
-receiving equal reward to as if you had never unbonded. Transactions structs of
-the re-delegation command may looks like this:
+receiving equal reward to as if you had never unbonded.
 
 ``` golang
 type TxRedelegate struct { 
@@ -347,16 +382,26 @@ type TxRedelegate struct {
 }
 ```
 
-Re-delegation is defined as an unbond followed by an immediate bond at the 
-maturity of the unbonding. 
-
 When re-delegation is initiated, delegator shares remain accounted for within
-the `Candidate.Shares` and the term `RedelegatingShares` is incremented.
+the `Candidate.Shares`, the term `RedelegatingShares` is incremented and a
+queue element is created.
+
+``` golang
+type QueueElemReDelegate struct {
+	QueueElem
+	Payout       Address  // account to pay out to
+    Shares       rational.Rat  // amount of shares which are unbonding
+    NewCandidate crypto.PubKey // validator to bond to after unbond
+}
+```
+
 During the unbonding period all unbonding shares do not count towards the
 voting power of a validator. Once the `QueueElemReDelegation` has reached
 maturity, the appropriate unbonding shares are removed from the `Shares` and
 `RedelegatingShares` term.   
 
+Note that with the current menchanism a delegator cannot redelegate funds which
+are currently redelegating. 
 
 ### Cancel Unbonding
 
@@ -369,7 +414,7 @@ will immediately begin to one again collect rewards from their validator.
 ## Provision Calculations
 
 Every hour atom provisions are assigned proportionally to the each slashable
-bonded token, not including unbonding tokens.
+bonded token which includes re-delegating atoms but not unbonding tokens.
 
 Validation provisions are payed directly to a global hold account
 (`BondedTokenPool`) and proportions of that hold account owned by each
@@ -461,7 +506,6 @@ params.BondedTokenPool += provisionTokensHourly
 
 ## Fee Calculations
 
-
 Collected fees are pooled globally and divided out passively to validators and
 delegators. Each validator has the opportunity to charge commission to the
 delegators on the fees collected on behalf of the delegators by the validators.
@@ -480,7 +524,7 @@ distribution occurs, withdrawal of fees must also occur.
 When the validator is the proposer of the round, that validator (and their
 delegators) receives between 1% and 5% of fee rewards, the reserve tax is then
 charged, then the remainder is distributed socially by voting power to all
-validators including the proposer validator.  The amount of provision reward is
+validators including the proposer validator.  The amount of proposer reward is
 calculated from pre-commits Tendermint messages. All provision rewards are
 added to a provision reward pool which validator holds individually. Here note
 that `BondedShares` represents the sum of all voting power saved in the
