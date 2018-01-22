@@ -10,5 +10,5 @@ install:
 test:
 	@go test `glide novendor`
 
-test_cli:
-	bash ./cmd/gaia/sh_tests/stake.sh
+test_cli: install
+	go run test/test.go all
