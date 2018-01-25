@@ -7,25 +7,25 @@ import:
 - package: github.com/spf13/pflag
 - package: github.com/spf13/viper
 - package: github.com/tendermint/abci
-  version: develop
+  version: master
   subpackages:
   - server
   - types
 - package: github.com/cosmos/cosmos-sdk
-  version: develop
+  version: tm-develop
 - package: github.com/tendermint/iavl
-  version: develop
+  version: master
 - package: github.com/tendermint/go-crypto
   version: remove_ledger
   subpackages:
   - cmd
   - keys
 - package: github.com/tendermint/go-wire
-  version: develop
+  version: master
   subpackages:
   - data
 - package: github.com/tendermint/tendermint
-  version: v0.15.0
+  version: develop 
   subpackages:
   - config
   - node
@@ -36,7 +36,7 @@ import:
   - rpc/lib/types
   - types
 - package: github.com/tendermint/tmlibs
-  version: develop
+  version: v0.7.0
   subpackages:
   - cli
   - cli/flags
