@@ -181,24 +181,23 @@ type Description struct {
 ```
 
 Candidate parameters are described:
- - Status: signal that the candidate is either vying for validator status
+ - Status: signal that the candidate is either vying for validator status,
    either unbonded or unbonding, an active validator, or a kicked validator
    either unbonding or unbonded.
  - PubKey: separated key from the owner of the candidate as is used strictly
    for participating in consensus.
  - Owner: Address where coins are bonded from and unbonded to 
  - GlobalStakeShares: Represents shares of `GlobalState.BondedPool` if
-   `Candidate.Status` is `Bonded`; or shares of `GlobalState.UnbondedPool` if
-   `Candidate.Status` is otherwise
- - IssuedDelegatorShares: Sum of all shares issued to delegators (which
-   includes the candidate's self-bond) which represent each of their stake in
+   `Candidate.Status` is `Bonded`; or shares of `GlobalState.UnbondedPool` otherwise
+ - IssuedDelegatorShares: Sum of all shares a candidate issued to delegators (which
+   includes the candidate's self-bond); a delegator share represents their stake in
    the Candidate's `GlobalStakeShares`
  - RedelegatingShares: The portion of `IssuedDelegatorShares` which are
    currently re-delegating to a new validator
  - VotingPower: Proportional to the amount of bonded tokens which the validator
-   has if the validator is within the top 100 validators.
+   has if the candidate is a validator.
  - Commission:  The commission rate of fees charged to any delegators
- - CommissionMax:  The maximum commission rate which this candidate can charge 
+ - CommissionMax:  The maximum commission rate this candidate can charge 
    each day from the date `GlobalState.DateLastCommissionReset` 
  - CommissionChangeRate: The maximum daily increase of the candidate commission
  - CommissionChangeToday: Counter for the amount of change to commission rate 
@@ -216,40 +215,59 @@ Candidate parameters are described:
    - Details: optional details
 
 
-Candidates are indexed by their `Candidate.PubKey`.
-Additionally, we index empty values by the candidates global stake shares concatenated with the public key.
+Within the store, each `Candidate` is stored by validator public key:
+
+ - key: `Candidate.PubKey`
+ - value: `Candidate` object
+
+A second key-value pair is also persisted in order to quickly sort though the
+group of all candidates. This second index is however not persisted through the
+Merkle store. 
+
+ - key: `Candidate.GlobalStakeShares`
+ - value: `Candidate.PubKey`
+
+When the validator set needs to be determined from the group of all
+candidates, the top candidates, sorted by GlobalStakeShares can be retrieved
+from this sorting without the need to retrieve the entire group of candidates.
+When validators are kicked from the validator set they are removed from this list. 
 
 TODO: be more precise.
 
-When the set of all validators needs to be determined from the group of all
-candidates, the top candidates, sorted by GlobalStakeShares can be retrieved
-from this sorting without the need to retrieve the entire group of candidates.
-When validators are kicked from the validator set they are removed from this
-list. 
+#### Delegator shares
 
-### TxDelegate
+A candidate is, depending on it's status, contributing Atoms to either bonded or unbonded pool, and in return gets  
+some amount of (global) pool shares. Note that not all those Atoms (and respective shares) are owned by the candidate 
+as some Atoms could be delegated to a candidate. The mechanism for distribution of Atoms (and shares) between a 
+candidate and it's delegators is based on a notion of delegator shares. More precisely, every candidate is issuing 
+(local) delegator shares (`Candidate.IssuedDelegatorShares`) that represents some portion of global shares 
+managed by the candidate (`Candidate.GlobalStakeShares`). The principle behind managing delegator shares is the same 
+as described in [Section](#The pool and the share). We now illustrate it with an example.
 
-All bonding, whether self-bonding or delegation, is done via
-`TxDelegate`. 
+Lets consider 4 validators p1, p2, p3 and p4, and assume that each validator has bonded 10 Atoms to a bonded pool. 
+Furthermore, lets assume that we have issued initially 40 global shares, i.e., that `share-to-atom-ex-rate = 1 atom per 
+share`. So we will `GlobalState.BondedPool = 40` and `GlobalState.BondedShares = 40` and in the Candidate data structure 
+of each validator `Candidate.GlobalStakeShares = 10`. Furthermore, each validator issued 10 delegator 
+shares which are initially owned by itself, i.e., `Candidate.IssuedDelegatorShares = 10`, where 
+`delegator-share-to-global-share-ex-rate = 1 global share per delegator share`.
+Now lets assume that a delegator d1 delegates 5 atoms to a validator p1 and consider what are the updates we need 
+to make to the data structures. First, `GlobalState.BondedPool = 45` and `GlobalState.BondedShares = 45`. Then,
+for validator p1 we have `Candidate.GlobalStakeShares = 15`, but we also need to issue also additional delegator shares, 
+i.e., `Candidate.IssuedDelegatorShares = 15` as the delegator d1 now owns 5 delegator shares of validator p1, where
+each delegator share is worth 1 global shares, i.e, 1 Atom. Lets see now what happens after 5 new Atoms are created due
+to inflation. In that case, we only need to update `GlobalState.BondedPool` which is now equal to 50 Atoms as created
+Atoms are added to the bonded pool. Note that the amount of global and delegator shares stay the same but they are now 
+worth more as share-to-atom-ex-rate is now worth 50/45 Atoms per share. Therefore, a delegator d1 now owns 
 
-Delegator bonds are created using the TxDelegate transaction. Within this
-transaction the validator candidate queried with an amount of coins, whereby
-given the current exchange rate of candidate's delegator-shares-to-atoms the
-candidate will return shares which are assigned in `DelegatorBond.Shares`.
-
-``` golang 
-type TxDelegate struct { 
-	PubKey crypto.PubKey
-	Amount coin.Coin       
-}
-```
+`delegatorCoins = 10 (delegator shares) * 1 (delegator-share-to-global-share-ex-rate) * 50/45 (share-to-atom-ex-rate) = 100/9 Atoms`  
+   
 
 ### DelegatorBond
 
-Atom holders may delegate coins to validators, under this circumstance their
-funds are held in a `DelegatorBond`. It is owned by one delegator, and is
+Atom holders may delegate coins to validators; under this circumstance their
+funds are held in a `DelegatorBond` data structure. It is owned by one delegator, and is
 associated with the shares for one validator. The sender of the transaction is
-considered to be the owner of the bond,  
+considered the owner of the bond.  
 
 ``` golang
 type DelegatorBond struct {
@@ -261,112 +279,73 @@ type DelegatorBond struct {
 ```
 
 Description: 
- - Candidate: pubkey of the validator candidate: bonding too
- - Shares: the number of shares received from the validator candidate
+ - Candidate: the public key of the validator candidate: bonding too
+ - Shares: the number of delegator shares received from the validator candidate
  - AdjustmentFeePool: Adjustment factor used to passively calculate each bonds
    entitled fees from `GlobalState.FeePool`
  - AdjustmentRewardPool: Adjustment factor used to passively calculate each
    bonds entitled fees from `Candidate.ProposerRewardPool``
 
-Each `DelegatorBond` is individually indexed within the store by delegator
-address and candidate pubkey.
+Each `DelegatorBond` is individually indexed within the store by the delegator
+address and the candidate public key.
 
- - key: Delegator and Candidate-Pubkey
- - value: DelegatorBond 
-
-
-## Provision Calculations
-
-Every hour atom provisions are assigned proportionally to the each slashable
-bonded token which includes re-delegating atoms but not unbonding tokens.
-
-Validation provisions are payed directly to a global hold account
-(`BondedTokenPool`) and proportions of that hold account owned by each
-validator is defined as the `GlobalStakeBonded`. The tokens are payed as bonded
-tokens.
-
-Here, the bonded tokens that a candidate has can be calculated as:
-
-```
-globalStakeExRate = params.BondedTokenPool / params.IssuedGlobalStakeShares
-candidateCoins = candidate.GlobalStakeShares * globalStakeExRate 
-```
-
-If a delegator chooses to add more tokens to a validator then the amount of
-validator shares distributed is calculated on exchange rate (aka every
-delegators shares do not change value at that moment. The validator's
-accounting of distributed shares to delegators must also increased at every
-deposit.
+ - key: Delegator address and `Candidate.PubKey`
+ - value: `DelegatorBond` 
  
+
+### TxDelegate
+
+All bonding, whether self-bonding or delegation, is done via
+`TxDelegate`. 
+
+Delegator bonds are created using the `TxDelegate` transaction. Within this
+transaction the delegator provides an amount of coins, and in return receives 
+some amount of candidate's delegator shares that are assigned to `DelegatorBond.Shares`. The amount of 
+created delegator shares depends on the candidate's delegator-shares-to-atoms exchange rate and is computed as
+`delegator-shares = delegator-coins / delegator-shares-to-atom-ex-rate`.
+
+``` golang 
+type TxDelegate struct { 
+	PubKey crypto.PubKey
+	Amount coin.Coin       
+}
 ```
-delegatorExRate = validatorCoins / candidate.IssuedDelegatorShares 
-createShares = coinsDeposited / delegatorExRate 
-candidate.IssuedDelegatorShares += createShares
-```
-
-Whenever a validator has new tokens added to it, the `BondedTokenPool` is
-increased and must be reflected in the global parameter as well as the
-validators `GlobalStakeShares`.  This calculation ensures that the worth of the
-`GlobalStakeShares` of other validators remains worth a constant absolute
-amount of the `BondedTokenPool`
-
-```
-createdGlobalStakeShares = coinsDeposited / globalStakeExRate 
-validator.GlobalStakeShares +=  createdGlobalStakeShares
-params.IssuedGlobalStakeShares +=  createdGlobalStakeShares
-
-params.BondedTokenPool += coinsDeposited
-```
-
-Similarly, if a delegator wanted to unbond coins:
-
-```
-coinsWithdrawn = withdrawlShares * delegatorExRate
-
-destroyedGlobalStakeShares = coinsWithdrawn / globalStakeExRate 
-validator.GlobalStakeShares -= destroyedGlobalStakeShares
-params.IssuedGlobalStakeShares -= destroyedGlobalStakeShares
-params.BondedTokenPool -= coinsWithdrawn
-```
-
-Note that when an re-delegation occurs the shares to move are placed in an
-re-delegation queue where they continue to collect validator provisions until
-queue element matures. Although provisions are collected during re-delegation,
-re-delegation tokens do not contribute to the voting power of a validator. 
+### Inflation provisions
 
 Validator provisions are minted on an hourly basis (the first block of a new
 hour).  The annual target of between 7% and 20%. The long-term target ratio of
 bonded tokens to unbonded tokens is 67%.  
-
+    
 The target annual inflation rate is recalculated for each previsions cycle. The
 inflation is also subject to a rate change (positive of negative) depending or
 the distance from the desired ratio (67%). The maximum rate change possible is
 defined to be 13% per year, however the annual inflation is capped as between
 7% and 20%.
-
+    
 ```
 inflationRateChange(0) = 0
-annualInflation(0) = 0.07
-
-bondedRatio = bondedTokenPool / totalTokenSupply
+GlobalState.Inflation(0) = 0.07
+    
+bondedRatio = GlobalState.BondedPool / GlobalState.TotalSupply
 AnnualInflationRateChange = (1 - bondedRatio / 0.67) * 0.13
 
 annualInflation += AnnualInflationRateChange
 
-if annualInflation > 0.20 then annualInflation = 0.20
-if annualInflation < 0.07 then annualInflation = 0.07
+if annualInflation > 0.20 then GlobalState.Inflation = 0.20
+if annualInflation < 0.07 then GlobalState.Inflation = 0.07
 
-provisionTokensHourly = totalTokenSupply * annualInflation / (365.25*24)
+provisionTokensHourly = GlobalState.TotalSupply * GlobalState.Inflation / (365.25*24)
 ```
 
-Because the validators hold a relative bonded share (`GlobalStakeShare`), when
-more bonded tokens are added proportionally to all validators the only term
-which needs to be updated is the `BondedTokenPool`. So for each previsions
+Because the validators hold a relative bonded share (`GlobalStakeShares`), when
+more bonded tokens are added proportionally to all validators, the only term
+which needs to be updated is the `GlobalState.BondedPool`. So for each previsions
 cycle:
 
 ```
-params.BondedTokenPool += provisionTokensHourly
+GlobalState.BondedPool += provisionTokensHourly
 ```
+
 
 
 
