@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 
+	"github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/commands"
 	"github.com/cosmos/cosmos-sdk/client/commands/query"
@@ -17,7 +18,6 @@ import (
 	scmds "github.com/cosmos/gaia/modules/stake/commands"
 
 	crypto "github.com/tendermint/go-crypto"
-	"github.com/tendermint/tmlibs/common"
 )
 
 // RegisterQueryCandidate is a mux.Router handler that exposes GET
@@ -62,7 +62,7 @@ func queryCandidate(w http.ResponseWriter, r *http.Request) {
 	pkArg := args["pubkey"]
 	pk, err := scmds.GetPubKey(pkArg)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
@@ -72,17 +72,17 @@ func queryCandidate(w http.ResponseWriter, r *http.Request) {
 	height, err := query.GetParsed(key, &candidate, query.GetHeight(), prove)
 	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("candidate bytes are empty for pubkey: %q", pkArg)
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	} else if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
 	// write the output
 	err = query.FoutputProof(w, candidate, height)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 	}
 }
 
@@ -95,13 +95,13 @@ func queryCandidates(w http.ResponseWriter, r *http.Request) {
 	key := stack.PrefixedKey(stake.Name(), stake.CandidatesPubKeysKey)
 	height, err := query.GetParsed(key, &pks, query.GetHeight(), prove)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
 	err = query.FoutputProof(w, pks, height)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 	}
 }
 
@@ -117,7 +117,7 @@ func queryDelegatorBond(w http.ResponseWriter, r *http.Request) {
 	pkArg := args["pubkey"]
 	pk, err := scmds.GetPubKey(pkArg)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func queryDelegatorBond(w http.ResponseWriter, r *http.Request) {
 	delegatorAddr := args["address"]
 	delegator, err := commands.ParseActor(delegatorAddr)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 	delegator = coin.ChainAddr(delegator)
@@ -136,17 +136,17 @@ func queryDelegatorBond(w http.ResponseWriter, r *http.Request) {
 	height, err := query.GetParsed(key, &bond, query.GetHeight(), prove)
 	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("bond bytes are empty for pubkey: %q, address: %q", pkArg, delegatorAddr)
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	} else if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
 	// write the output
 	err = query.FoutputProof(w, bond, height)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 	}
 }
 
@@ -162,7 +162,7 @@ func queryDelegatorCandidates(w http.ResponseWriter, r *http.Request) {
 	delegatorAddr := args["address"]
 	delegator, err := commands.ParseActor(delegatorAddr)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 	delegator = coin.ChainAddr(delegator)
@@ -173,16 +173,16 @@ func queryDelegatorCandidates(w http.ResponseWriter, r *http.Request) {
 	height, err := query.GetParsed(key, &bond, query.GetHeight(), prove)
 	if client.IsNoDataErr(err) {
 		err := fmt.Errorf("bond bytes are empty for address: %q", delegatorAddr)
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	} else if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 		return
 	}
 
 	// write the output
 	err = query.FoutputProof(w, bond, height)
 	if err != nil {
-		common.WriteError(w, err)
+		sdk.WriteError(w, err)
 	}
 }
