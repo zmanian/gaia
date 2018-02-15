@@ -36,7 +36,7 @@ import:
   - rpc/lib/types
   - types
 - package: github.com/tendermint/tmlibs
-  version: v0.7.0
+  version: v0.6.0
   subpackages:
   - cli
   - cli/flags
