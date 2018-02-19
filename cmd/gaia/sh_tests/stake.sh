@@ -139,10 +139,10 @@ test02DeclareCandidacy() {
     if [ $? != 0 ]; then return 1; fi
 
     # copy in the genesis from the first initialization to the new server
-    cp $SERVER1/genesis.json $SERVER2/genesis.json
+    cp $SERVER1/config/genesis.json $SERVER2/config/genesis.json
 
     # point the new config to the old server location
-    rm $SERVER2/config.toml
+    rm $SERVER2/config/config.toml
     echo 'proxy_app = "tcp://127.0.0.1:46668"
     moniker = "anonymous"
     fast_sync = true
@@ -154,7 +154,7 @@ test02DeclareCandidacy() {
 
     [p2p]
     laddr = "tcp://0.0.0.0:46666"
-    seeds = "0.0.0.0:46656"' >$SERVER2/config.toml
+    seeds = "0.0.0.0:46656"' >$SERVER2/config/config.toml
 
     # start the second node
     ${SERVER_EXE} start --home=$SERVER2 >>$SERVER_LOG2 2>&1 &
@@ -168,7 +168,7 @@ test02DeclareCandidacy() {
     fi
 
     # get the pubkey of the second validator
-    PK2=$(cat $SERVER2/priv_validator.json | jq -r .pub_key.data)
+    PK2=$(cat $SERVER2/config/priv_validator.json | jq -r .pub_key.data)
 
     CAND_ADDR=$(getAddr $POOR)
     TX=$(echo qwertyuiop | ${CLIENT_EXE} tx declare-candidacy --sequence=1 --amount=2fermion --name=$POOR --pubkey=$PK2 --moniker=rigey)

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/mux"
 	crypto "github.com/tendermint/go-crypto"
-	"github.com/tendermint/tmlibs/common"
 
 	sdk "github.com/cosmos/cosmos-sdk"
 	"github.com/cosmos/cosmos-sdk/client/commands"
@@ -82,8 +81,8 @@ func prepareDelegateTx(di *delegateInput) sdk.Tx {
 func delegate(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	di := new(delegateInput)
-	if err := common.ParseRequestAndValidateJSON(r, di); err != nil {
-		common.WriteError(w, err)
+	if err := sdk.ParseRequestAndValidateJSON(r, di); err != nil {
+		sdk.WriteError(w, err)
 		return
 	}
 
@@ -99,16 +98,16 @@ func delegate(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(errsList) > 0 {
 		code := http.StatusBadRequest
-		err := &common.ErrorResponse{
+		err := &sdk.ErrorResponse{
 			Err:  strings.Join(errsList, ", "),
 			Code: code,
 		}
-		common.WriteCode(w, err, code)
+		sdk.WriteCode(w, err, code)
 		return
 	}
 
 	tx := prepareDelegateTx(di)
-	common.WriteSuccess(w, tx)
+	sdk.WriteSuccess(w, tx)
 }
 
 func prepareUnbondTx(ui *unbondInput) sdk.Tx {
@@ -129,8 +128,8 @@ func prepareUnbondTx(ui *unbondInput) sdk.Tx {
 func unbond(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ui := new(unbondInput)
-	if err := common.ParseRequestAndValidateJSON(r, ui); err != nil {
-		common.WriteError(w, err)
+	if err := sdk.ParseRequestAndValidateJSON(r, ui); err != nil {
+		sdk.WriteError(w, err)
 		return
 	}
 
@@ -146,14 +145,14 @@ func unbond(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(errsList) > 0 {
 		code := http.StatusBadRequest
-		err := &common.ErrorResponse{
+		err := &sdk.ErrorResponse{
 			Err:  strings.Join(errsList, ", "),
 			Code: code,
 		}
-		common.WriteCode(w, err, code)
+		sdk.WriteCode(w, err, code)
 		return
 	}
 
 	tx := prepareUnbondTx(ui)
-	common.WriteSuccess(w, tx)
+	sdk.WriteSuccess(w, tx)
 }
